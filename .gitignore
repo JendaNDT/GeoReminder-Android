@@ -12,6 +12,8 @@ local.properties
 mapskey.properties
 # podpisový keystore (jen s ním jdou aktualizace instalovat přes starou verzi)
 app/georeminder.keystore
+# GitHub token pro push (fine-grained PAT)
+github.properties
 
 # IDE a systémové soubory
 .idea/
