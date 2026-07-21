@@ -1,13 +1,24 @@
 # GeoReminder (Android)
 
 Nativní Android verze GeoReminderu – **„Připomeň mi X, až budu u Y / v 18:30."**
-Vzhled 1:1 podle iOS verze (viz `design-podklady/DESIGN_SPEC.md` v iOS projektu).
+Vzhled 1:1 podle iOS verze (viz `design-podklady/DESIGN_SPEC.md` v iOS projektu), plus vlastní vylepšení navrch.
 
-Stack: Kotlin + Jetpack Compose, Google Maps, GeofencingClient, AlarmManager, Glance widget. Minimum: Android 8 (API 26).
+**Aktuální verze: 1.6** · Stack: Kotlin + Jetpack Compose, Google Maps, GeofencingClient, AlarmManager, Glance widget · Minimum: Android 8 (API 26)
+
+## Co appka umí
+
+- Připomínky **na místo** (příjezd/odjezd, poloměr 50–1000 m, opakování) a **na čas** (jednorázově / denně / týdně ve vybrané dny)
+- **Druhy upozornění**: Tiché / Výchozí / Naléhavé (budíkový zvuk do zavření) + **dožadování** (nepotvrzená připomínka se vrací à 5 min)
+- Tlačítka na notifikaci: Hotovo · Odložit o hodinu · Zítra ráno
+- **Živé našeptávání míst** (Photon – i názvy podniků, vzdálenosti, ikony, poslední a oblíbená místa)
+- **Sdílení místa z Map Google** rovnou do připomínky, příjem geo: odkazů
+- Oblíbená místa s čipy, mapový přehled připomínek
+- **Widget** s tlačítkem +, rychlé akce ikony, přepínač vzhledu (systém/světlý/tmavý)
+- Obnova hlídání po restartu, hlídač optimalizace baterie
 
 ## Jak sestavit APK
 
-Nejjednodušší: **přilož tenhle projekt (zip) do session s Claudem** a napiš, co je potřeba. Claude umí projekt sestavit v cloudu a poslat hotové APK.
+Nejjednodušší: **přilož tenhle projekt do session s Claudem** a napiš, co je potřeba. Claude projekt sestaví v cloudu a pošle hotové APK.
 
 Ručně přes Android Studio:
 1. Otevři tuhle složku v Android Studiu (Open → vybrat složku projektu).
@@ -18,5 +29,15 @@ Ručně přes Android Studio:
 ## Důležité soubory
 
 - `mapskey.properties` – Google Maps klíč (`MAPS_API_KEY=AIza…`). Bez něj se appka sestaví, ale mapa bude prázdná.
-- `app/georeminder.keystore` – podpisový klíč (hesla `georeminder`). **Neztratit!** Jen s ním jdou aktualizace instalovat přes starší verzi.
+- `app/georeminder.keystore` – podpisový klíč. Jen s ním jdou aktualizace instalovat přes starší verzi. Při nové verzi zvyš `versionCode` v `app/build.gradle.kts`.
 - `PROJECT_STATUS.md` – aktuální stav projektu; přilož ho na začátku další session s Claudem.
+
+> **Pozor:** `mapskey.properties` a `app/georeminder.keystore` jsou záměrně **mimo git** (`.gitignore`) – jsou to tajnosti. Kompletní kopie projektu **včetně nich** je v zipu ve složce `GeoReminder Android/Android/` na Jendově Macu. Po naklonování repozitáře je potřeba tyhle dva soubory doplnit odtamtud (bez keystore se APK podepíše jen vývojářským podpisem a nepůjde nainstalovat přes stávající verzi).
+
+## Struktura kódu (`app/src/main/java/cz/jenda/georeminder/`)
+
+- `model/` – datový model připomínky a oblíbeného místa, české formátování (JSON kompatibilní s iOS verzí)
+- `data/` – úložiště (JSON soubory), poloha, poslední místa, rozluštění sdílených odkazů, změřené systémové lišty
+- `notify/` – notifikace a kanály, plánovač (geofence + budíky + dožadování), přijímače událostí, obnova po restartu
+- `ui/` – obrazovky (seznam, formulář, výběr místa, oblíbená, mapa, onboarding, nastavení) + iOS-look komponenty a téma
+- `widget/` – Glance widget „Nejbližší připomínky"
