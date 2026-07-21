@@ -2,6 +2,7 @@ package cz.jenda.georeminder.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -49,6 +51,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -59,6 +64,7 @@ import cz.jenda.georeminder.data.FavoritesStore
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.AlertStyle
 import cz.jenda.georeminder.model.CzechFormat
+import cz.jenda.georeminder.model.DEFAULT_RADIUS
 import cz.jenda.georeminder.model.FavoritePlace
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
@@ -66,8 +72,8 @@ import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
 import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.ui.components.CardDivider
-import cz.jenda.georeminder.ui.components.IOSSlider
 import cz.jenda.georeminder.ui.components.IOSSwitch
+import cz.jenda.georeminder.ui.components.RadiusSlider
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.SectionHeader
 import cz.jenda.georeminder.ui.components.SegmentedControl
@@ -101,7 +107,7 @@ fun EditReminderSheet(
     var kind by remember { mutableStateOf(existing?.kind ?: initialKind) }
     var trigger by remember { mutableStateOf(existing?.trigger ?: TriggerType.ARRIVE) }
     var repeats by remember { mutableStateOf(existing?.repeats ?: false) }
-    var radius by remember { mutableStateOf(existing?.radius ?: 150.0) }
+    var radius by remember { mutableStateOf(existing?.radius ?: DEFAULT_RADIUS) }
     var placeName by remember {
         mutableStateOf(existing?.placeName ?: initialPlaceName)
     }
@@ -141,8 +147,12 @@ fun EditReminderSheet(
     var repeatMenuOpen by remember { mutableStateOf(false) }
     var alertMenuOpen by remember { mutableStateOf(false) }
 
+    val timeInPast = kind == ReminderKind.TIME &&
+            timeRepeat == TimeRepeat.NEVER &&
+            dueDate <= System.currentTimeMillis()
     val canSave = title.trim().isNotEmpty() &&
-            (kind == ReminderKind.TIME || coordinate != null)
+            (kind == ReminderKind.TIME || coordinate != null) &&
+            !timeInPast
 
     fun save() {
         val cleanTitle = title.trim()
@@ -230,6 +240,15 @@ fun EditReminderSheet(
             rightEnabled = canSave,
             onRight = { save() },
         )
+
+        if (timeInPast) {
+            Text(
+                text = "Vybraný čas už uplynul – zvol čas v budoucnu.",
+                style = GeoType.caption,
+                color = colors.red,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp),
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -329,11 +348,9 @@ fun EditReminderSheet(
                                 style = GeoType.subheadline,
                                 color = colors.label,
                             )
-                            IOSSlider(
-                                value = radius.toFloat(),
-                                onValueChange = { radius = (Math.round(it / 25.0) * 25.0) },
-                                valueRange = 50f..1000f,
-                                steps = 37,
+                            RadiusSlider(
+                                radius = radius,
+                                onRadiusChange = { radius = it },
                             )
                             Text(
                                 text = "Doporučeno alespoň 100 m – menší kruhy systém hlídá hůř.",
@@ -446,30 +463,49 @@ fun EditReminderSheet(
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
                             val dayLabels = listOf("Po", "Út", "St", "Čt", "Pá", "So", "Ne")
+                            val dayFull = listOf(
+                                "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle",
+                            )
                             for (day in 1..7) {
                                 val selected = day in weekdaysSel
+                                // Plnovýšková, rovnoměrně široká dotyková buňka (≥44 dp),
+                                // uvnitř menší vizuální kolečko – lepší se trefí i TalkBack.
                                 Box(
                                     modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (selected) colors.accent else colors.segmentTrack
+                                        .weight(1f)
+                                        .height(44.dp)
+                                        .toggleable(
+                                            value = selected,
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            role = Role.Checkbox,
+                                            onValueChange = {
+                                                weekdaysSel = if (selected) {
+                                                    // aspoň jeden den musí zůstat vybraný
+                                                    if (weekdaysSel.size > 1) weekdaysSel - day else weekdaysSel
+                                                } else {
+                                                    weekdaysSel + day
+                                                }
+                                            },
                                         )
-                                        .iosClickable {
-                                            weekdaysSel = if (selected) {
-                                                // aspoň jeden den musí zůstat vybraný
-                                                if (weekdaysSel.size > 1) weekdaysSel - day else weekdaysSel
-                                            } else {
-                                                weekdaysSel + day
-                                            }
-                                        },
+                                        .semantics { contentDescription = dayFull[day - 1] },
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Text(
-                                        text = dayLabels[day - 1],
-                                        style = GeoType.footnote,
-                                        color = if (selected) Color.White else colors.label,
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (selected) colors.accent else colors.segmentTrack
+                                            ),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = dayLabels[day - 1],
+                                            style = GeoType.footnote,
+                                            color = if (selected) Color.White else colors.label,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -716,7 +752,7 @@ fun FavoriteChip(place: FavoritePlace, onClick: () -> Unit) {
     ) {
         Icon(
             Icons.Filled.Star, null,
-            tint = colors.label,
+            tint = colors.yellow,
             modifier = Modifier.size(13.dp),
         )
         Spacer(Modifier.width(5.dp))

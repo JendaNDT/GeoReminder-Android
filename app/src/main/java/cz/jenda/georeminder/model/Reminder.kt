@@ -11,6 +11,9 @@ import kotlinx.serialization.encoding.Encoder
 import java.util.Locale
 import java.util.UUID
 
+/** Výchozí poloměr geo-oblasti (metry). */
+const val DEFAULT_RADIUS = 150.0
+
 /**
  * Datumy se ukládají stejně jako v iOS verzi: jako počet sekund od 1. 1. 2001
  * (Apple "reference date"). Díky tomu jsou JSON soubory obou platforem
@@ -102,14 +105,14 @@ enum class TimeRepeat {
 @Serializable
 data class Reminder(
     val id: String = newUUID(),
-    val title: String,
+    val title: String = "",
     val kind: ReminderKind = ReminderKind.LOCATION,
 
     // Pole pro kind == LOCATION
     val placeName: String = "",
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
-    val radius: Double = 150.0,
+    val radius: Double = DEFAULT_RADIUS,
     val trigger: TriggerType = TriggerType.ARRIVE,
     val repeats: Boolean = false,
 
@@ -158,8 +161,8 @@ data class Reminder(
 @Serializable
 data class FavoritePlace(
     val id: String = newUUID(),
-    val name: String,
-    val latitude: Double,
-    val longitude: Double,
-    val radius: Double = 150.0,
+    val name: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val radius: Double = DEFAULT_RADIUS,
 )

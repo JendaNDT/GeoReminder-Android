@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Řízená záloha (Android 12+). Zálohují se jen uživatelská DATA (připomínky
+  a oblíbená místa), aby přežila výměnu telefonu / přeinstalaci. Záměrně se
+  NEzálohuje soubor SharedPreferences „georeminder" – obsahuje přechodné
+  značky plánování (vystřelené geofence/budíky, odložení), jejichž obnova na
+  novém zařízení by mohla zmást hlídání. Vzhled se na novém telefonu prostě
+  vrátí na „Podle systému".
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="reminders.json" />
+        <include domain="file" path="favorites.json" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="reminders.json" />
+        <include domain="file" path="favorites.json" />
+    </device-transfer>
+</data-extraction-rules>

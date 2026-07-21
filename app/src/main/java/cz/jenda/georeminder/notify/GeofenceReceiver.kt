@@ -3,6 +3,7 @@ package cz.jenda.georeminder.notify
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import com.google.android.gms.location.LocationServices
@@ -56,6 +57,8 @@ class GeofenceReceiver : BroadcastReceiver() {
                             .removeGeofences(listOf(id))
                     }
                 }
+            } catch (e: Exception) {
+                Log.w("GeofenceReceiver", "Chyba při zpracování geofence události", e)
             } finally {
                 pending.finish()
             }

@@ -25,8 +25,8 @@ android {
         applicationId = "cz.jenda.georeminder"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.6"
+        versionCode = 12
+        versionName = "2.0"
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 
@@ -45,7 +45,14 @@ android {
 
     buildTypes {
         release {
+            // Minifikace/R8 je připravená (pravidla v proguard-rules.pro), ale
+            // zatím VYPNUTÁ – zapnout až po otestování na zařízení (viz
+            // GOOGLE-PLAY-CHECKLIST.md), aby se ověřilo, že se nerozbije JSON.
             isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             if (keystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("georeminder")
             }

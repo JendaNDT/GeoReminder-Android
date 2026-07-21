@@ -32,7 +32,8 @@ object NotificationHelper {
     const val ACTION_DONE = "cz.jenda.georeminder.ACTION_DONE"
     const val ACTION_SNOOZE = "cz.jenda.georeminder.ACTION_SNOOZE"
     const val ACTION_SNOOZE_MORNING = "cz.jenda.georeminder.ACTION_SNOOZE_MORNING"
-    const val EXTRA_REMINDER_ID = "reminder_id"
+    // Sdílíme jednu hodnotu se schedulerem, ať se doručování nerozejde.
+    const val EXTRA_REMINDER_ID = ReminderScheduler.EXTRA_REMINDER_ID
 
     fun createChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)

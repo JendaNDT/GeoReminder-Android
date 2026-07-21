@@ -10,7 +10,6 @@ import kotlin.math.abs
  * při prázdném hledacím poli.
  */
 object RecentPlaces {
-    private const val PREFS = "georeminder"
     private const val KEY = "recentPlaces"
     private const val LIMIT = 5
 
@@ -21,7 +20,7 @@ object RecentPlaces {
     )
 
     fun load(context: Context): List<Entry> {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val raw = context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
             .getString(KEY, null) ?: return emptyList()
         return try {
             val array = JSONArray(raw)
@@ -56,7 +55,7 @@ object RecentPlaces {
                     .put("lng", it.longitude)
             )
         }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY, array.toString())
             .apply()

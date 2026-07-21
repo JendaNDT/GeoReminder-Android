@@ -6,6 +6,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,21 +40,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 
-/** Klik bez Material ripple efektu (iOS vzhled). */
+/** Klik bez Material ripple efektu (iOS vzhled), s jemnou hmatovou odezvou. */
 @Composable
-fun Modifier.iosClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier =
-    this.clickable(
+fun Modifier.iosClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier {
+    val haptics = LocalHapticFeedback.current
+    return this.clickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = null,
         enabled = enabled,
-        onClick = onClick,
-    )
+    ) {
+        // Jemné cvaknutí při ťuknutí – UI dřív nedávalo žádnou odezvu.
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onClick()
+    }
+}
 
 /** Kruhové „skleněné" tlačítko v toolbaru (hvězdička, plus). */
 @Composable
@@ -209,7 +220,13 @@ fun IOSSwitch(
             .height(31.dp)
             .clip(CircleShape)
             .background(trackColor)
-            .iosClickable { onCheckedChange(!checked) },
+            .toggleable(
+                value = checked,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            ),
     ) {
         Box(
             modifier = Modifier
@@ -269,6 +286,22 @@ fun IOSSlider(
     )
 }
 
+/** Slider poloměru geo-oblasti (50–1000 m, krok 25 m) – sjednocuje formulář, oblíbená i výběr místa. */
+@Composable
+fun RadiusSlider(
+    radius: Double,
+    onRadiusChange: (Double) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IOSSlider(
+        value = radius.toFloat(),
+        onValueChange = { onRadiusChange(Math.round(it / 25.0) * 25.0) },
+        valueRange = 50f..1000f,
+        steps = 37,
+        modifier = modifier,
+    )
+}
+
 /** iOS segmentovaný přepínač s klouzajícím jezdcem. */
 @Composable
 fun SegmentedControl(
@@ -299,13 +332,19 @@ fun SegmentedControl(
                 .shadow(2.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.25f))
                 .background(colors.segmentThumb, CircleShape),
         )
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.fillMaxSize().selectableGroup()) {
             options.forEachIndexed { index, option ->
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .iosClickable { onSelect(index) },
+                        .selectable(
+                            selected = index == selectedIndex,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.RadioButton,
+                            onClick = { onSelect(index) },
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(

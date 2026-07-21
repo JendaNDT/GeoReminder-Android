@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -85,7 +87,9 @@ fun OnboardingScreen(onFinish: () -> Unit) {
         ) { index ->
             val page = pages[index]
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -163,7 +167,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 color = colors.secondaryLabel,
                 modifier = Modifier
                     .iosClickable(onClick = onFinish)
-                    .padding(6.dp),
+                    .padding(horizontal = 24.dp, vertical = 14.dp),
             )
         }
     }

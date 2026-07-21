@@ -74,7 +74,6 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
-import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.ActivityInsets
@@ -84,6 +83,7 @@ import cz.jenda.georeminder.data.RecentPlaces
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.ui.components.CapsulePillButton
 import cz.jenda.georeminder.ui.components.PrimaryButton
+import cz.jenda.georeminder.ui.components.RadiusSlider
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
@@ -142,6 +142,7 @@ fun LocationPickerSheet(
     var results by remember { mutableStateOf<List<GeoSearchResult>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
     var searchedOnce by remember { mutableStateOf(false) }
+    var networkError by remember { mutableStateOf(false) }
 
     val searchInteraction = remember { MutableInteractionSource() }
     val searchFocused by searchInteraction.collectIsFocusedAsState()
@@ -156,12 +157,21 @@ fun LocationPickerSheet(
             results = emptyList()
             isSearching = false
             searchedOnce = false
+            networkError = false
             return@LaunchedEffect
         }
         isSearching = true
         delay(350)
-        val found = searchPlaces(context, query, LocationHolder.location.value)
-        results = found
+        when (val outcome = searchPlaces(context, query, LocationHolder.location.value)) {
+            is SearchOutcome.Ok -> {
+                results = outcome.results
+                networkError = false
+            }
+            SearchOutcome.Offline -> {
+                results = emptyList()
+                networkError = true
+            }
+        }
         isSearching = false
         searchedOnce = true
     }
@@ -323,16 +333,22 @@ fun LocationPickerSheet(
                         color = colors.accent,
                     )
                 } else if (searchText.isNotEmpty()) {
-                    Icon(
-                        Icons.Filled.Cancel, null,
-                        tint = colors.secondaryLabel,
+                    Box(
                         modifier = Modifier
-                            .size(20.dp)
+                            .size(40.dp)
                             .iosClickable {
                                 searchText = ""
                                 results = emptyList()
                             },
-                    )
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Cancel,
+                            contentDescription = "Smazat hledání",
+                            tint = colors.secondaryLabel,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
 
@@ -401,7 +417,11 @@ fun LocationPickerSheet(
                         .background(colors.glass),
                 ) {
                     Text(
-                        "Nic jsem nenašel – zkus jiný název, nebo ťukni rovnou do mapy.",
+                        if (networkError) {
+                            "Vypadá to na výpadek připojení – zkontroluj internet, nebo ťukni rovnou do mapy."
+                        } else {
+                            "Nic jsem nenašel – zkus jiný název, nebo ťukni rovnou do mapy."
+                        },
                         style = GeoType.footnote,
                         color = colors.secondaryLabel,
                         modifier = Modifier.padding(12.dp),
@@ -486,17 +506,16 @@ fun LocationPickerSheet(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Poloměr", style = GeoType.subheadline, color = colors.label)
                     Spacer(Modifier.width(10.dp))
-                    cz.jenda.georeminder.ui.components.IOSSlider(
-                        value = radius.toFloat(),
-                        onValueChange = { radius = (Math.round(it / 25.0) * 25.0) },
-                        valueRange = 50f..1000f,
-                        steps = 37,
+                    RadiusSlider(
+                        radius = radius,
+                        onRadiusChange = { radius = it },
                         modifier = Modifier.weight(1f),
                     )
                     Box(modifier = Modifier.width(64.dp), contentAlignment = Alignment.CenterEnd) {
                         Text(
                             "${radius.toInt()} m",
-                            style = GeoType.subheadline,
+                            // Tabulkové číslice, ať hodnota při tažení neposkakuje.
+                            style = GeoType.subheadline.copy(fontFeatureSettings = "tnum"),
                             color = colors.label,
                         )
                     }
@@ -576,19 +595,31 @@ fun boundsAround(center: LatLng, spanMeters: Double): LatLngBounds {
  * podniků, s preferencí okolí uživatele), záložně vestavěný geokodér
  * Androidu (adresy).
  */
+/** Výsledek hledání – rozlišuje „nic nenalezeno" od výpadku sítě. */
+sealed class SearchOutcome {
+    data class Ok(val results: List<GeoSearchResult>) : SearchOutcome()
+    object Offline : SearchOutcome()
+}
+
 private suspend fun searchPlaces(
     context: android.content.Context,
     query: String,
     near: android.location.Location?,
-): List<GeoSearchResult> = withContext(Dispatchers.IO) {
+): SearchOutcome = withContext(Dispatchers.IO) {
+    var photonFailed = false
     val photonResults = try {
         photonSearch(query, near)
     } catch (_: Exception) {
+        photonFailed = true
         emptyList()
     }
     val base = photonResults.ifEmpty { geocoderSearch(context, query, near) }
+    if (base.isEmpty() && photonFailed) {
+        // Photon spadl (nejspíš není síť) a záloha (geokodér) nic nevrátila → offline.
+        return@withContext SearchOutcome.Offline
+    }
     // Doplnit vzdálenost od uživatele
-    if (near == null) base else base.map { result ->
+    val withDistance = if (near == null) base else base.map { result ->
         val out = FloatArray(1)
         android.location.Location.distanceBetween(
             near.latitude, near.longitude,
@@ -596,6 +627,7 @@ private suspend fun searchPlaces(
         )
         result.copy(distanceMeters = out[0])
     }
+    SearchOutcome.Ok(withDistance)
 }
 
 /** Photon (photon.komoot.io) – OpenStreetMap hledání s našeptáváním podniků. */

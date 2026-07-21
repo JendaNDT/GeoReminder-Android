@@ -42,7 +42,6 @@ import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TriggerType
-import kotlinx.serialization.builtins.ListSerializer
 
 /**
  * Widget „Nejbližší připomínky" (Jetpack Glance) – ekvivalent WidgetKit widgetu.
@@ -73,14 +72,8 @@ class GeoReminderWidget : GlanceAppWidget() {
     /** Načte nejnovější aktivní připomínky ze sdíleného JSON souboru. */
     private fun loadActive(context: Context): List<Reminder> {
         val text = SharedStorage.readText(context, "reminders.json") ?: return emptyList()
-        val all = try {
-            SharedStorage.json.decodeFromString(
-                ListSerializer(Reminder.serializer()), text
-            )
-        } catch (_: Exception) {
-            return emptyList()
-        }
-        return all.filter { !it.isDone }
+        return SharedStorage.decodeReminders(text)
+            .filter { !it.isDone }
             .sortedByDescending { it.createdAt }
             .take(3)
     }

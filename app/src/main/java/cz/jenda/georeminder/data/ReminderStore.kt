@@ -1,12 +1,17 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
+import android.os.Looper
+import android.util.Log
 import cz.jenda.georeminder.model.Reminder
-import cz.jenda.georeminder.notify.NotificationHelper
 import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.widget.WidgetRefresher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 
 /**
@@ -17,6 +22,15 @@ import kotlinx.serialization.builtins.ListSerializer
 class ReminderStore private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val scheduler = ReminderScheduler(appContext)
+
+    // Zápisy na disk jdou na jedno IO vlákno (serializovaně), aby neblokovaly UI
+    // a zároveň se nepřekrývaly.
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+
+    // true = poslední čtení dat selhalo → dočasně nepovolit zápis (ochrana proti
+    // přepsání platného souboru prázdným seznamem).
+    @Volatile
+    private var loadFailed = false
 
     private val _reminders = MutableStateFlow<List<Reminder>>(emptyList())
     val reminders: StateFlow<List<Reminder>> = _reminders
@@ -40,15 +54,23 @@ class ReminderStore private constructor(context: Context) {
     /** Znovu načte data z disku (po akci na notifikaci, návratu do popředí…). */
     @Synchronized
     fun reload() {
-        val text = SharedStorage.readText(appContext, FILE) ?: return
-        val decoded = try {
-            SharedStorage.json.decodeFromString(
-                ListSerializer(Reminder.serializer()), text
-            )
-        } catch (_: Exception) {
-            return
+        when (val res = SharedStorage.read(appContext, FILE)) {
+            is SharedStorage.ReadResult.Ok -> {
+                _reminders.value = SharedStorage.decodeReminders(res.text)
+                loadFailed = false
+            }
+            SharedStorage.ReadResult.Empty -> {
+                // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
+                _reminders.value = emptyList()
+                loadFailed = false
+            }
+            SharedStorage.ReadResult.Error -> {
+                // Čtení selhalo – NEPŘEPISOVAT paměť a zablokovat zápis, aby se
+                // platný soubor nepřepsal prázdným seznamem.
+                loadFailed = true
+                Log.w("ReminderStore", "Čtení dat selhalo – uložení dočasně zablokováno")
+            }
         }
-        _reminders.value = decoded
     }
 
     @Synchronized
@@ -103,10 +125,24 @@ class ReminderStore private constructor(context: Context) {
     }
 
     private fun persist() {
-        val text = SharedStorage.json.encodeToString(
-            ListSerializer(Reminder.serializer()), _reminders.value
-        )
-        SharedStorage.writeText(appContext, FILE, text)
-        WidgetRefresher.refresh(appContext)
+        if (loadFailed) {
+            Log.w("ReminderStore", "Uložení přeskočeno – poslední čtení dat selhalo")
+            return
+        }
+        val snapshot = _reminders.value
+        val write = {
+            val text = SharedStorage.json.encodeToString(
+                ListSerializer(Reminder.serializer()), snapshot
+            )
+            SharedStorage.writeText(appContext, FILE, text)
+            WidgetRefresher.refresh(appContext)
+        }
+        // Z UI vlákna zapisovat na pozadí (žádný jank), z receiverů (už na IO)
+        // synchronně, aby změna určitě dopadla na disk před koncem broadcastu.
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            ioScope.launch { write() }
+        } else {
+            write()
+        }
     }
 }

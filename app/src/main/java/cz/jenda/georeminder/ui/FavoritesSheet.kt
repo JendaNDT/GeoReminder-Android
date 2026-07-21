@@ -43,6 +43,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -50,12 +53,13 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
 import cz.jenda.georeminder.data.FavoritesStore
+import cz.jenda.georeminder.model.DEFAULT_RADIUS
 import cz.jenda.georeminder.model.FavoritePlace
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
 import cz.jenda.georeminder.ui.components.GlassCircleButton
-import cz.jenda.georeminder.ui.components.IOSSlider
 import cz.jenda.georeminder.ui.components.InsetCard
+import cz.jenda.georeminder.ui.components.RadiusSlider
 import cz.jenda.georeminder.ui.components.SectionHeader
 import cz.jenda.georeminder.ui.components.SheetHeader
 import cz.jenda.georeminder.ui.components.iosClickable
@@ -90,7 +94,6 @@ fun FavoritesSheet(onClose: () -> Unit) {
                 GlassCircleButton(
                     icon = Icons.Filled.Add,
                     contentDescription = "Nové oblíbené místo",
-                    size = 38.dp,
                 ) { addingNew = true }
             },
         )
@@ -193,6 +196,11 @@ private fun SwipeFavoriteRow(
                 .fillMaxWidth()
                 .background(colors.card)
                 .iosClickable(onClick = onTap)
+                .semantics {
+                    customActions = listOf(
+                        CustomAccessibilityAction("Smazat") { onDelete(); true }
+                    )
+                }
                 .defaultMinSize(minHeight = 58.dp)
                 .padding(horizontal = 16.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -237,7 +245,7 @@ fun EditFavoriteSheet(
     var coordinate by remember {
         mutableStateOf(existing?.let { LatLng(it.latitude, it.longitude) })
     }
-    var radius by remember { mutableStateOf(existing?.radius ?: 150.0) }
+    var radius by remember { mutableStateOf(existing?.radius ?: DEFAULT_RADIUS) }
     var showPicker by remember { mutableStateOf(false) }
 
     val canSave = name.trim().isNotEmpty() && coordinate != null
@@ -345,11 +353,9 @@ fun EditFavoriteSheet(
                             style = GeoType.subheadline,
                             color = colors.label,
                         )
-                        IOSSlider(
-                            value = radius.toFloat(),
-                            onValueChange = { radius = (Math.round(it / 25.0) * 25.0) },
-                            valueRange = 50f..1000f,
-                            steps = 37,
+                        RadiusSlider(
+                            radius = radius,
+                            onRadiusChange = { radius = it },
                         )
                     }
                 }

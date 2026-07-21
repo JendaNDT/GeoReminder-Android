@@ -3,6 +3,7 @@ package cz.jenda.georeminder.notify
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import cz.jenda.georeminder.data.ReminderStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +34,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         store.markDone(reminder)
                     }
                     NotificationHelper.ACTION_SNOOZE -> {
-                        store.snooze(reminder, minutes = 60)
+                        store.snooze(reminder, minutes = ReminderScheduler.SNOOZE_MINUTES)
                     }
                     NotificationHelper.ACTION_SNOOZE_MORNING -> {
                         // Nejbližší ráno v 8:00 (po půlnoci = ještě dnes)
@@ -50,6 +51,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     }
                 }
                 NotificationHelper.cancel(context, id)
+            } catch (e: Exception) {
+                Log.w("NotifActionReceiver", "Chyba při obsluze tlačítka notifikace", e)
             } finally {
                 pending.finish()
             }

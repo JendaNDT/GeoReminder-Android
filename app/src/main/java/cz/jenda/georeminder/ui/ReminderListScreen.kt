@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -39,6 +40,10 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -51,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +64,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,6 +94,7 @@ import cz.jenda.georeminder.ui.components.SectionHeader
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import kotlinx.coroutines.launch
 
 /**
  * Hlavní obrazovka: velký titulek GeoReminder, bannery oprávnění a seznam
@@ -100,6 +110,7 @@ fun ReminderListScreen() {
 
     val reminders by store.reminders.collectAsStateWithLifecycle()
     val userLocation by LocationHolder.location.collectAsStateWithLifecycle()
+    val geofenceFailed by LocationHolder.geofenceFailed.collectAsStateWithLifecycle()
 
     var showNewSheet by rememberSaveable { mutableStateOf(false) }
     var newSheetKind by rememberSaveable { mutableStateOf<String?>(null) }
@@ -112,6 +123,10 @@ fun ReminderListScreen() {
     var backgroundMissing by remember { mutableStateOf(false) }
     var batteryRestricted by remember { mutableStateOf(false) }
     var sharedPrefill by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var pendingDeleteIds by remember { mutableStateOf(setOf<String>()) }
 
     fun refreshPermissionState() {
         notificationsDenied =
@@ -163,11 +178,13 @@ fun ReminderListScreen() {
         }
     }
 
-    val active = remember(reminders) {
-        reminders.filter { !it.isDone }.sortedByDescending { it.createdAt }
+    val active = remember(reminders, pendingDeleteIds) {
+        reminders.filter { !it.isDone && it.id !in pendingDeleteIds }
+            .sortedByDescending { it.createdAt }
     }
-    val done = remember(reminders) {
-        reminders.filter { it.isDone }.sortedByDescending { it.createdAt }
+    val done = remember(reminders, pendingDeleteIds) {
+        reminders.filter { it.isDone && it.id !in pendingDeleteIds }
+            .sortedByDescending { it.createdAt }
     }
 
     fun distanceText(reminder: Reminder): String? {
@@ -181,6 +198,24 @@ fun ReminderListScreen() {
         return CzechFormat.distance(result[0])
     }
 
+    // Mazání s možností „Vrátit zpět": připomínka nejdřív jen zmizí ze seznamu,
+    // skutečně se smaže až po zavření snackbaru (pokud ho uživatel nevrátí).
+    fun requestDelete(reminder: Reminder) {
+        pendingDeleteIds = pendingDeleteIds + reminder.id
+        scope.launch {
+            val res = snackbarHostState.showSnackbar(
+                message = "Připomínka smazána",
+                actionLabel = "Vrátit zpět",
+                duration = SnackbarDuration.Short,
+            )
+            pendingDeleteIds = pendingDeleteIds - reminder.id
+            if (res != SnackbarResult.ActionPerformed) {
+                store.delete(reminder)
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 130.dp),
@@ -218,7 +253,7 @@ fun ReminderListScreen() {
             )
         }
         // Bannery oprávnění a spolehlivosti
-        if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted) {
+        if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted || geofenceFailed) {
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -265,6 +300,12 @@ fun ReminderListScreen() {
                             },
                         )
                     }
+                    if (geofenceFailed) {
+                        PermissionBanner(
+                            icon = Icons.Filled.LocationOff,
+                            message = "Hlídání místa se nepodařilo nastavit – zkontroluj polohu a zkus připomínku uložit znovu.",
+                        )
+                    }
                 }
             }
         }
@@ -296,7 +337,7 @@ fun ReminderListScreen() {
                                     distance = distanceText(reminder),
                                     onTap = { editingReminder = reminder },
                                     onToggleDone = { store.toggleDone(reminder) },
-                                    onDelete = { store.delete(reminder) },
+                                    onDelete = { requestDelete(reminder) },
                                 )
                             }
                             if (index != active.lastIndex) CardDivider(startIndent = 60.dp)
@@ -316,7 +357,7 @@ fun ReminderListScreen() {
                                     distance = distanceText(reminder),
                                     onTap = { editingReminder = reminder },
                                     onToggleDone = { store.toggleDone(reminder) },
-                                    onDelete = { store.delete(reminder) },
+                                    onDelete = { requestDelete(reminder) },
                                 )
                             }
                             if (index != done.lastIndex) CardDivider(startIndent = 60.dp)
@@ -325,6 +366,14 @@ fun ReminderListScreen() {
                 }
             }
         }
+    }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 96.dp),
+        )
     }
 
     // Formulář (nová / úprava)
@@ -465,7 +514,21 @@ private fun SwipeReminderRow(
             }
         },
     ) {
-        ReminderRow(reminder = reminder, distance = distance, onTap = onTap)
+        ReminderRow(
+            reminder = reminder,
+            distance = distance,
+            onTap = onTap,
+            // Přístupnost: swipe akce jsou pro TalkBack nedostupné, proto je
+            // nabídneme jako vlastní akce čtečky (Hotovo/Vrátit a Smazat).
+            modifier = Modifier.semantics {
+                customActions = listOf(
+                    CustomAccessibilityAction(
+                        if (reminder.isDone) "Vrátit" else "Hotovo"
+                    ) { onToggleDone(); true },
+                    CustomAccessibilityAction("Smazat") { onDelete(); true },
+                )
+            },
+        )
     }
 }
 
@@ -475,10 +538,11 @@ private fun ReminderRow(
     reminder: Reminder,
     distance: String?,
     onTap: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = GeoTheme.colors
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(colors.card)
             .iosClickable(onClick = onTap)

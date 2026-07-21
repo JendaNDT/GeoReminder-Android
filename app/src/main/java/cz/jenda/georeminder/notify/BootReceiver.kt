@@ -3,6 +3,7 @@ package cz.jenda.georeminder.notify
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import cz.jenda.georeminder.data.ReminderStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,8 @@ class BootReceiver : BroadcastReceiver() {
                 val store = ReminderStore.get(context)
                 store.reload()
                 store.resyncAll()
+            } catch (e: Exception) {
+                Log.w("BootReceiver", "Chyba při obnově připomínek po restartu", e)
             } finally {
                 pending.finish()
             }

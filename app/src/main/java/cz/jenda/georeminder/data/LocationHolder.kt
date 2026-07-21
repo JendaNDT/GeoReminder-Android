@@ -27,6 +27,13 @@ object LocationHolder {
     /** Poslední známá poloha uživatele (null = zatím neznámá). */
     val location = MutableStateFlow<Location?>(null)
 
+    /**
+     * true = poslední pokus o registraci geofence selhal (např. systémový limit
+     * 100 geofence nebo vypnuté služby polohy). UI to ukáže bannerem, aby
+     * hlídání místa neselhalo potichu.
+     */
+    val geofenceFailed = MutableStateFlow(false)
+
     fun hasFineLocation(context: Context): Boolean =
         ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION

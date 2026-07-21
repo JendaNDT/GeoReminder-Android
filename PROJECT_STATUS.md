@@ -6,7 +6,7 @@ Nativní Android verze GeoReminderu – připomínky vázané na místo i čas, 
 Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmManager (přesné budíky), Glance widget, App Shortcuts, JSON úložiště formátově kompatibilní s iOS verzí. Minimum: Android 8 (API 26). Jeden modul, bez dalších služeb.
 
 ## ⏭️ Příští krok
-**Otestovat v1.5:** hlavně že je na mapě po výběru místa vidět tlačítko „Použít toto místo" (Jendou nahlášená chyba), nový přepínač vzhledu (⚙️ vpravo nahoře → Vzhled), živé našeptávání s vzdálenostmi a ikonkami. Plus zbylé novinky z v1.3 (sdílení z Map, widget +, „Zítra ráno", opakování ve vybrané dny) a pořád geo-trigger v terénu.
+**v2.0 = Fáze 3 (příprava na Google Play).** V kódu hotovo: řízené zálohování dat, minifikace připravená (zatím vypnutá), UI polish, cílový API 35. Postup na Play je rozepsaný v **`GOOGLE-PLAY-CHECKLIST.md`** – pozor hlavně na **test 12 testerů / 14 dní** pro nové osobní účty. Otestovat v2.0 na telefonu (chová se jako v1.9 + drobný polish). Až budeš chtít publikovat: řekni a zapnu minifikaci + sestavím App Bundle (`.aab`).
 
 ## ✅ Hotovo
 - Kompletní přepis všech obrazovek podle DESIGN_SPEC: onboarding (3 stránky, text upravený pro androidí oprávnění „Povolit vždy"), seznam se sekcemi **Aktivní/Hotové** + swipe Hotovo/Vrátit/Smazat, formulář (Na místě/Na čas, opakování, čipy oblíbených), výběr místa na mapě (hledání, ťuknutí, živý kruh poloměru), oblíbená místa, mapový přehled, oranžové bannery oprávnění
@@ -49,6 +49,35 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
   - technicky: 3 notifikační kanály, data zpětně kompatibilní (nová pole `alertStyle`, `nagging`; iOS je ignoruje)
   - nezávislá kontrola našla 1 chybu (neviditelná nekonečná smyčka budíků při zablokování jednoho kanálu notifikací) → opravena před vydáním
 
+- **v1.7 (Fáze 0 oprav z auditu `AUDIT1.md`):** zpevnění ukládání dat a doručení připomínek:
+  - **ochrana proti ztrátě dat:** načítání `reminders.json` je odolné (jeden vadný/nekompatibilní záznam nezahodí celý seznam – čte se po záznamech), rozlišuje se „prázdno" od chyby čtení a po neúspěšném čtení se zablokuje zápis (dřív hrozil přepis platného souboru prázdným); atomický zápis navíc dělá zálohu `.bak`
+  - **časové připomínky se neztratí:** jednorázový termín v minulosti formulář nepustí a upozorní; zmeškané připomínky (telefon byl vypnutý) se doručí po zapnutí (catch-up); odložení (snooze) přežije restart telefonu
+  - **geofence neselže potichu:** při selhání registrace (systémový limit / vypnutá poloha) se ukáže banner; ošetřen souběh značek „vystřeleno"
+  - **stabilita:** souborové zápisy z UI běží mimo hlavní vlákno; receivery mají ochranu proti pádu procesu (catch)
+  - nezávislá revize našla 1 skulinu (možné dvojí upozornění u nepřesných budíků) → opravena před sestavením; **build v cloudu: BUILD SUCCESSFUL, podepsané APK 14 MB (versionCode 9)**
+
+- **v1.8 (Fáze 1 z auditu – UX a přístupnost):**
+  - **„Vrátit zpět" u mazání:** smazání připomínky swipem jde vzít zpět (snackbar), teprve pak se smaže natrvalo
+  - **hmatová odezva:** ťuknutí kdekoli dává jemné cvaknutí (haptika) – appka dřív nedávala žádnou odezvu
+  - **přístupnost (TalkBack):** swipe akce Hotovo/Vrátit/Smazat dostupné jako akce čtečky; vlastní přepínače/segmenty/volby vzhledu i denní kolečka mají správné role a popisky
+  - **offline hláška:** hledání místa bez internetu hlásí výpadek připojení místo „nic nenalezeno"
+  - **větší dotykové cíle:** „+" u oblíbených, křížek hledání, denní kolečka i „Přeskočit"
+  - nezávislá revize: bez blokujících nálezů; **build BUILD SUCCESSFUL, podepsané APK (versionCode 10)**
+
+- **v1.9 (Fáze 2 z auditu – úklid kódu, bez viditelných změn):**
+  - sjednocené duplicity: jedna komponenta `RadiusSlider` (dřív 3×), sdílené odolné dekódování `reminders.json` (Store i widget), jedna konstanta výchozího poloměru
+  - konstanty místo roztroušených literálů: jeden název SharedPreferences (`SharedStorage.PREFS`), sdílený klíč `EXTRA_REMINDER_ID`, `SNOOZE_MINUTES`
+  - odstraněna naše redundantní deklarace oprávnění `ACCESS_NETWORK_STATE` (v APK ho dál deklaruje mapová SDK, pokud ho potřebuje); dokumentace srovnaná (Photon vs. geokodér)
+  - **build BUILD SUCCESSFUL, podepsané APK (versionCode 11)**
+
+- **v2.0 (Fáze 3 – příprava na Google Play):**
+  - **řízené zálohování dat** (`data_extraction_rules.xml` + `full_backup_content.xml`): zálohují se jen `reminders.json` + `favorites.json` (přežijí výměnu telefonu), přechodné plánovací značky NE
+  - **minifikace R8/ProGuard připravená** (`proguard-rules.pro` + wiring), zatím `isMinifyEnabled = false` – zapnout až po testu na zařízení
+  - **UI polish:** neaktivní tab šedě, tabulkové číslice u poloměru na mapě, sjednocená žlutá hvězdička, scrollovatelný onboarding
+  - cílový **API 35** = splňuje požadavek Play 2026
+  - **`GOOGLE-PLAY-CHECKLIST.md`** = krok-za-krokem postup vydání; pozor na test 12 testerů/14 dní u nových osobních účtů
+  - **build BUILD SUCCESSFUL, podepsané APK (versionCode 12)**
+
 - **Projekt je na GitHubu (21. 7. večer):** https://github.com/JendaNDT/GeoReminder-Android – kompletní zdrojový kód a dokumentace. Tajnosti (mapový klíč, podpisový keystore) jsou záměrně mimo git a žijí jen v zipu ve složce na Macu
 
 ## 📝 TODO
@@ -56,10 +85,11 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
 - **Test na telefonu** (instalace dle `NAVOD-INSTALACE.md`, časová připomínka + geo-trigger v terénu, widget)
 
 ### Backlog (později)
-- Vydání na Google Play (jednorázově 25 $ vývojářský účet)
+- **Vydání na Google Play** – postup v `GOOGLE-PLAY-CHECKLIST.md` (účet + ověření identity, test 12 testerů/14 dní, privacy policy, Data safety, deklarace polohy na pozadí, App Bundle `.aab`).
+- Volitelně **Fáze 2.5** (architektura: ViewModel místo statického event-busu, singleton scheduler, rozdělení god-souborů EditReminderSheet/LocationPickerSheet) – jen kdyby začala bránit další práci.
 
 ## 🐛 Známé bugy
-- Žádné známé bugy. Netestováno zatím na fyzickém zařízení – první kolo testů může něco odhalit.
+- **Audit (`AUDIT1.md`) prošel appku přes 6 dimenzí.** Kritické/důležité nálezy jsou vyřešené ve Fázi 0 (v1.7) a Fázi 1 (v1.8), úklid dluhu ve Fázi 2 (v1.9); zbytek eviduje `IMPLEMENTACNI-PLAN.md` (Fáze 3). Aktuálně žádný známý funkční bug; čeká se na Jendův test v terénu.
 - Pozn. ke Google účtu: mail „Quota Request – Action Required" (žádost o platbu 50 $) s Demo klíčem nesouvisí – vznikl omylem vyžádanou žádostí o navýšení kvóty v konzoli. **Nic neplatit, mail ignorovat**, žádost sama vyprší. Demo klíč funguje zdarma.
 
 ## 🏗️ Klíčová rozhodnutí
@@ -69,7 +99,7 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
 - **Opakování ve vybrané dny = nové pole `weekdays` v datech:** iOS verze ho při čtení ignoruje (JSON zůstává kompatibilní); kdyby se někdy vyvíjela dál, je fér funkci doplnit i tam.
 - **Přepínač vzhledu (Světlý/Tmavý/Podle systému) jen na Androidu:** iOS verze nastavení nemá, řídí se systémem. Ikona ⚙️ v hlavičce je odchylka od iOS designu (nutná – jinde tlačítko nemá kde být).
 - **Google Maps s Demo klíčem (21. 7.):** zdarma, bez platební karty, denní limity pro osobní použití bohaté. Mapová vrstva je izolovaná v `LocationPickerSheet.kt` + `MapOverviewScreen.kt` – kdyby Google změnil podmínky, jde vyměnit za MapLibre bez zásahu do zbytku appky.
-- **Hledání míst přes vestavěný `Geocoder` (zdarma, bez klíče):** mapový klíč se spotřebovává jen na zobrazení mapy, hledání limity nežere. Hledá přednostně do ~30 km od uživatele, pak celosvětově.
+- **Geokodér = jen záloha hledání:** primární je Photon (viz výše); vestavěný `Geocoder` (zdarma, bez klíče) se použije jen při výpadku Photonu. Mapový klíč se spotřebovává jen na zobrazení mapy, hledání limity nežere.
 - **Vlastní iOS-look komponenty místo Material:** segmentový přepínač, zelený toggle, slider s bílým palcem, kapslová tlačítka, tab bar – Material by vypadal androidovsky a zadání bylo 1:1 vzhled.
 - **Podpisový klíč `app/georeminder.keystore` (hesla: georeminder) je SOUČÁSTÍ projektu – neztratit!** Díky němu půjdou budoucí verze instalovat přes stávající bez odinstalace (a ztráty dat).
 - **Jednorázové geofence se značkou „vystřeleno"** (SharedPreferences): po spuštění se znovu neregistrují, ale připomínka zůstává v seznamu aktivní – přesně jako na iOS. Úprava nebo „Vrátit" ji znovu ozbrojí.
@@ -78,7 +108,7 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
 
 ## 📁 Stav souborů
 - `GeoReminder-Android-projekt.zip` – kompletní projekt (rozbalit a otevřít v Android Studiu, nebo přiložit do další session s Claudem)
-- `GeoReminder.apk` – instalační balíček (zatím bez mapového klíče)
+- `GeoReminder.apk` – aktuální instalační balíček (v1.9, s Demo mapovým klíčem)
 - `NAVOD-INSTALACE.md` – jak APK dostat do telefonu a co odklikat
 - V projektu: `app/src/main/java/cz/jenda/georeminder/` – `model/` (Reminder, formáty), `data/` (úložiště, poloha), `notify/` (notifikace, geofence, budíky, receivery), `ui/` (obrazovky + iOS komponenty + theme), `widget/` (Glance widget)
 - `mapskey.properties` – sem patří Google Maps klíč (řádek `MAPS_API_KEY=AIza…`)

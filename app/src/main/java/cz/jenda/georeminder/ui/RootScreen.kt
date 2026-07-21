@@ -49,6 +49,7 @@ import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.data.ActivityInsets
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
+import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
@@ -63,7 +64,7 @@ fun RootScreen() {
     val context = LocalContext.current
     val colors = GeoTheme.colors
     val prefs = remember {
-        context.getSharedPreferences("georeminder", Context.MODE_PRIVATE)
+        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
     }
     var hasSeenOnboarding by remember {
         mutableStateOf(prefs.getBoolean("hasSeenOnboarding", false))
@@ -228,7 +229,7 @@ private fun TabBarItem(
     onClick: () -> Unit,
 ) {
     val colors = GeoTheme.colors
-    val tint = if (active) colors.accent else colors.label
+    val tint = if (active) colors.accent else colors.secondaryLabel
     Box(
         modifier = Modifier
             .width(96.dp)

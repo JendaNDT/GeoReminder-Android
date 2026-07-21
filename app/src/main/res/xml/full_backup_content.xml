@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Řízená záloha pro Android 11 a starší (ekvivalent data_extraction_rules). -->
+<full-backup-content>
+    <include domain="file" path="reminders.json" />
+    <include domain="file" path="favorites.json" />
+</full-backup-content>
