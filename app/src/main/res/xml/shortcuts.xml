@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_time_reminder"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_time"
+        android:shortcutShortLabel="@string/shortcut_time_short"
+        android:shortcutLongLabel="@string/shortcut_time_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="cz.jenda.georeminder"
+            android:targetClass="cz.jenda.georeminder.MainActivity">
+            <extra android:name="shortcut_kind" android:value="time" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_place_reminder"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_place"
+        android:shortcutShortLabel="@string/shortcut_place_short"
+        android:shortcutLongLabel="@string/shortcut_place_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="cz.jenda.georeminder"
+            android:targetClass="cz.jenda.georeminder.MainActivity">
+            <extra android:name="shortcut_kind" android:value="location" />
+        </intent>
+    </shortcut>
+</shortcuts>

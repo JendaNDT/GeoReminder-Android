@@ -1,0 +1,19 @@
+# Build výstupy
+build/
+app/build/
+.gradle/
+.kotlin/
+
+# Lokální konfigurace prostředí
+local.properties
+
+# Tajnosti – NEPATŘÍ do gitu (žijí v lokální kopii projektu / zipu):
+# Google Maps klíč
+mapskey.properties
+# podpisový keystore (jen s ním jdou aktualizace instalovat přes starou verzi)
+app/georeminder.keystore
+
+# IDE a systémové soubory
+.idea/
+*.iml
+.DS_Store

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GeoReminder</string>
+    <string name="widget_name">Nejbližší připomínky</string>
+    <string name="widget_description">Aktivní připomínky pořád na očích.</string>
+    <string name="shortcut_time_short">Připomínka na čas</string>
+    <string name="shortcut_time_long">Přidat připomínku na čas</string>
+    <string name="shortcut_place_short">Připomínka na místo</string>
+    <string name="shortcut_place_long">Přidat připomínku na místo</string>
+</resources>
