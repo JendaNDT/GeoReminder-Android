@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.res.stringResource
 import cz.jenda.georeminder.R
+import cz.jenda.georeminder.ui.components.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -687,8 +688,6 @@ private fun ReminderActionSheet(
                 Spacer(Modifier.width(12.dp))
                 Text("Smazat připomínku", style = GeoType.body, color = colors.red, modifier = Modifier.weight(1f))
             }
-        }
-    }
         }
     }
 }

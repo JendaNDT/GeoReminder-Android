@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
+import cz.jenda.georeminder.data.FeatureSettings
 import cz.jenda.georeminder.model.AlertStyle
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder

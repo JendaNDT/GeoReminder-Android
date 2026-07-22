@@ -82,7 +82,7 @@ object AttachmentHelper {
 
     /** Smaže soubor přílohy z interního úložiště. */
     fun deleteAttachment(context: Context, path: String?) {
-        if (path.isNull_orBlank()) return
+        if (path.isNullOrBlank()) return
         try {
             val file = File(path)
             if (file.exists()) {

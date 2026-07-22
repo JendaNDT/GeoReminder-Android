@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import cz.jenda.georeminder.ui.components.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
@@ -177,7 +178,7 @@ private fun SwipeFavoriteRow(
     if (showConfirmDialog) {
         IOSConfirmDialog(
             title = "Smazat oblíbené místo?",
-            message = "Opravdu chcete smazat místo „${place.name}"?",
+            message = "Opravdu chcete smazat místo „${place.name}“?",
             confirmText = "Smazat",
             isDestructive = true,
             onConfirm = {

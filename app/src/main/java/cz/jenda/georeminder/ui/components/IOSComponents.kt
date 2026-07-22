@@ -466,3 +466,55 @@ fun PrimaryButton(
         Text(text = text, style = GeoType.headline, color = Color.White)
     }
 }
+
+/** Standardní iOS potvrdzovací dialog pro stornování neuložených změn. */
+@Composable
+fun IOSDiscardDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = GeoTheme.colors
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.discard_dialog_title), style = GeoType.headline) },
+        text = { Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.discard_dialog_text), style = GeoType.body) },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onConfirm) {
+                Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.discard_dialog_confirm), color = colors.red)
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.discard_dialog_dismiss))
+            }
+        }
+    )
+}
+
+/** Obecný potvrdzovací dialog (např. mazání položky). */
+@Composable
+fun IOSConfirmDialog(
+    title: String,
+    message: String,
+    confirmText: String = "Potvrdit",
+    isDestructive: Boolean = false,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = GeoTheme.colors
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, style = GeoType.headline) },
+        text = { Text(message, style = GeoType.body) },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onConfirm) {
+                Text(confirmText, color = if (isDestructive) colors.red else colors.accent)
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Zrušit")
+            }
+        }
+    )
+}
