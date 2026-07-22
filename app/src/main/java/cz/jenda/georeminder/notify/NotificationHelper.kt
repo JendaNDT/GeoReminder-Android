@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.FeatureSettings
+import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.model.AlertStyle
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder
@@ -90,21 +91,23 @@ object NotificationHelper {
         AlertStyle.URGENT -> CHANNEL_URGENT_ID
     }
 
-    /** Tělo notifikace – texty 1:1 podle iOS verze. */
-    fun body(reminder: Reminder): String = when (reminder.kind) {
-        ReminderKind.LOCATION ->
-            if (reminder.trigger == TriggerType.ARRIVE) {
-                "Jsi u místa: ${reminder.placeName}"
-            } else {
-                "Odjíždíš od místa: ${reminder.placeName}"
-            }
-        ReminderKind.TIME -> {
-            val due = reminder.dueDate
-            if (due == null) "" else when (reminder.timeRepeat) {
-                TimeRepeat.NEVER -> "Připomínka na " + CzechFormat.dateTime(due)
-                TimeRepeat.DAILY -> "Opakuje se každý den v " + CzechFormat.time(due)
-                TimeRepeat.WEEKLY -> "Opakuje se každý týden: " +
-                        CzechFormat.weeklyLabel(due, reminder.weekdays)
+    /** Tělo notifikace – s podpora CZ a EN. */
+    fun body(reminder: Reminder): String {
+        val isEn = FeatureSettings.appLanguage.value == LanguageController.LANG_EN
+        return when (reminder.kind) {
+            ReminderKind.LOCATION ->
+                if (reminder.trigger == TriggerType.ARRIVE) {
+                    if (isEn) "Arriving at: ${reminder.placeName}" else "Jsi u místa: ${reminder.placeName}"
+                } else {
+                    if (isEn) "Leaving location: ${reminder.placeName}" else "Odjíždíš od místa: ${reminder.placeName}"
+                }
+            ReminderKind.TIME -> {
+                val due = reminder.dueDate
+                if (due == null) "" else when (reminder.timeRepeat) {
+                    TimeRepeat.NEVER -> (if (isEn) "Reminder for " else "Připomínka na ") + CzechFormat.dateTime(due)
+                    TimeRepeat.DAILY -> (if (isEn) "Repeats every day at " else "Opakuje se každý den v ") + CzechFormat.time(due)
+                    TimeRepeat.WEEKLY -> (if (isEn) "Repeats every week: " else "Opakuje se každý týden: ") + CzechFormat.weeklyLabel(due, reminder.weekdays)
+                }
             }
         }
     }

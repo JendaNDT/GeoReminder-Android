@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
@@ -104,10 +105,10 @@ fun CalendarImportSheet(onClose: () -> Unit) {
             .fillMaxHeight()
     ) {
         SheetHeader(
-            title = "Import z kalendáře",
-            leftText = "Zrušit",
+            title = stringResource(cz.jenda.georeminder.R.string.calendar_import_title),
+            leftText = stringResource(cz.jenda.georeminder.R.string.action_cancel),
             onLeft = onClose,
-            rightText = if (selectedIds.isNotEmpty()) "Importovat (${selectedIds.size})" else "",
+            rightText = if (selectedIds.isNotEmpty()) stringResource(cz.jenda.georeminder.R.string.calendar_import_button, selectedIds.size) else "",
             rightEnabled = selectedIds.isNotEmpty(),
             onRight = {
                 importSelected()
@@ -125,8 +126,8 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     EmptyState(
                         icon = Icons.Filled.CalendarMonth,
-                        title = "Oprávnění ke Kalendáři",
-                        text = "Aplikace potřebuje přístup ke kalendáři pro import nadcházejících událostí.",
+                        title = stringResource(cz.jenda.georeminder.R.string.calendar_import_title),
+                        text = stringResource(cz.jenda.georeminder.R.string.permission_banner_notifications),
                     )
                     Spacer(Modifier.height(16.dp))
                     androidx.compose.material3.Button(
@@ -139,7 +140,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                     ) {
                         Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Povolit přístup ke kalendáři", style = GeoType.footnoteBold)
+                        Text(stringResource(cz.jenda.georeminder.R.string.calendar_grant_button), style = GeoType.footnoteBold)
                     }
                 }
             }

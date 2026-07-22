@@ -75,10 +75,17 @@
     <!-- Settings Sheet -->
     <string name="settings_title">Nastavení</string>
     <string name="settings_appearance">Vzhled aplikace</string>
+    <string name="settings_language">Jazyk aplikace</string>
+    <string name="lang_system">Podle systému</string>
+    <string name="lang_cs">Čeština</string>
+    <string name="lang_en">English</string>
+
     <string name="settings_tts">Hlasové čtení (Text-to-Speech)</string>
     <string name="settings_tts_enable">Hlasové čtení připomínek</string>
     <string name="settings_tts_full">Číst i název a místo</string>
     <string name="settings_tts_test">Vyzkoušet hlas</string>
+    <string name="settings_features">Funkce &amp; Chování</string>
+    <string name="settings_group_by_place">Seskupovat notifikace na stejném místě</string>
     <string name="settings_backup">Záloha &amp; Kalendář</string>
     <string name="settings_export_backup">Exportovat JSON zálohu</string>
     <string name="settings_import_backup">Importovat JSON zálohu</string>
@@ -91,11 +98,18 @@
     <string name="favorites_title">Oblíbená místa</string>
     <string name="favorites_add">Přidat nové oblíbené místo</string>
     <string name="favorites_empty">Zatím nemáš žádná oblíbená místa.</string>
+    <string name="favorites_delete_title">Smazat oblíbené místo?</string>
+    <string name="favorites_delete_message">Opravdu chcete smazat místo „%1$s“?</string>
+    <string name="favorite_edit_title">Upravit oblíbené místo</string>
+    <string name="favorite_new_title">Nové oblíbené místo</string>
+    <string name="favorite_name_label">Název místa</string>
+    <string name="favorite_name_hint">Např. Domov, Práce, Chata…</string>
 
     <!-- Notifications & Calendar -->
     <string name="calendar_import_title">Import z Kalendáře</string>
     <string name="calendar_import_button">Importovat vybrané (%1$d)</string>
-    <string name="calendar_no_events">Žádné nadcházející události nebyly nalezeny.</string>
+    <string name="calendar_no_events">Žádné nadchádzající události nebyly nalezeny.</string>
+    <string name="calendar_grant_button">Povolit přístup ke kalendáři</string>
 
     <!-- Discard & Search Empty -->
     <string name="discard_dialog_title">Zahodit neuložené změny?</string>
@@ -104,4 +118,40 @@
     <string name="discard_dialog_dismiss">Pokračovat v úpravách</string>
     <string name="search_empty_title">Nic nenalezeno</string>
     <string name="search_empty_text">Pro výraz „%1$s“ nebyly nalezeny žádné připomínky.</string>
+
+    <!-- Banners & Toasts -->
+    <string name="battery_banner_title">Spolehlivé doručení na pozadí</string>
+    <string name="battery_banner_text">Systém může zpožďovat notifikace. Vypni optimalizaci baterie pro GeoReminder.</string>
+    <string name="battery_banner_action">Vypnout optimalizaci</string>
+    <string name="permission_banner_location">GeoReminder potřebuje přístup k poloze na pozadí pro fungování geofence.</string>
+    <string name="permission_banner_notifications">GeoReminder potřebuje oprávnění k zasílání notifikací.</string>
+    <string name="permission_banner_grant">Povolit přístup</string>
+
+    <!-- Toasts & Messages -->
+    <string name="toast_backup_export_success">Záloha byla úspěšně exportována</string>
+    <string name="toast_backup_import_success">Záloha byla úspěšně importována</string>
+    <string name="toast_backup_error">Chyba při práci se zálohou</string>
+    <string name="toast_no_navigation_app">Nenašla se aplikace pro navigaci</string>
+    <string name="tts_test_message">Toto je zkušební hlasité přečtení připomínky.</string>
+    <string name="backup_json_notice">Exportuje textová data (připomínky a oblíbená místa). Soubory příloh se nebalí.</string>
+
+    <!-- Days of the week -->
+    <string name="day_mon">Po</string>
+    <string name="day_tue">Út</string>
+    <string name="day_wed">St</string>
+    <string name="day_thu">Čt</string>
+    <string name="day_fri">Pá</string>
+    <string name="day_sat">So</string>
+    <string name="day_sun">Ne</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_1">Vítej v GeoReminderu</string>
+    <string name="onboarding_text_1">Připomene ti úkoly přesně ve chvíli, kdy jsi na správném místě – nebo ve správný čas. „Koupit mléko, až budu u obchodu.“</string>
+    <string name="onboarding_title_2">Poloha „Povolit vždy“</string>
+    <string name="onboarding_text_2">Aby připomínka přišla i se zavřenou appkou, potřebuje Android svolit polohu „Povolit vždy“. Hlídání dělá úsporně systém – baterii to prakticky nezatěžuje.</string>
+    <string name="onboarding_title_3">Notifikace</string>
+    <string name="onboarding_text_3">Bez notifikací ti appka nemá jak dát vědět. V dalším kroku je prosím povol – stejně jako přístup k poloze.</string>
+    <string name="onboarding_button_continue">Pokračovat</string>
+    <string name="onboarding_button_finish">Povolit a začít</string>
+    <string name="onboarding_button_skip">Přeskočit</string>
 </resources>

@@ -31,6 +31,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import cz.jenda.georeminder.R
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -73,11 +75,11 @@ fun QuickActionSheet(
     ) {
         SheetHeader(
             title = reminder.title,
-            leftText = "Zavřít",
+            leftText = stringResource(R.string.action_close),
             onLeft = onClose,
         )
 
-        SectionHeader("Rychlé akce", Modifier.padding(top = 8.dp))
+        SectionHeader(stringResource(R.string.action_sheet_title), Modifier.padding(top = 8.dp))
         InsetCard(modifier = Modifier.padding(horizontal = 16.dp)) {
             // 1. Odložit na zítra ráno
             Row(
@@ -92,7 +94,7 @@ fun QuickActionSheet(
             ) {
                 Icon(Icons.Filled.Schedule, null, tint = colors.orange, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("Odložit na zítra ráno (8:00)", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.action_snooze_tomorrow), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
             // 2. Navigovat (pokud je připomínka na místo)
@@ -110,7 +112,7 @@ fun QuickActionSheet(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.DirectionsWalk, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Spustit navigaci na místo", style = GeoType.body, color = colors.accent, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.action_navigate), style = GeoType.body, color = colors.accent, modifier = Modifier.weight(1f))
                 }
             }
 
@@ -128,7 +130,7 @@ fun QuickActionSheet(
             ) {
                 Icon(Icons.Filled.Share, null, tint = colors.purple, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("Sdílet připomínku", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.action_share), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
             // 4. Upravit
@@ -145,7 +147,7 @@ fun QuickActionSheet(
             ) {
                 Icon(Icons.Filled.Edit, null, tint = colors.label, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("Upravit připomínku", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.action_edit), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
             // 5. Smazat
@@ -162,7 +164,7 @@ fun QuickActionSheet(
             ) {
                 Icon(Icons.Filled.Delete, null, tint = colors.red, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text("Smazat připomínku", style = GeoType.body, color = colors.red, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.action_delete), style = GeoType.body, color = colors.red, modifier = Modifier.weight(1f))
             }
         }
     }

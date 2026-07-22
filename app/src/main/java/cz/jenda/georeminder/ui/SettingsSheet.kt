@@ -23,11 +23,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.ui.res.stringResource
+import cz.jenda.georeminder.R
+import cz.jenda.georeminder.data.LanguageController
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -161,9 +165,52 @@ fun SettingsSheet(onClose: () -> Unit) {
                 )
             }
 
+            // --- SEKCIE 1B: JAZYK ---
+            val currentLang by FeatureSettings.appLanguage.collectAsState()
+            Column {
+                SectionHeader(stringResource(R.string.settings_language))
+                InsetCard {
+                    listOf(
+                        LanguageController.LANG_SYSTEM to stringResource(R.string.lang_system),
+                        LanguageController.LANG_CS to stringResource(R.string.lang_cs),
+                        LanguageController.LANG_EN to stringResource(R.string.lang_en),
+                    ).forEachIndexed { index, (langCode, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = langCode == currentLang,
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    role = Role.RadioButton,
+                                    onClick = { LanguageController.setAppLanguage(context, langCode) },
+                                )
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = label,
+                                style = GeoType.body,
+                                color = colors.label,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (langCode == currentLang) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = colors.accent,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
+                        if (index != 2) CardDivider()
+                    }
+                }
+            }
+
             // --- SEKCIE 2: FUNKCE & TTS ---
             Column {
-                SectionHeader("Funkce & Hlasové čtení")
+                SectionHeader(stringResource(R.string.settings_features))
                 InsetCard {
                     Row(
                         modifier = Modifier
@@ -297,7 +344,7 @@ fun SettingsSheet(onClose: () -> Unit) {
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.FileUpload, null, tint = colors.accent, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Filled.Upload, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.size(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Exportovat zálohu (JSON)", style = GeoType.body, color = colors.accent)

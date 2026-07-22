@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import cz.jenda.georeminder.ui.components.*
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
@@ -177,9 +178,9 @@ private fun SwipeFavoriteRow(
 
     if (showConfirmDialog) {
         IOSConfirmDialog(
-            title = "Smazat oblíbené místo?",
-            message = "Opravdu chcete smazat místo „${place.name}“?",
-            confirmText = "Smazat",
+            title = stringResource(cz.jenda.georeminder.R.string.favorites_delete_title),
+            message = stringResource(cz.jenda.georeminder.R.string.favorites_delete_message, place.name),
+            confirmText = stringResource(cz.jenda.georeminder.R.string.action_delete),
             isDestructive = true,
             onConfirm = {
                 showConfirmDialog = false
@@ -316,10 +317,10 @@ fun EditFavoriteSheet(
             .statusBarsPadding()
     ) {
         SheetHeader(
-            title = if (existing == null) "Nové místo" else "Upravit místo",
-            leftText = "Zrušit",
+            title = if (existing == null) stringResource(cz.jenda.georeminder.R.string.favorite_new_title) else stringResource(cz.jenda.georeminder.R.string.favorite_edit_title),
+            leftText = stringResource(cz.jenda.georeminder.R.string.action_cancel),
             onLeft = { handleClose() },
-            rightText = "Uložit",
+            rightText = stringResource(cz.jenda.georeminder.R.string.action_save),
             rightEnabled = canSave,
             onRight = { save() },
         )
@@ -330,17 +331,17 @@ fun EditFavoriteSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 40.dp),
         ) {
-            SectionHeader("Název", Modifier.padding(top = 8.dp))
+            SectionHeader(stringResource(cz.jenda.georeminder.R.string.favorite_name_label), Modifier.padding(top = 8.dp))
             InsetCard {
                 FormTextField(
                     value = name,
                     onValueChange = { name = it },
-                    placeholder = "Např. Domov",
+                    placeholder = stringResource(cz.jenda.georeminder.R.string.favorite_name_hint),
                 )
             }
 
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Místo")
+            SectionHeader(stringResource(cz.jenda.georeminder.R.string.kind_location))
             InsetCard {
                 Row(
                     modifier = Modifier
@@ -357,7 +358,7 @@ fun EditFavoriteSheet(
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = when {
-                            coordinate == null -> "Vybrat místo na mapě"
+                            coordinate == null -> stringResource(cz.jenda.georeminder.R.string.location_picker_title)
                             placeName.isNotEmpty() -> placeName
                             else -> "Místo vybráno"
                         },

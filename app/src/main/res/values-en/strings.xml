@@ -13,7 +13,7 @@
     <string name="tab_map">Map</string>
     <string name="search_placeholder">Search reminders…</string>
     <string name="status_active">%1$d active</string>
-    <string name="status_all_done">All done</string>
+    <string name="status_all_done">All completed</string>
     <string name="status_done_suffix">• %1$d completed</string>
     <string name="section_active">Active</string>
     <string name="section_done">Completed</string>
@@ -74,11 +74,18 @@
 
     <!-- Settings Sheet -->
     <string name="settings_title">Settings</string>
-    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance">App Appearance</string>
+    <string name="settings_language">App Language</string>
+    <string name="lang_system">System default</string>
+    <string name="lang_cs">Čeština (Czech)</string>
+    <string name="lang_en">English</string>
+
     <string name="settings_tts">Voice Readout (Text-to-Speech)</string>
     <string name="settings_tts_enable">Read reminders aloud</string>
     <string name="settings_tts_full">Read title and place</string>
     <string name="settings_tts_test">Test voice</string>
+    <string name="settings_features">Features &amp; Behavior</string>
+    <string name="settings_group_by_place">Group notifications at same location</string>
     <string name="settings_backup">Backup &amp; Calendar</string>
     <string name="settings_export_backup">Export JSON backup</string>
     <string name="settings_import_backup">Import JSON backup</string>
@@ -91,11 +98,18 @@
     <string name="favorites_title">Favorite Places</string>
     <string name="favorites_add">Add new favorite place</string>
     <string name="favorites_empty">No favorite places saved yet.</string>
+    <string name="favorites_delete_title">Delete favorite place?</string>
+    <string name="favorites_delete_message">Are you sure you want to delete place \"%1$s\"?</string>
+    <string name="favorite_edit_title">Edit Favorite Place</string>
+    <string name="favorite_new_title">New Favorite Place</string>
+    <string name="favorite_name_label">Place Name</string>
+    <string name="favorite_name_hint">E.g. Home, Work, Cabin…</string>
 
     <!-- Notifications & Calendar -->
     <string name="calendar_import_title">Import from Calendar</string>
     <string name="calendar_import_button">Import selected (%1$d)</string>
     <string name="calendar_no_events">No upcoming calendar events found.</string>
+    <string name="calendar_grant_button">Grant calendar access</string>
 
     <!-- Discard & Search Empty -->
     <string name="discard_dialog_title">Discard unsaved changes?</string>
@@ -104,4 +118,40 @@
     <string name="discard_dialog_dismiss">Keep editing</string>
     <string name="search_empty_title">No results found</string>
     <string name="search_empty_text">No reminders found matching \"%1$s\".</string>
+
+    <!-- Banners & Toasts -->
+    <string name="battery_banner_title">Reliable background delivery</string>
+    <string name="battery_banner_text">System may delay notifications. Disable battery optimization for GeoReminder.</string>
+    <string name="battery_banner_action">Disable optimization</string>
+    <string name="permission_banner_location">GeoReminder needs background location access to trigger geofence reminders.</string>
+    <string name="permission_banner_notifications">GeoReminder needs permission to send notifications.</string>
+    <string name="permission_banner_grant">Grant access</string>
+
+    <!-- Toasts & Messages -->
+    <string name="toast_backup_export_success">Backup successfully exported</string>
+    <string name="toast_backup_import_success">Backup successfully imported</string>
+    <string name="toast_backup_error">Error processing backup</string>
+    <string name="toast_no_navigation_app">No navigation app found</string>
+    <string name="tts_test_message">This is a test readout of a reminder.</string>
+    <string name="backup_json_notice">Exports text data (reminders and favorite places). Attachment files are not bundled.</string>
+
+    <!-- Days of the week -->
+    <string name="day_mon">Mon</string>
+    <string name="day_tue">Tue</string>
+    <string name="day_wed">Wed</string>
+    <string name="day_thu">Thu</string>
+    <string name="day_fri">Fri</string>
+    <string name="day_sat">Sat</string>
+    <string name="day_sun">Sun</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_1">Welcome to GeoReminder</string>
+    <string name="onboarding_text_1">Reminds you of tasks right when you are at the right place – or at the right time. \"Buy milk when at the store.\"</string>
+    <string name="onboarding_title_2">Location \"Allow all the time\"</string>
+    <string name="onboarding_text_2">To trigger reminders even with the app closed, Android needs \"Allow all the time\" location permission. Monitoring is done efficiently by the system.</string>
+    <string name="onboarding_title_3">Notifications</string>
+    <string name="onboarding_text_3">Without notifications, the app can\'t alert you. Please grant permission in the next step, along with location.</string>
+    <string name="onboarding_button_continue">Continue</string>
+    <string name="onboarding_button_finish">Allow &amp; Start</string>
+    <string name="onboarding_button_skip">Skip</string>
 </resources>

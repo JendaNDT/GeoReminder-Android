@@ -30,8 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.ui.components.PrimaryButton
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
@@ -40,13 +42,12 @@ import kotlinx.coroutines.launch
 
 private data class OnboardingPage(
     val icon: ImageVector,
-    val title: String,
-    val text: String,
+    val titleRes: Int,
+    val textRes: Int,
 )
 
 /**
- * Uvítací průvodce při prvním spuštění – 3 stránky. Texty podle DESIGN_SPEC §5.1;
- * druhá stránka je přepsaná pro Android (oprávnění „Povolit vždy").
+ * Uvítací průvodce při prvním spuštění – 3 stránky s plnou lokalizací (CZ/EN).
  */
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
@@ -54,18 +55,18 @@ fun OnboardingScreen(onFinish: () -> Unit) {
     val pages = listOf(
         OnboardingPage(
             icon = Icons.Filled.PinDrop,
-            title = "Vítej v GeoReminderu",
-            text = "Připomene ti úkoly přesně ve chvíli, kdy jsi na správném místě – nebo ve správný čas. „Koupit mléko, až budu u obchodu.“",
+            titleRes = R.string.onboarding_title_1,
+            textRes = R.string.onboarding_text_1,
         ),
         OnboardingPage(
             icon = Icons.Filled.NearMe,
-            title = "Poloha „Povolit vždy“",
-            text = "Aby připomínka přišla i se zavřenou appkou, potřebuje Android svolit polohu „Povolit vždy“. Hlídání dělá úsporně systém – baterii to prakticky nezatěžuje.",
+            titleRes = R.string.onboarding_title_2,
+            textRes = R.string.onboarding_text_2,
         ),
         OnboardingPage(
             icon = Icons.Filled.NotificationsActive,
-            title = "Notifikace",
-            text = "Bez notifikací ti appka nemá jak dát vědět. V dalším kroku je prosím povol – stejně jako přístup k poloze.",
+            titleRes = R.string.onboarding_title_3,
+            textRes = R.string.onboarding_text_3,
         ),
     )
 
@@ -101,14 +102,14 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 )
                 Spacer(Modifier.height(20.dp))
                 Text(
-                    text = page.title,
+                    text = stringResource(page.titleRes),
                     style = GeoType.title2Bold,
                     color = colors.label,
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(20.dp))
                 Text(
-                    text = page.text,
+                    text = stringResource(page.textRes),
                     style = GeoType.body,
                     color = colors.secondaryLabel,
                     textAlign = TextAlign.Center,
@@ -151,7 +152,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PrimaryButton(
-                text = if (isLast) "Povolit a začít" else "Pokračovat",
+                text = if (isLast) stringResource(R.string.onboarding_button_finish) else stringResource(R.string.onboarding_button_continue),
             ) {
                 if (isLast) {
                     onFinish()
@@ -162,7 +163,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 }
             }
             Text(
-                text = "Přeskočit",
+                text = stringResource(R.string.onboarding_button_skip),
                 style = GeoType.footnote,
                 color = colors.secondaryLabel,
                 modifier = Modifier
