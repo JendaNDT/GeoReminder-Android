@@ -301,7 +301,8 @@ fun LocationPickerSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    Icons.Filled.Search, null,
+                    Icons.Filled.Search,
+                    contentDescription = "Hledat místo",
                     tint = colors.secondaryLabel,
                     modifier = Modifier.size(20.dp),
                 )

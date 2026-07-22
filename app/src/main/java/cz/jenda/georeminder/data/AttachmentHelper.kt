@@ -44,7 +44,14 @@ object AttachmentHelper {
 
             val targetFile = File(dir, "${UUID.randomUUID()}.$ext")
             var bytesCopied = 0L
-            contentResolver.openInputStream(uri)?.use { input ->
+
+            val inputStream = contentResolver.openInputStream(uri)
+            if (inputStream == null) {
+                targetFile.delete()
+                return null
+            }
+
+            inputStream.use { input ->
                 targetFile.outputStream().use { output ->
                     val buffer = ByteArray(8192)
                     var read: Int
@@ -60,6 +67,12 @@ object AttachmentHelper {
                     }
                 }
             }
+
+            if (bytesCopied == 0L) {
+                targetFile.delete()
+                return null
+            }
+
             targetFile.absolutePath
         } catch (e: Exception) {
             android.util.Log.e("AttachmentHelper", "Chyba při kopírování přílohy", e)

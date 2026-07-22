@@ -158,8 +158,9 @@ class ReminderScheduler(context: Context) {
     // iOS), ale nesmí se při dalším startu appky znovu zaregistrovat a střílet
     // opakovaně. Úprava/Vrátit/smazání jde přes cancel(), který značku smaže.
 
-    private fun firedGeofenceIds(): Set<String> =
+    private fun firedGeofenceIds(): Set<String> = synchronized(prefsLock) {
         prefs.getStringSet(KEY_FIRED_GEOFENCES, emptySet()) ?: emptySet()
+    }
 
     fun markGeofenceFired(reminderId: String) = synchronized(prefsLock) {
         prefs.edit()
@@ -178,11 +179,14 @@ class ReminderScheduler(context: Context) {
 
     // Značka „už odpáleno" pro jednorázové časové budíky – aby je catch-up po
     // restartu telefonu neposlal znovu, když se normálně doručily před restartem.
-    private fun firedAlarmIds(): Set<String> =
+    private fun firedAlarmIds(): Set<String> = synchronized(prefsLock) {
         prefs.getStringSet(KEY_FIRED_ALARMS, emptySet()) ?: emptySet()
+    }
 
     /** true = jednorázový budík už byl doručen (catch-up nebo AlarmReceiver). */
-    fun isAlarmFired(reminderId: String): Boolean = reminderId in firedAlarmIds()
+    fun isAlarmFired(reminderId: String): Boolean = synchronized(prefsLock) {
+        reminderId in firedAlarmIds()
+    }
 
     fun markAlarmFired(reminderId: String) = synchronized(prefsLock) {
         prefs.edit()

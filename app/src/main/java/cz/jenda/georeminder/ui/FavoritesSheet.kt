@@ -163,15 +163,31 @@ private fun SwipeFavoriteRow(
     onDelete: () -> Unit,
 ) {
     val colors = GeoTheme.colors
+    var showConfirmDialog by remember { mutableStateOf(false) }
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
-                onDelete()
+                showConfirmDialog = true
             }
             false
         },
         positionalThreshold = { totalDistance -> totalDistance * 0.4f },
     )
+
+    if (showConfirmDialog) {
+        IOSConfirmDialog(
+            title = "Smazat oblíbené místo?",
+            message = "Opravdu chcete smazat místo „${place.name}"?",
+            confirmText = "Smazat",
+            isDestructive = true,
+            onConfirm = {
+                showConfirmDialog = false
+                onDelete()
+            },
+            onDismiss = { showConfirmDialog = false },
+        )
+    }
+
     SwipeToDismissBox(
         state = state,
         enableDismissFromStartToEnd = false,
@@ -197,7 +213,7 @@ private fun SwipeFavoriteRow(
                 .iosClickable(onClick = onTap)
                 .semantics {
                     customActions = listOf(
-                        CustomAccessibilityAction("Smazat") { onDelete(); true }
+                        CustomAccessibilityAction("Smazat") { showConfirmDialog = true; true }
                     )
                 }
                 .defaultMinSize(minHeight = 58.dp)
@@ -246,8 +262,26 @@ fun EditFavoriteSheet(
     }
     var radius by remember { mutableStateOf(existing?.radius ?: DEFAULT_RADIUS) }
     var showPicker by remember { mutableStateOf(false) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
 
+    val initialName = remember { existing?.name ?: "" }
+    val initialCoord = remember { existing?.let { LatLng(it.latitude, it.longitude) } }
+    val initialRadius = remember { existing?.radius ?: DEFAULT_RADIUS }
+
+    val isDirty = name.trim() != initialName.trim() || coordinate != initialCoord || radius != initialRadius
     val canSave = name.trim().isNotEmpty() && coordinate != null
+
+    fun handleClose() {
+        if (isDirty) {
+            showDiscardDialog = true
+        } else {
+            onClose()
+        }
+    }
+
+    androidx.activity.compose.BackHandler(enabled = true) {
+        handleClose()
+    }
 
     fun save() {
         val coord = coordinate ?: return
@@ -283,7 +317,7 @@ fun EditFavoriteSheet(
         SheetHeader(
             title = if (existing == null) "Nové místo" else "Upravit místo",
             leftText = "Zrušit",
-            onLeft = onClose,
+            onLeft = { handleClose() },
             rightText = "Uložit",
             rightEnabled = canSave,
             onRight = { save() },
@@ -360,6 +394,16 @@ fun EditFavoriteSheet(
                 }
             }
         }
+    }
+
+    if (showDiscardDialog) {
+        IOSDiscardDialog(
+            onConfirm = {
+                showDiscardDialog = false
+                onClose()
+            },
+            onDismiss = { showDiscardDialog = false },
+        )
     }
 
     if (showPicker) {

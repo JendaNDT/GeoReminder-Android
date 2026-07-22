@@ -52,27 +52,28 @@ class ReminderStore private constructor(context: Context) {
     }
 
     /** Znovu načte data z disku (po akci na notifikaci, návratu do popředí…). */
-    @Synchronized
     fun reload() {
-        when (val res = SharedStorage.read(appContext, FILE)) {
-            is SharedStorage.ReadResult.Ok -> {
-                val loaded = SharedStorage.decodeReminders(res.text)
-                _reminders.value = loaded
-                loadFailed = false
-                ioScope.launch {
-                    AttachmentHelper.cleanupOrphanedAttachments(appContext, loaded)
+        ioScope.launch {
+            synchronized(this@ReminderStore) {
+                when (val res = SharedStorage.read(appContext, FILE)) {
+                    is SharedStorage.ReadResult.Ok -> {
+                        val loaded = SharedStorage.decodeReminders(res.text)
+                        _reminders.value = loaded
+                        loadFailed = false
+                        AttachmentHelper.cleanupOrphanedAttachments(appContext, loaded)
+                    }
+                    SharedStorage.ReadResult.Empty -> {
+                        // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
+                        _reminders.value = emptyList()
+                        loadFailed = false
+                    }
+                    SharedStorage.ReadResult.Error -> {
+                        // Čtení selhalo – NEPŘEPISOVAT paměť a zablokovat zápis, aby se
+                        // platný soubor nepřepsal prázdným seznamem.
+                        loadFailed = true
+                        Log.w("ReminderStore", "Čtení dat selhalo – uložení dočasně zablokováno")
+                    }
                 }
-            }
-            SharedStorage.ReadResult.Empty -> {
-                // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
-                _reminders.value = emptyList()
-                loadFailed = false
-            }
-            SharedStorage.ReadResult.Error -> {
-                // Čtení selhalo – NEPŘEPISOVAT paměť a zablokovat zápis, aby se
-                // platný soubor nepřepsal prázdným seznamem.
-                loadFailed = true
-                Log.w("ReminderStore", "Čtení dat selhalo – uložení dočasně zablokováno")
             }
         }
     }

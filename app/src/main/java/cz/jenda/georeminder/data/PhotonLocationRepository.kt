@@ -39,6 +39,11 @@ object PhotonLocationRepository {
         connection.setRequestProperty("User-Agent", "GeoReminder-Android")
 
         try {
+            val code = connection.responseCode
+            if (code != HttpURLConnection.HTTP_OK) {
+                android.util.Log.w("PhotonRepo", "HTTP chyba $code při hledání místa")
+                return@withContext emptyList()
+            }
             val body = connection.inputStream.bufferedReader().readText()
             val features = JSONObject(body).optJSONArray("features") ?: return@withContext emptyList()
             val results = mutableListOf<PhotonItem>()
@@ -79,6 +84,9 @@ object PhotonLocationRepository {
                 )
             }
             results
+        } catch (e: Exception) {
+            android.util.Log.w("PhotonRepo", "Hledání v Photon API selhalo", e)
+            emptyList()
         } finally {
             connection.disconnect()
         }

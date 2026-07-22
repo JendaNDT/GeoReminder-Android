@@ -36,28 +36,31 @@ class FavoritesStore private constructor(context: Context) {
             }
     }
 
-    @Synchronized
     fun reload() {
-        when (val res = SharedStorage.read(appContext, FILE)) {
-            is SharedStorage.ReadResult.Ok -> {
-                try {
-                    val decoded = SharedStorage.json.decodeFromString(
-                        ListSerializer(FavoritePlace.serializer()), res.text
-                    )
-                    _favorites.value = decoded
-                    loadFailed = false
-                } catch (e: Exception) {
-                    loadFailed = true
-                    android.util.Log.w("FavoritesStore", "Dekódování oblíbených míst selhalo", e)
+        ioScope.launch {
+            synchronized(this@FavoritesStore) {
+                when (val res = SharedStorage.read(appContext, FILE)) {
+                    is SharedStorage.ReadResult.Ok -> {
+                        try {
+                            val decoded = SharedStorage.json.decodeFromString(
+                                ListSerializer(FavoritePlace.serializer()), res.text
+                            )
+                            _favorites.value = decoded
+                            loadFailed = false
+                        } catch (e: Exception) {
+                            loadFailed = true
+                            android.util.Log.w("FavoritesStore", "Dekódování oblíbených míst selhalo", e)
+                        }
+                    }
+                    SharedStorage.ReadResult.Empty -> {
+                        _favorites.value = emptyList()
+                        loadFailed = false
+                    }
+                    SharedStorage.ReadResult.Error -> {
+                        loadFailed = true
+                        android.util.Log.w("FavoritesStore", "Čtení oblíbených míst selhalo – uložení dočasně zablokováno")
+                    }
                 }
-            }
-            SharedStorage.ReadResult.Empty -> {
-                _favorites.value = emptyList()
-                loadFailed = false
-            }
-            SharedStorage.ReadResult.Error -> {
-                loadFailed = true
-                android.util.Log.w("FavoritesStore", "Čtení oblíbených míst selhalo – uložení dočasně zablokováno")
             }
         }
     }

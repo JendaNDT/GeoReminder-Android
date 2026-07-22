@@ -49,10 +49,10 @@ object TtsSpeaker {
             reminder.title
         }
 
-        if (isInitialized) {
-            tts?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, "reminder_${reminder.id}")
-        } else {
-            synchronized(pendingQueue) {
+        synchronized(pendingQueue) {
+            if (isInitialized) {
+                tts?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, "reminder_${reminder.id}")
+            } else {
                 pendingQueue.add(textToSpeak)
             }
         }
@@ -61,10 +61,10 @@ object TtsSpeaker {
     fun speakText(context: Context, text: String) {
         init(context)
         val textToSpeak = text.ifEmpty { "GeoReminder pripomínka" }
-        if (isInitialized) {
-            tts?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, "sample_tts")
-        } else {
-            synchronized(pendingQueue) {
+        synchronized(pendingQueue) {
+            if (isInitialized) {
+                tts?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, "sample_tts")
+            } else {
                 pendingQueue.add(textToSpeak)
             }
         }

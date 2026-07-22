@@ -53,25 +53,34 @@ object BackupManager {
             val store = ReminderStore.get(context)
             val favStore = FavoritesStore.get(context)
 
+            val currentReminders = store.reminders.value.associateBy { it.id }
             backupObj.reminders.forEach { r ->
-                val exists = store.reminders.value.any { it.id == r.id }
-                if (exists) {
-                    store.update(r)
+                val latValid = !r.latitude.isNaN() && r.latitude in -90.0..90.0
+                val lonValid = !r.longitude.isNaN() && r.longitude in -180.0..180.0
+                if (!latValid || !lonValid) return@forEach
+                val sanitized = r.copy(radius = r.radius.coerceIn(50.0, 1000.0))
+                if (currentReminders.containsKey(sanitized.id)) {
+                    store.update(sanitized)
                 } else {
-                    store.add(r)
+                    store.add(sanitized)
                 }
             }
+            val currentFavs = favStore.favorites.value.associateBy { it.id }
             backupObj.favorites.forEach { f ->
-                val exists = favStore.favorites.value.any { it.id == f.id }
-                if (exists) {
-                    favStore.update(f)
+                val latValid = !f.latitude.isNaN() && f.latitude in -90.0..90.0
+                val lonValid = !f.longitude.isNaN() && f.longitude in -180.0..180.0
+                if (!latValid || !lonValid) return@forEach
+                val sanitized = f.copy(radius = f.radius.coerceIn(50.0, 1000.0))
+                if (currentFavs.containsKey(sanitized.id)) {
+                    favStore.update(sanitized)
                 } else {
-                    favStore.add(f)
+                    favStore.add(sanitized)
                 }
             }
 
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.w("BackupManager", "Import zálohy selhal", e)
             false
         }
     }

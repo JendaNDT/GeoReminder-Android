@@ -127,11 +127,17 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                         text = "Aplikace potřebuje přístup ke kalendáři pro import nadcházejících událostí.",
                     )
                     Spacer(Modifier.height(16.dp))
-                    GlassCircleButton(
-                        icon = Icons.Filled.CalendarMonth,
-                        contentDescription = "Povolit přístup ke kalendáři",
+                    androidx.compose.material3.Button(
+                        onClick = { permissionLauncher.launch(Manifest.permission.READ_CALENDAR) },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = colors.accent,
+                            contentColor = Color.White,
+                        ),
+                        shape = RoundedCornerShape(20.dp),
                     ) {
-                        permissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+                        Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Povolit přístup ke kalendáři", style = GeoType.footnoteBold)
                     }
                 }
             }

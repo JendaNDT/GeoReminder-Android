@@ -356,7 +356,7 @@ fun ReminderRow(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
+                contentDescription = if (reminder.isDone) "Dokončená připomínka" else "Připomínka ${if (reminder.kind == ReminderKind.LOCATION) "na místo" else "na čas"}",
                 tint = if (reminder.isDone) colors.secondaryLabel else categoryColor,
                 modifier = Modifier.size(20.dp),
             )

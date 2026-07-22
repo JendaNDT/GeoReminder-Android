@@ -46,16 +46,17 @@ fun PermissionBanner(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val bannerTextColor = Color(0xFF1C1C1E)
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = Color.White,
+            tint = bannerTextColor,
             modifier = Modifier.size(22.dp),
         )
         Text(
             text = message,
             style = GeoType.footnote,
-            color = Color.White,
+            color = bannerTextColor,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 10.dp),
@@ -63,10 +64,10 @@ fun PermissionBanner(
         Text(
             text = actionLabel,
             style = GeoType.footnoteBold,
-            color = Color.White,
+            color = bannerTextColor,
             modifier = Modifier
                 .clip(CircleShape)
-                .border(1.dp, Color.White, CircleShape)
+                .border(1.dp, bannerTextColor, CircleShape)
                 .iosClickable {
                     if (onAction != null) {
                         onAction()

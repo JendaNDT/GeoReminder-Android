@@ -299,7 +299,10 @@ fun SettingsSheet(onClose: () -> Unit) {
                     ) {
                         Icon(Icons.Filled.FileUpload, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.size(10.dp))
-                        Text("Exportovat zálohu (JSON)", style = GeoType.body, color = colors.accent, modifier = Modifier.weight(1f))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Exportovat zálohu (JSON)", style = GeoType.body, color = colors.accent)
+                            Text("Uloží seznam připomínek a oblíbených do souboru (bez příloh)", style = GeoType.caption, color = colors.secondaryLabel)
+                        }
                         Icon(Icons.Filled.ChevronRight, null, tint = colors.tertiaryLabel, modifier = Modifier.size(20.dp))
                     }
                     CardDivider()
@@ -312,7 +315,10 @@ fun SettingsSheet(onClose: () -> Unit) {
                     ) {
                         Icon(Icons.Filled.FileDownload, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.size(10.dp))
-                        Text("Importovat zálohu (JSON)", style = GeoType.body, color = colors.accent, modifier = Modifier.weight(1f))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Importovat zálohu (JSON)", style = GeoType.body, color = colors.accent)
+                            Text("Načte seznam připomínek a oblíbených ze záložního JSONu", style = GeoType.caption, color = colors.secondaryLabel)
+                        }
                         Icon(Icons.Filled.ChevronRight, null, tint = colors.tertiaryLabel, modifier = Modifier.size(20.dp))
                     }
                 }
@@ -320,24 +326,8 @@ fun SettingsSheet(onClose: () -> Unit) {
 
             // --- SEKCIE 4: SPOLEHLIVOST & SYSTÉM ---
             Column {
-                val adaptivePowerSaver by FeatureSettings.adaptivePowerSaver.collectAsStateWithLifecycle()
                 SectionHeader("Spolehlivost & Oprávnění")
                 InsetCard {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Adaptivní šetření baterie (Senzory)", style = GeoType.body, color = colors.label)
-                            Text("Utlumí GPS polling při stání telefonu na stole (šetří až 80 % baterie)", style = GeoType.caption, color = colors.secondaryLabel)
-                        }
-                        IOSSwitch(checked = adaptivePowerSaver) {
-                            FeatureSettings.setAdaptivePowerSaver(context, it)
-                        }
-                    }
-                    CardDivider()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

@@ -289,6 +289,9 @@ fun EditReminderSheet(
         if (isDirty) {
             showDiscardDialog = true
         } else {
+            if (attachmentPath != null && attachmentPath != existing?.attachmentPath) {
+                AttachmentHelper.deleteAttachment(context, attachmentPath)
+            }
             onClose()
         }
     }
@@ -298,23 +301,15 @@ fun EditReminderSheet(
     }
 
     if (showDiscardDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showDiscardDialog = false },
-            title = { Text(stringResource(R.string.discard_dialog_title), style = GeoType.headline) },
-            text = { Text(stringResource(R.string.discard_dialog_text), style = GeoType.body) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDiscardDialog = false
-                    onClose()
-                }) {
-                    Text(stringResource(R.string.discard_dialog_confirm), color = colors.red)
+        IOSDiscardDialog(
+            onConfirm = {
+                showDiscardDialog = false
+                if (attachmentPath != null && attachmentPath != existing?.attachmentPath) {
+                    AttachmentHelper.deleteAttachment(context, attachmentPath)
                 }
+                onClose()
             },
-            dismissButton = {
-                TextButton(onClick = { showDiscardDialog = false }) {
-                    Text(stringResource(R.string.discard_dialog_dismiss))
-                }
-            }
+            onDismiss = { showDiscardDialog = false },
         )
     }
 
@@ -783,7 +778,13 @@ fun EditReminderSheet(
                             tint = colors.red,
                             modifier = Modifier
                                 .size(22.dp)
-                                .iosClickable { attachmentPath = null },
+                                .iosClickable {
+                                    val toDelete = attachmentPath
+                                    attachmentPath = null
+                                    if (toDelete != null && toDelete != existing?.attachmentPath) {
+                                        AttachmentHelper.deleteAttachment(context, toDelete)
+                                    }
+                                },
                         )
                     }
                 }

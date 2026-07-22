@@ -170,7 +170,7 @@ object NotificationHelper {
             .extend(wearableExtender)
             .setVibrate(longArrayOf(0, 150, 100, 150))
 
-        if (FeatureSettings.get(context).groupByPlace && reminder.kind == ReminderKind.LOCATION && reminder.placeName.isNotBlank()) {
+        if (FeatureSettings.groupByPlace.value && reminder.kind == ReminderKind.LOCATION && reminder.placeName.isNotBlank()) {
             val groupKey = "geo_place_${reminder.placeName.trim().lowercase()}"
             builder.setGroup(groupKey)
         }
