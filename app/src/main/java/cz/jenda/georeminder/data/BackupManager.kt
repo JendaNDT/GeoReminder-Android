@@ -53,8 +53,22 @@ object BackupManager {
             val store = ReminderStore.get(context)
             val favStore = FavoritesStore.get(context)
 
-            backupObj.reminders.forEach { r -> store.add(r) }
-            backupObj.favorites.forEach { f -> favStore.add(f) }
+            backupObj.reminders.forEach { r ->
+                val exists = store.reminders.value.any { it.id == r.id }
+                if (exists) {
+                    store.update(r)
+                } else {
+                    store.add(r)
+                }
+            }
+            backupObj.favorites.forEach { f ->
+                val exists = favStore.favorites.value.any { it.id == f.id }
+                if (exists) {
+                    favStore.update(f)
+                } else {
+                    favStore.add(f)
+                }
+            }
 
             true
         } catch (_: Exception) {

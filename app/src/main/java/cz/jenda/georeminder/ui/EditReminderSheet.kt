@@ -251,18 +251,36 @@ fun EditReminderSheet(
     }
     val initialTitle = existing?.title ?: ""
     val initialKindVal = existing?.kind ?: initialKind
+    val initialTriggerVal = existing?.trigger ?: TriggerType.ARRIVE
+    val initialRepeatsVal = existing?.repeats ?: false
+    val initialRadiusVal = existing?.radius ?: DEFAULT_RADIUS
     val initialPlaceVal = existing?.placeName ?: initialPlaceName
     val initialCoordVal = if (existing != null && existing.kind == ReminderKind.LOCATION) {
         LatLng(existing.latitude, existing.longitude)
     } else {
         initialCoordinate
     }
+    val initialDueDateVal = existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
+        ?: (System.currentTimeMillis() + 3_600_000L)
+    val initialTimeRepeatVal = existing?.timeRepeat ?: TimeRepeat.NEVER
+    val initialWeekdaysVal = existing?.weekdays?.takeIf { it.isNotEmpty() }?.toSet()
+        ?: setOf(ReminderScheduler.isoWeekday(initialDueDateVal))
+    val initialAlertStyleVal = existing?.alertStyle ?: AlertStyle.DEFAULT
+    val initialNaggingVal = existing?.nagging ?: false
     val initialAttachmentVal = existing?.attachmentPath
 
     val isDirty = title.trim() != initialTitle ||
             kind != initialKindVal ||
+            trigger != initialTriggerVal ||
+            repeats != initialRepeatsVal ||
+            radius != initialRadiusVal ||
             placeName != initialPlaceVal ||
             coordinate != initialCoordVal ||
+            dueDate != initialDueDateVal ||
+            timeRepeat != initialTimeRepeatVal ||
+            weekdaysSel != initialWeekdaysVal ||
+            alertStyle != initialAlertStyleVal ||
+            nagging != initialNaggingVal ||
             attachmentPath != initialAttachmentVal
 
     var showDiscardDialog by remember { mutableStateOf(false) }

@@ -2,6 +2,7 @@
 build/
 app/build/
 .gradle/
+.gradle_dist/
 .kotlin/
 
 # Lokální konfigurace prostředí

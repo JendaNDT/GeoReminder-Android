@@ -11,10 +11,27 @@ import java.util.UUID
 object AttachmentHelper {
     private const val DIR_ATTACHMENTS = "attachments"
 
-    /** Zkopíruje vybraný URI soubor do interního úložiště aplikace. */
+    private const val MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024L // 10 MB
+
+    /** Zkopíruje vybraný URI soubor do interního úložiště aplikace. Povoleno max 10 MB. */
     fun copyToInternal(context: Context, uri: Uri): String? {
         return try {
             val contentResolver = context.contentResolver
+            
+            // Kontrola velikosti přes ContentResolver query pokud je k dispozici
+            contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                    if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                        val size = cursor.getLong(sizeIndex)
+                        if (size > MAX_ATTACHMENT_SIZE_BYTES) {
+                            android.util.Log.w("AttachmentHelper", "Příloha přesahuje limit 10 MB ($size B)")
+                            return null
+                        }
+                    }
+                }
+            }
+
             val mimeType = contentResolver.getType(uri) ?: ""
             val ext = when {
                 mimeType.contains("pdf") -> "pdf"
@@ -26,15 +43,54 @@ object AttachmentHelper {
             if (!dir.exists()) dir.mkdirs()
 
             val targetFile = File(dir, "${UUID.randomUUID()}.$ext")
+            var bytesCopied = 0L
             contentResolver.openInputStream(uri)?.use { input ->
                 targetFile.outputStream().use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(8192)
+                    var read: Int
+                    while (input.read(buffer).also { read = it } >= 0) {
+                        bytesCopied += read
+                        if (bytesCopied > MAX_ATTACHMENT_SIZE_BYTES) {
+                            output.close()
+                            targetFile.delete()
+                            android.util.Log.w("AttachmentHelper", "Příloha přesahuje limit 10 MB během kopírování")
+                            return null
+                        }
+                        output.write(buffer, 0, read)
+                    }
                 }
             }
             targetFile.absolutePath
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.e("AttachmentHelper", "Chyba při kopírování přílohy", e)
             null
         }
+    }
+
+    /** Smaže soubor přílohy z interního úložiště. */
+    fun deleteAttachment(context: Context, path: String?) {
+        if (path.isNull_orBlank()) return
+        try {
+            val file = File(path)
+            if (file.exists()) {
+                file.delete()
+            }
+        } catch (_: Exception) {}
+    }
+
+    /** Smaže soubory příloh, které už nepatří žádné aktivní připomínce. */
+    fun cleanupOrphanedAttachments(context: Context, activeReminders: List<cz.jenda.georeminder.model.Reminder>) {
+        try {
+            val dir = File(context.filesDir, DIR_ATTACHMENTS)
+            if (!dir.exists() || !dir.isDirectory) return
+            val activePaths = activeReminders.mapNotNull { it.attachmentPath }.toSet()
+            dir.listFiles()?.forEach { file ->
+                if (!activePaths.contains(file.absolutePath)) {
+                    android.util.Log.i("AttachmentHelper", "Mazání osiřelé přílohy: ${file.name}")
+                    file.delete()
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     /** Otevře přílohu v systémové aplikaci přes FileProvider. */

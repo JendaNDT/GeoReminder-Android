@@ -48,12 +48,13 @@ object MapStyles {
     ]
     """
 
-    fun getMapStyle(mode: ThemeMode): MapStyleOptions? {
+    fun getMapStyle(mode: ThemeMode, isSystemDark: Boolean = false): MapStyleOptions? {
         return when (mode) {
             ThemeMode.DARK -> MapStyleOptions(DARK_STYLE)
             ThemeMode.NEUTRAL -> MapStyleOptions(NEUTRAL_STYLE)
             ThemeMode.GLASS -> MapStyleOptions(GLASS_STYLE)
-            else -> null // Výchozí světlá mapa pro SYSTEM / LIGHT
+            ThemeMode.SYSTEM -> if (isSystemDark) MapStyleOptions(DARK_STYLE) else null
+            ThemeMode.LIGHT -> null
         }
     }
 }

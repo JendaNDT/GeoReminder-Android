@@ -56,8 +56,12 @@ class ReminderStore private constructor(context: Context) {
     fun reload() {
         when (val res = SharedStorage.read(appContext, FILE)) {
             is SharedStorage.ReadResult.Ok -> {
-                _reminders.value = SharedStorage.decodeReminders(res.text)
+                val loaded = SharedStorage.decodeReminders(res.text)
+                _reminders.value = loaded
                 loadFailed = false
+                ioScope.launch {
+                    AttachmentHelper.cleanupOrphanedAttachments(appContext, loaded)
+                }
             }
             SharedStorage.ReadResult.Empty -> {
                 // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
@@ -85,6 +89,10 @@ class ReminderStore private constructor(context: Context) {
         val list = _reminders.value.toMutableList()
         val index = list.indexOfFirst { it.id == reminder.id }
         if (index < 0) return
+        val oldReminder = list[index]
+        if (oldReminder.attachmentPath != null && oldReminder.attachmentPath != reminder.attachmentPath) {
+            AttachmentHelper.deleteAttachment(appContext, oldReminder.attachmentPath)
+        }
         list[index] = reminder
         _reminders.value = list
         persist()
@@ -105,6 +113,9 @@ class ReminderStore private constructor(context: Context) {
     @Synchronized
     fun delete(reminder: Reminder) {
         _reminders.value = _reminders.value.filterNot { it.id == reminder.id }
+        if (reminder.attachmentPath != null) {
+            AttachmentHelper.deleteAttachment(appContext, reminder.attachmentPath)
+        }
         scheduler.cancel(reminder.id)
         persist()
     }

@@ -14,6 +14,9 @@ class FavoritesStore private constructor(context: Context) {
         kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
     )
 
+    @Volatile
+    private var loadFailed = false
+
     private val _favorites = MutableStateFlow<List<FavoritePlace>>(emptyList())
     val favorites: StateFlow<List<FavoritePlace>> = _favorites
 
@@ -35,15 +38,28 @@ class FavoritesStore private constructor(context: Context) {
 
     @Synchronized
     fun reload() {
-        val text = SharedStorage.readText(appContext, FILE) ?: return
-        val decoded = try {
-            SharedStorage.json.decodeFromString(
-                ListSerializer(FavoritePlace.serializer()), text
-            )
-        } catch (_: Exception) {
-            return
+        when (val res = SharedStorage.read(appContext, FILE)) {
+            is SharedStorage.ReadResult.Ok -> {
+                try {
+                    val decoded = SharedStorage.json.decodeFromString(
+                        ListSerializer(FavoritePlace.serializer()), res.text
+                    )
+                    _favorites.value = decoded
+                    loadFailed = false
+                } catch (e: Exception) {
+                    loadFailed = true
+                    android.util.Log.w("FavoritesStore", "Dekódování oblíbených míst selhalo", e)
+                }
+            }
+            SharedStorage.ReadResult.Empty -> {
+                _favorites.value = emptyList()
+                loadFailed = false
+            }
+            SharedStorage.ReadResult.Error -> {
+                loadFailed = true
+                android.util.Log.w("FavoritesStore", "Čtení oblíbených míst selhalo – uložení dočasně zablokováno")
+            }
         }
-        _favorites.value = decoded
     }
 
     @Synchronized
@@ -69,6 +85,10 @@ class FavoritesStore private constructor(context: Context) {
     }
 
     private fun persist() {
+        if (loadFailed) {
+            android.util.Log.w("FavoritesStore", "Uložení přeskočeno – poslední čtení oblíbených selhalo")
+            return
+        }
         val snapshot = _favorites.value
         ioScope.launch {
             try {

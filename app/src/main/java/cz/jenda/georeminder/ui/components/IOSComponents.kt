@@ -52,19 +52,31 @@ import androidx.compose.ui.unit.dp
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 
-/** Klik bez Material ripple efektu (iOS vzhled), s jemnou hmatovou odezvou. */
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+
+/** Klik bez agresivního Material ripple efektu (iOS vzhled), s jemnou vizuální a hmatovou odezvou. */
 @Composable
 fun Modifier.iosClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier {
     val haptics = LocalHapticFeedback.current
-    return this.clickable(
-        interactionSource = remember { MutableInteractionSource() },
-        indication = null,
-        enabled = enabled,
-    ) {
-        // Jemné cvaknutí při ťuknutí – UI dřív nedávalo žádnou odezvu.
-        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        onClick()
-    }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val alpha by animateFloatAsState(
+        targetValue = if (isPressed && enabled) 0.6f else 1.0f,
+        label = "iosClickAlpha"
+    )
+
+    return this
+        .graphicsLayer { this.alpha = alpha }
+        .clickable(
+            interactionSource = interactionSource,
+            indication = null,
+            enabled = enabled,
+        ) {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        }
 }
 
 /** Kruhové „skleněné" tlačítko v toolbaru (hvězdička, plus). */

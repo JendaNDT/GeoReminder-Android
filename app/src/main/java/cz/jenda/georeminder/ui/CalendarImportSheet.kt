@@ -86,14 +86,20 @@ fun CalendarImportSheet(onClose: () -> Unit) {
         selectedEvents.forEach { ev ->
             store.add(CalendarImporter.toReminder(ev))
         }
-        importedCount = selectedEvents.size
+        val count = selectedEvents.size
+        if (count > 0) {
+            android.widget.Toast.makeText(
+                context,
+                "Naimportováno $count událostí z kalendáře",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .statusBarsPadding()
     ) {
         SheetHeader(
             title = "Import z kalendáře",

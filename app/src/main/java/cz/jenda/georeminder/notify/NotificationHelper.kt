@@ -149,7 +149,7 @@ object NotificationHelper {
         val wearableExtender = NotificationCompat.WearableExtender()
             .setHintHideIcon(false)
 
-        val notification = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
+        val builder = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
             .setSmallIcon(R.drawable.ic_stat_pin)
             .setContentTitle(reminder.title)
             .setContentText(body(reminder))
@@ -169,7 +169,13 @@ object NotificationHelper {
             .addAction(0, context.getString(R.string.action_snooze_morning), morningIntent)
             .extend(wearableExtender)
             .setVibrate(longArrayOf(0, 150, 100, 150))
-            .build()
+
+        if (FeatureSettings.get(context).groupByPlace && reminder.kind == ReminderKind.LOCATION && reminder.placeName.isNotBlank()) {
+            val groupKey = "geo_place_${reminder.placeName.trim().lowercase()}"
+            builder.setGroup(groupKey)
+        }
+
+        val notification = builder.build()
 
         // Naléhavé: zvuk se opakuje, dokud uživatel notifikaci nezavře
         if (reminder.alertStyle == AlertStyle.URGENT) {

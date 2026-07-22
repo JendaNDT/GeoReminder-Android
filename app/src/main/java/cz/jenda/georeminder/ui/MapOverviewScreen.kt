@@ -143,13 +143,14 @@ fun MapOverviewScreen() {
                 label = "pulseScale"
             )
 
+            val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 contentPadding = PaddingValues(top = 60.dp, bottom = 96.dp),
                 properties = MapProperties(
                     isMyLocationEnabled = hasFine,
-                    mapStyleOptions = MapStyles.getMapStyle(currentThemeMode),
+                    mapStyleOptions = MapStyles.getMapStyle(currentThemeMode, isSystemDark),
                 ),
                 uiSettings = MapUiSettings(
                     zoomControlsEnabled = false,

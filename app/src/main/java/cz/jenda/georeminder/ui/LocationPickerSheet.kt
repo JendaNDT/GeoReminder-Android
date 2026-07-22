@@ -234,12 +234,13 @@ fun LocationPickerSheet(
     ) {
         val hasFine = remember { LocationHolder.hasFineLocation(context) }
         val currentThemeMode by ThemeController.mode.collectAsStateWithLifecycle()
+        val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = MapProperties(
                 isMyLocationEnabled = hasFine,
-                mapStyleOptions = MapStyles.getMapStyle(currentThemeMode),
+                mapStyleOptions = MapStyles.getMapStyle(currentThemeMode, isSystemDark),
             ),
             uiSettings = MapUiSettings(
                 zoomControlsEnabled = false,

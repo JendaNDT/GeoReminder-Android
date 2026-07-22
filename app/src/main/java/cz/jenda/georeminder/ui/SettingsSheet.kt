@@ -101,7 +101,6 @@ fun SettingsSheet(onClose: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .statusBarsPadding()
     ) {
         SheetHeader(
             title = "Nastavení",

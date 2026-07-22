@@ -84,7 +84,6 @@ fun FavoritesSheet(onClose: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .statusBarsPadding()
     ) {
         SheetHeader(
             title = "Oblíbená místa",
