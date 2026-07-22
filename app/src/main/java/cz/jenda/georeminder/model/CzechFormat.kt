@@ -12,17 +12,19 @@ import java.util.Locale
 object CzechFormat {
     private val locale = Locale("cs", "CZ")
 
+    private val dateTimeFmt = ThreadLocal.withInitial { SimpleDateFormat("d. M. yyyy H:mm", locale) }
+    private val timeFmt = ThreadLocal.withInitial { SimpleDateFormat("H:mm", locale) }
+    private val weekdayTimeFmt = ThreadLocal.withInitial { SimpleDateFormat("EEEE H:mm", locale) }
+    private val dateFmt = ThreadLocal.withInitial { SimpleDateFormat("d. M. yyyy", locale) }
+
     /** „20. 7. 2026 18:30" */
-    fun dateTime(millis: Long): String =
-        SimpleDateFormat("d. M. yyyy H:mm", locale).format(Date(millis))
+    fun dateTime(millis: Long): String = dateTimeFmt.get()!!.format(Date(millis))
 
     /** „18:30" */
-    fun time(millis: Long): String =
-        SimpleDateFormat("H:mm", locale).format(Date(millis))
+    fun time(millis: Long): String = timeFmt.get()!!.format(Date(millis))
 
     /** „pondělí 18:30" */
-    fun weekdayTime(millis: Long): String =
-        SimpleDateFormat("EEEE H:mm", locale).format(Date(millis))
+    fun weekdayTime(millis: Long): String = weekdayTimeFmt.get()!!.format(Date(millis))
 
     private val shortDays = arrayOf("po", "út", "st", "čt", "pá", "so", "ne")
     private val fullDays = arrayOf(
@@ -42,8 +44,7 @@ object CzechFormat {
     }
 
     /** „21. 7. 2026" – pro kapsli s datem ve formuláři */
-    fun date(millis: Long): String =
-        SimpleDateFormat("d. M. yyyy", locale).format(Date(millis))
+    fun date(millis: Long): String = dateFmt.get()!!.format(Date(millis))
 
     /** „850 m odsud" / „1,2 km odsud" */
     fun distance(meters: Float): String {

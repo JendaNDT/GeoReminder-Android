@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GeoReminder</string>
+    <string name="widget_name">Upcoming Reminders</string>
+    <string name="widget_description">Keep active reminders visible on your home screen.</string>
+    <string name="shortcut_time_short">Time Reminder</string>
+    <string name="shortcut_time_long">Add time reminder</string>
+    <string name="shortcut_place_short">Location Reminder</string>
+    <string name="shortcut_place_long">Add location reminder</string>
+
+    <!-- Navigation & Main Screen -->
+    <string name="tab_reminders">Reminders</string>
+    <string name="tab_map">Map</string>
+    <string name="search_placeholder">Search reminders…</string>
+    <string name="status_active">%1$d active</string>
+    <string name="status_all_done">All done</string>
+    <string name="status_done_suffix">• %1$d completed</string>
+    <string name="section_active">Active</string>
+    <string name="section_done">Completed</string>
+    <string name="empty_reminders_title">No reminders yet</string>
+    <string name="empty_reminders_text">Tap + to create your first location or time reminder.</string>
+
+    <!-- Quick Action Sheet -->
+    <string name="action_sheet_title">Quick Actions</string>
+    <string name="action_snooze_tomorrow">Snooze until tomorrow morning (8:00)</string>
+    <string name="action_snooze_hour">Snooze 1 hour</string>
+    <string name="action_snooze_morning">Tomorrow morning</string>
+    <string name="action_navigate">Start navigation to location</string>
+    <string name="action_share">Share reminder</string>
+    <string name="action_edit">Edit reminder</string>
+    <string name="action_delete">Delete reminder</string>
+    <string name="action_close">Close</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_done">Done</string>
+    <string name="action_undo">Undo</string>
+
+    <!-- Edit Reminder Sheet -->
+    <string name="title_new_reminder">New Reminder</string>
+    <string name="title_edit_reminder">Edit Reminder</string>
+    <string name="field_title_hint">What would you like to be reminded of?</string>
+    <string name="kind_location">At Location</string>
+    <string name="kind_time">At Time</string>
+
+    <string name="trigger_arrive">When I arrive</string>
+    <string name="trigger_leave">When I leave</string>
+    <string name="trigger_arrive_repeat">Repeat on every arrival</string>
+    <string name="trigger_leave_repeat">Repeat on every departure</string>
+
+    <string name="repeat_never">Never</string>
+    <string name="repeat_daily">Every day</string>
+    <string name="repeat_weekly">Every week</string>
+    <string name="repeat_weekdays">Mon–Fri</string>
+    <string name="repeat_label">Repeat</string>
+
+    <string name="alert_quiet">Quiet</string>
+    <string name="alert_default">Default</string>
+    <string name="alert_urgent">Urgent</string>
+    <string name="alert_style_label">Alert Style</string>
+    <string name="alert_nagging">Remind until confirmed</string>
+
+    <string name="attachment_header">Attachment (Photo / PDF)</string>
+    <string name="attachment_attach">Attach photo or PDF file</string>
+    <string name="attachment_open">Open attachment</string>
+    <string name="attachment_delete">Remove attachment</string>
+
+    <!-- Location Picker -->
+    <string name="location_picker_title">Select Location</string>
+    <string name="location_picker_search_hint">Search address, store, city…</string>
+    <string name="location_radius">Radius</string>
+    <string name="location_use_this">Use this location</string>
+    <string name="location_favorites">Favorite Places</string>
+    <string name="location_recent">Recent Places</string>
+
+    <!-- Settings Sheet -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_tts">Voice Readout (Text-to-Speech)</string>
+    <string name="settings_tts_enable">Read reminders aloud</string>
+    <string name="settings_tts_full">Read title and place</string>
+    <string name="settings_tts_test">Test voice</string>
+    <string name="settings_backup">Backup &amp; Calendar</string>
+    <string name="settings_export_backup">Export JSON backup</string>
+    <string name="settings_import_backup">Import JSON backup</string>
+    <string name="settings_import_calendar">Import Calendar events</string>
+    <string name="settings_reliability">Background Reliability</string>
+    <string name="settings_battery_optimization">Battery Optimization</string>
+    <string name="settings_app_info">About App</string>
+
+    <!-- Favorites Sheet -->
+    <string name="favorites_title">Favorite Places</string>
+    <string name="favorites_add">Add new favorite place</string>
+    <string name="favorites_empty">No favorite places saved yet.</string>
+
+    <!-- Notifications & Calendar -->
+    <string name="calendar_import_title">Import from Calendar</string>
+    <string name="calendar_import_button">Import selected (%1$d)</string>
+    <string name="calendar_no_events">No upcoming calendar events found.</string>
+
+    <!-- Discard & Search Empty -->
+    <string name="discard_dialog_title">Discard unsaved changes?</string>
+    <string name="discard_dialog_text">You have unsaved changes in your reminder. Are you sure you want to exit without saving?</string>
+    <string name="discard_dialog_confirm">Discard</string>
+    <string name="discard_dialog_dismiss">Keep editing</string>
+    <string name="search_empty_title">No results found</string>
+    <string name="search_empty_text">No reminders found matching \"%1$s\".</string>
+</resources>

@@ -25,8 +25,8 @@ android {
         applicationId = "cz.jenda.georeminder"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "2.4"
+        versionCode = 17
+        versionName = "2.5"
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 
@@ -45,9 +45,8 @@ android {
 
     buildTypes {
         release {
-            // Minifikace/R8 je připravená (pravidla v proguard-rules.pro), ale
-            // zatím VYPNUTÁ – zapnout až po otestování na zařízení (viz
-            // GOOGLE-PLAY-CHECKLIST.md), aby se ověřilo, že se nerozbije JSON.
+            // Minifikace/R8 zatím VYPNUTÁ – zapnout až po úspěšném testu na zařízení
+            // (proguard-rules.pro chrání JSON modely kompatibilní s iOS).
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -89,10 +88,15 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.google.maps.android:maps-compose:6.1.2")
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
     implementation("androidx.glance:glance-appwidget:1.1.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
+

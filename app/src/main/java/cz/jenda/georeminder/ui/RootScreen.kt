@@ -5,7 +5,14 @@ import android.content.Context
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,16 +45,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import cz.jenda.georeminder.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.data.ActivityInsets
-import cz.jenda.georeminder.data.Attachments
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
@@ -137,18 +146,44 @@ fun RootScreen() {
                 store.reload()
                 store.resyncAll()
                 LocationHolder.refresh(context)
-                // Úklid osiřelých souborů příloh (odebrané/zrušené/smazané).
-                Attachments.gc(context, store.reminders.value)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val infiniteTransition = rememberInfiniteTransition(label = "auroraTransition")
+    val auroraOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(15000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "auroraOffset"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
+            .then(
+                if (colors.isGlass) {
+                    Modifier.background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF5468E8),
+                                Color(0xFF7A5AE0),
+                                Color(0xFFB95CC8),
+                                Color(0xFFE58BA6),
+                            ),
+                            start = Offset(auroraOffset, 0f),
+                            end = Offset(1000f - auroraOffset, 1500f)
+                        )
+                    )
+                } else {
+                    Modifier.background(colors.background)
+                }
+            )
     ) {
         if (!hasSeenOnboarding) {
             OnboardingScreen(
@@ -212,12 +247,12 @@ private fun FloatingTabBar(
         Row(modifier = Modifier.padding(5.dp)) {
             TabBarItem(
                 icon = Icons.Filled.Checklist,
-                label = "Připomínky",
+                label = stringResource(R.string.tab_reminders),
                 active = selectedTab == 0,
             ) { onSelect(0) }
             TabBarItem(
                 icon = Icons.Filled.Map,
-                label = "Mapa",
+                label = stringResource(R.string.tab_map),
                 active = selectedTab == 1,
             ) { onSelect(1) }
         }

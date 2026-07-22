@@ -44,9 +44,17 @@ import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import cz.jenda.georeminder.ui.components.EmptyState
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import cz.jenda.georeminder.ui.theme.MapStyles
+import cz.jenda.georeminder.ui.theme.ThemeController
 
 /**
  * Druhá záložka: všechny aktivní geo-připomínky na jedné mapě.
@@ -114,15 +122,34 @@ fun MapOverviewScreen() {
                 }
             }
 
+            val currentThemeMode by ThemeController.mode.collectAsStateWithLifecycle()
+            val infiniteTransition = rememberInfiniteTransition(label = "pulseCircle")
+            val pulseAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.28f,
+                targetValue = 0.08f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2200, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulseAlpha"
+            )
+            val pulseScale by infiniteTransition.animateFloat(
+                initialValue = 0.92f,
+                targetValue = 1.15f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2200, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulseScale"
+            )
+
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
                 contentPadding = PaddingValues(top = 60.dp, bottom = 96.dp),
                 properties = MapProperties(
                     isMyLocationEnabled = hasFine,
-                    mapStyleOptions = if (colors.isDark) {
-                        MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
-                    } else null,
+                    mapStyleOptions = MapStyles.getMapStyle(currentThemeMode),
                 ),
                 uiSettings = MapUiSettings(
                     zoomControlsEnabled = false,
@@ -143,10 +170,10 @@ fun MapOverviewScreen() {
                     )
                     Circle(
                         center = LatLng(reminder.latitude, reminder.longitude),
-                        radius = reminder.radius,
-                        fillColor = colors.accent.copy(alpha = 0.12f),
-                        strokeColor = colors.accent.copy(alpha = 0.6f),
-                        strokeWidth = with(density) { 1.5.dp.toPx() },
+                        radius = reminder.radius * pulseScale,
+                        fillColor = colors.accent.copy(alpha = pulseAlpha),
+                        strokeColor = colors.accent.copy(alpha = (pulseAlpha * 2f).coerceAtMost(0.8f)),
+                        strokeWidth = with(density) { 2.dp.toPx() },
                     )
                 }
             }

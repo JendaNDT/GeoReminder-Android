@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +41,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -71,16 +74,19 @@ fun GlassCircleButton(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
-    tint: Color = GeoTheme.colors.label,
+    tint: Color = if (GeoTheme.colors.isGlass) Color.White else GeoTheme.colors.label,
     onClick: () -> Unit,
 ) {
+    val colors = GeoTheme.colors
+    val bgColor = if (colors.isGlass) Color.White.copy(alpha = 0.22f) else colors.card
     Surface(
         modifier = modifier
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             .size(size)
-            .shadow(4.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.35f))
+            .shadow(4.dp, CircleShape, spotColor = colors.shadow)
             .iosClickable(onClick = onClick),
         shape = CircleShape,
-        color = GeoTheme.colors.card,
+        color = bgColor,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
@@ -105,17 +111,20 @@ fun CapsulePillButton(
     val colors = GeoTheme.colors
     Surface(
         modifier = modifier
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             .shadow(3.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.25f))
             .iosClickable(enabled = enabled, onClick = onClick),
         shape = CircleShape,
         color = colors.card,
     ) {
-        Text(
-            text = text,
-            style = if (bold) GeoType.headline else GeoType.body,
-            color = if (enabled) colors.accent else colors.tertiaryLabel,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                style = if (bold) GeoType.headline else GeoType.body,
+                color = if (enabled) colors.accent else colors.tertiaryLabel,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+            )
+        }
     }
 }
 
@@ -139,7 +148,11 @@ fun SheetHeader(
             text = title,
             style = GeoType.headline,
             color = GeoTheme.colors.label,
-            modifier = Modifier.align(Alignment.Center),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(horizontal = 72.dp),
         )
         if (leftText != null && onLeft != null) {
             CapsulePillButton(
@@ -199,13 +212,15 @@ fun CardDivider(startIndent: Dp = 16.dp) {
     )
 }
 
-/** iOS přepínač (zelený toggle). */
+/** iOS přepínač (zelený toggle) s haptickou odezvou a min. 48dp dotykovou plochou. */
 @Composable
 fun IOSSwitch(
     checked: Boolean,
+    modifier: Modifier = Modifier,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val colors = GeoTheme.colors
+    val haptics = LocalHapticFeedback.current
     val trackColor by animateColorAsState(
         targetValue = if (checked) colors.green else colors.switchTrackOff,
         label = "switchTrack",
@@ -215,27 +230,35 @@ fun IOSSwitch(
         label = "switchThumb",
     )
     Box(
-        modifier = Modifier
-            .width(51.dp)
-            .height(31.dp)
-            .clip(CircleShape)
-            .background(trackColor)
-            .toggleable(
-                value = checked,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Switch,
-                onValueChange = onCheckedChange,
-            ),
+        modifier = modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = thumbOffset)
-                .size(27.dp)
-                .shadow(3.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.3f))
-                .background(Color.White, CircleShape),
-        )
+                .width(51.dp)
+                .height(31.dp)
+                .clip(CircleShape)
+                .background(trackColor)
+                .toggleable(
+                    value = checked,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    role = Role.Switch,
+                    onValueChange = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onCheckedChange(it)
+                    },
+                ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = thumbOffset)
+                    .size(27.dp)
+                    .shadow(3.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.3f))
+                    .background(Color.White, CircleShape),
+            )
+        }
     }
 }
 
@@ -302,7 +325,7 @@ fun RadiusSlider(
     )
 }
 
-/** iOS segmentovaný přepínač s klouzajícím jezdcem. */
+/** iOS segmentovaný přepínač s klouzajícím jezdcem a haptikou. */
 @Composable
 fun SegmentedControl(
     options: List<String>,
@@ -311,10 +334,12 @@ fun SegmentedControl(
     onSelect: (Int) -> Unit,
 ) {
     val colors = GeoTheme.colors
+    val haptics = LocalHapticFeedback.current
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(36.dp)
+            .defaultMinSize(minHeight = 44.dp)
+            .height(38.dp)
             .clip(CircleShape)
             .background(colors.segmentTrack),
     ) {
@@ -343,7 +368,10 @@ fun SegmentedControl(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             role = Role.RadioButton,
-                            onClick = { onSelect(index) },
+                            onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelect(index)
+                            },
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -358,7 +386,7 @@ fun SegmentedControl(
     }
 }
 
-/** Prázdný stav (ekvivalent ContentUnavailableView). */
+/** Prázdný stav (88×88 dlaždice v accent barvě dle Vytříbený). */
 @Composable
 fun EmptyState(
     icon: ImageVector,
@@ -370,14 +398,25 @@ fun EmptyState(
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = colors.secondaryLabel,
-            modifier = Modifier.size(48.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .background(
+                    color = colors.accent.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(22.dp)
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = colors.accent,
+                modifier = Modifier.size(44.dp),
+            )
+        }
+        Spacer(Modifier.height(2.dp))
         Text(
             text = title,
             style = GeoType.emptyTitle,

@@ -35,14 +35,6 @@ object NotificationHelper {
     // Sdílíme jednu hodnotu se schedulerem, ať se doručování nerozejde.
     const val EXTRA_REMINDER_ID = ReminderScheduler.EXTRA_REMINDER_ID
 
-    /** Skupina notifikací pro připomínky spuštěné na jednom místě. */
-    const val GROUP_KEY_PLACE = "cz.jenda.georeminder.group.PLACE"
-    private const val GROUP_SUMMARY_ID = 0x67726F75 // stabilní ID souhrnné notifikace
-
-    // Reminder ID aktuálně zobrazené ve skupině „místo" – aby je i opakované
-    // připomenutí (nag) znovu ukázalo ve skupině, ne samostatně.
-    private val groupedIds = java.util.Collections.synchronizedSet(HashSet<String>())
-
     fun createChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
 
@@ -116,7 +108,7 @@ object NotificationHelper {
         }
     }
 
-    fun show(context: Context, reminder: Reminder, group: String? = null) {
+    fun show(context: Context, reminder: Reminder) {
         val notifId = reminder.id.hashCode()
 
         val contentIntent = PendingIntent.getActivity(
@@ -154,7 +146,10 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
+        val wearableExtender = NotificationCompat.WearableExtender()
+            .setHintHideIcon(false)
+
+        val notification = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
             .setSmallIcon(R.drawable.ic_stat_pin)
             .setContentTitle(reminder.title)
             .setContentText(body(reminder))
@@ -169,43 +164,12 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
-
-        // Připomínka na místě: první akce „Navigovat" – otevře mapy s navigací
-        // na daný bod. Míří přes PendingIntent.getActivity na NavigateActivity
-        // (ne přes receiver – Android 12+ by start aktivity z receiveru zablokoval).
-        // Systémový intent, nepoužívá Maps API klíč appky.
-        if (reminder.kind == ReminderKind.LOCATION) {
-            val navigateIntent = PendingIntent.getActivity(
-                context,
-                notifId + 4,
-                Intent(context, NavigateActivity::class.java).apply {
-                    putExtra(NavigateActivity.EXTRA_LAT, reminder.latitude)
-                    putExtra(NavigateActivity.EXTRA_LNG, reminder.longitude)
-                    putExtra(NavigateActivity.EXTRA_NAME, reminder.placeName)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            builder.addAction(0, "Navigovat", navigateIntent)
-        }
-
-        builder.addAction(0, "Hotovo", doneIntent)
-            .addAction(0, "Odložit o hodinu", snoozeIntent)
-
-        // „Zítra ráno" jen u časových připomínek – u míst by to bylo čtvrté tlačítko
-        // a systém zobrazí max 3 (u míst má přednost Navigovat).
-        if (reminder.kind != ReminderKind.LOCATION) {
-            builder.addAction(0, "Zítra ráno", morningIntent)
-        }
-
-        // Zařazení do skupiny (chytré seskupení notifikací na stejném místě).
-        // I opakované připomenutí (nag) drží skupinu, dokud je připomínka grouped.
-        val effectiveGroup = group ?: if (reminder.id in groupedIds) GROUP_KEY_PLACE else null
-        if (effectiveGroup != null) {
-            builder.setGroup(effectiveGroup)
-        }
-
-        val notification = builder.build()
+            .addAction(0, context.getString(R.string.action_done), doneIntent)
+            .addAction(0, context.getString(R.string.action_snooze_hour), snoozeIntent)
+            .addAction(0, context.getString(R.string.action_snooze_morning), morningIntent)
+            .extend(wearableExtender)
+            .setVibrate(longArrayOf(0, 150, 100, 150))
+            .build()
 
         // Naléhavé: zvuk se opakuje, dokud uživatel notifikaci nezavře
         if (reminder.alertStyle == AlertStyle.URGENT) {
@@ -214,6 +178,7 @@ object NotificationHelper {
 
         try {
             NotificationManagerCompat.from(context).notify(notifId, notification)
+            TtsSpeaker.speakIfEnabled(context, reminder)
         } catch (_: SecurityException) {
             // Uživatel nepovolil notifikace – appka to ukazuje oranžovým bannerem.
         }
@@ -231,93 +196,7 @@ object NotificationHelper {
         }
     }
 
-    /**
-     * Zobrazí víc připomínek spuštěných na jednom místě jako skupinu: každou
-     * jako samostatnou notifikaci (vlastní tlačítka i stav – splnění jedné
-     * neukončí ostatní) plus jedno souhrnné upozornění „Na tomto místě máš N…".
-     * Systém sbalí skupinu do souhrnu, po rozbalení ukáže jednotlivé.
-     */
-    fun showGroup(context: Context, reminders: List<Reminder>) {
-        if (reminders.isEmpty()) return
-        if (reminders.size == 1) {
-            show(context, reminders[0])
-            return
-        }
-
-        // Jednotlivé připomínky (zařazené do skupiny)
-        reminders.forEach {
-            groupedIds.add(it.id)
-            show(context, it, group = GROUP_KEY_PLACE)
-        }
-
-        // Souhrn skupiny
-        val title = "Na tomto místě máš " + pluralReminders(reminders.size)
-        val inbox = NotificationCompat.InboxStyle().setSummaryText(title)
-        reminders.forEach { inbox.addLine(it.title.ifBlank { "Připomínka" }) }
-
-        val contentIntent = PendingIntent.getActivity(
-            context,
-            GROUP_SUMMARY_ID,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        // Souhrn vede na kanál podle stylu dětí – skupina samých „Tichých"
-        // připomínek nemá dělat hlasitý souhrn.
-        val allQuiet = reminders.all { it.alertStyle == AlertStyle.QUIET }
-        val summary = NotificationCompat.Builder(
-            context, if (allQuiet) CHANNEL_QUIET_ID else CHANNEL_ID,
-        )
-            .setSmallIcon(R.drawable.ic_stat_pin)
-            .setContentTitle(title)
-            .setContentText("Klepnutím otevřeš přehled.")
-            .setStyle(inbox)
-            .setPriority(
-                if (allQuiet) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH,
-            )
-            .setGroup(GROUP_KEY_PLACE)
-            .setGroupSummary(true)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setAutoCancel(true)
-            .setContentIntent(contentIntent)
-            .build()
-
-        try {
-            NotificationManagerCompat.from(context).notify(GROUP_SUMMARY_ID, summary)
-        } catch (_: SecurityException) {
-            // Notifikace nepovolené – appka to ukazuje bannerem.
-        }
-    }
-
-    /** České skloňování: „2 připomínky" (2–4) / „5 připomínek" (5+). */
-    private fun pluralReminders(n: Int): String = if (n >= 5) "$n připomínek" else "$n připomínky"
-
     fun cancel(context: Context, reminderId: String) {
-        val notifId = reminderId.hashCode()
-        groupedIds.remove(reminderId)
-        NotificationManagerCompat.from(context).cancel(notifId)
-        cleanupGroupSummary(context, notifId)
-    }
-
-    /**
-     * Zruší souhrn skupiny „místo", pokud pod ním po zrušení dětské notifikace
-     * nezůstala žádná připomínka (jinak by osiřelý souhrn visel v liště).
-     * Právě zrušené ID se vylučuje – systém ho z [NotificationManager.getActiveNotifications]
-     * odstraní asynchronně, takže by tam ještě chvíli figurovalo.
-     */
-    private fun cleanupGroupSummary(context: Context, justCancelledId: Int) {
-        try {
-            val nm = context.getSystemService(NotificationManager::class.java)
-            val hasChild = nm.activeNotifications.any {
-                it.id != GROUP_SUMMARY_ID &&
-                    it.id != justCancelledId &&
-                    it.notification.group == GROUP_KEY_PLACE
-            }
-            if (!hasChild) {
-                NotificationManagerCompat.from(context).cancel(GROUP_SUMMARY_ID)
-            }
-        } catch (_: Exception) {
-            // getActiveNotifications může vzácně vyhodit – pak souhrn nechat být.
-        }
+        NotificationManagerCompat.from(context).cancel(reminderId.hashCode())
     }
 }

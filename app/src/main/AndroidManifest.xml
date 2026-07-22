@@ -26,8 +26,7 @@
     <!-- Čtení kalendáře pro jednorázový import události do připomínky -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
 
-    <!-- Viditelnost mapových aplikací pro tlačítko „Navigovat" (Android 11+):
-         jinak resolveActivity/chooser mapu „nevidí" kvůli omezení viditelnosti balíčků -->
+    <!-- Viditelnost mapových aplikací pro tlačítko „Navigovat" (Android 11+) -->
     <queries>
         <package android:name="com.google.android.apps.maps" />
         <intent>
@@ -78,15 +77,6 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
-
-        <!-- Neviditelná přestupní aktivita pro tlačítko „Navigovat" na notifikaci
-             (Android 12+ blokuje start aktivity z receiveru – „trampoline") -->
-        <activity
-            android:name=".notify.NavigateActivity"
-            android:exported="false"
-            android:excludeFromRecents="true"
-            android:launchMode="singleTop"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- FileProvider pro otevírání příloh (soubory z privátního úložiště appky) -->
         <provider

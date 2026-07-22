@@ -58,6 +58,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cz.jenda.georeminder.ui.theme.MapStyles
+import cz.jenda.georeminder.ui.theme.ThemeController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -230,14 +233,13 @@ fun LocationPickerSheet(
             .background(colors.background),
     ) {
         val hasFine = remember { LocationHolder.hasFineLocation(context) }
+        val currentThemeMode by ThemeController.mode.collectAsStateWithLifecycle()
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = MapProperties(
                 isMyLocationEnabled = hasFine,
-                mapStyleOptions = if (colors.isDark) {
-                    MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
-                } else null,
+                mapStyleOptions = MapStyles.getMapStyle(currentThemeMode),
             ),
             uiSettings = MapUiSettings(
                 zoomControlsEnabled = false,
@@ -590,11 +592,6 @@ fun boundsAround(center: LatLng, spanMeters: Double): LatLngBounds {
     )
 }
 
-/**
- * Hledání míst: primárně služba Photon (zdarma, bez klíče – umí i názvy
- * podniků, s preferencí okolí uživatele), záložně vestavěný geokodér
- * Androidu (adresy).
- */
 /** Výsledek hledání – rozlišuje „nic nenalezeno" od výpadku sítě. */
 sealed class SearchOutcome {
     data class Ok(val results: List<GeoSearchResult>) : SearchOutcome()
@@ -608,7 +605,14 @@ private suspend fun searchPlaces(
 ): SearchOutcome = withContext(Dispatchers.IO) {
     var photonFailed = false
     val photonResults = try {
-        photonSearch(query, near)
+        cz.jenda.georeminder.data.PhotonLocationRepository.search(query, near).map { item ->
+            GeoSearchResult(
+                title = item.title,
+                subtitle = item.subtitle,
+                position = LatLng(item.latitude, item.longitude),
+                category = placeCategory(item.osmKey, item.osmValue),
+            )
+        }
     } catch (_: Exception) {
         photonFailed = true
         emptyList()
@@ -628,71 +632,6 @@ private suspend fun searchPlaces(
         result.copy(distanceMeters = out[0])
     }
     SearchOutcome.Ok(withDistance)
-}
-
-/** Photon (photon.komoot.io) – OpenStreetMap hledání s našeptáváním podniků. */
-private fun photonSearch(
-    query: String,
-    near: android.location.Location?,
-): List<GeoSearchResult> {
-    val urlString = buildString {
-        append("https://photon.komoot.io/api/?q=")
-        append(java.net.URLEncoder.encode(query, "UTF-8"))
-        append("&limit=5")
-        if (near != null) {
-            append("&lat=${near.latitude}&lon=${near.longitude}")
-        }
-    }
-    val connection = java.net.URL(urlString).openConnection()
-            as java.net.HttpURLConnection
-    connection.connectTimeout = 5000
-    connection.readTimeout = 5000
-    connection.setRequestProperty("User-Agent", "GeoReminder-Android")
-    try {
-        val body = connection.inputStream.bufferedReader().readText()
-        val features = org.json.JSONObject(body).optJSONArray("features")
-            ?: return emptyList()
-        val results = mutableListOf<GeoSearchResult>()
-        for (i in 0 until minOf(features.length(), 5)) {
-            val feature = features.optJSONObject(i) ?: continue
-            val props = feature.optJSONObject("properties") ?: continue
-            val coords = feature.optJSONObject("geometry")
-                ?.optJSONArray("coordinates") ?: continue
-            val lng = coords.optDouble(0)
-            val lat = coords.optDouble(1)
-            if (lat.isNaN() || lng.isNaN()) continue
-
-            val street = listOf(props.optString("street"), props.optString("housenumber"))
-                .filter { it.isNotBlank() }
-                .joinToString(" ")
-            val title = props.optString("name")
-                .ifBlank { street }
-                .ifBlank { props.optString("city") }
-                .ifBlank { "Bez názvu" }
-
-            val subtitleParts = mutableListOf<String>()
-            if (street.isNotBlank() && street != title) subtitleParts += street
-            props.optString("city")
-                .takeIf { it.isNotBlank() && it != title }
-                ?.let { subtitleParts += it }
-            props.optString("country")
-                .takeIf { it.isNotBlank() && it != "Česko" && it != "Czechia" }
-                ?.let { subtitleParts += it }
-
-            results += GeoSearchResult(
-                title = title,
-                subtitle = subtitleParts.joinToString(", "),
-                position = LatLng(lat, lng),
-                category = placeCategory(
-                    props.optString("osm_key"),
-                    props.optString("osm_value"),
-                ),
-            )
-        }
-        return results
-    } finally {
-        connection.disconnect()
-    }
 }
 
 /** Kategorie místa podle OpenStreetMap značek (pro ikonku ve výsledku). */

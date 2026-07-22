@@ -7,4 +7,101 @@
     <string name="shortcut_time_long">Přidat připomínku na čas</string>
     <string name="shortcut_place_short">Připomínka na místo</string>
     <string name="shortcut_place_long">Přidat připomínku na místo</string>
+
+    <!-- Navigation & Main Screen -->
+    <string name="tab_reminders">Připomínky</string>
+    <string name="tab_map">Mapa</string>
+    <string name="search_placeholder">Hledat v připomínkách…</string>
+    <string name="status_active">%1$d aktivní</string>
+    <string name="status_all_done">Vše vyřízeno</string>
+    <string name="status_done_suffix">• %1$d hotovo</string>
+    <string name="section_active">Aktivní</string>
+    <string name="section_done">Hotové</string>
+    <string name="empty_reminders_title">Zatím žádné připomínky</string>
+    <string name="empty_reminders_text">Ťukni na + a vytvoř první připomínku na místo nebo na čas.</string>
+
+    <!-- Quick Action Sheet -->
+    <string name="action_sheet_title">Rychlé akce</string>
+    <string name="action_snooze_tomorrow">Odložit na zítra ráno (8:00)</string>
+    <string name="action_snooze_hour">Odložit o hodinu</string>
+    <string name="action_snooze_morning">Zítra ráno</string>
+    <string name="action_navigate">Spustit navigaci na místo</string>
+    <string name="action_share">Sdílet připomínku</string>
+    <string name="action_edit">Upravit připomínku</string>
+    <string name="action_delete">Smazat připomínku</string>
+    <string name="action_close">Zavřít</string>
+    <string name="action_cancel">Zrušit</string>
+    <string name="action_save">Uložit</string>
+    <string name="action_done">Hotovo</string>
+    <string name="action_undo">Vrátit</string>
+
+    <!-- Edit Reminder Sheet -->
+    <string name="title_new_reminder">Nová připomínka</string>
+    <string name="title_edit_reminder">Úprava připomínky</string>
+    <string name="field_title_hint">Co si přeješ připomenout?</string>
+    <string name="kind_location">Na místě</string>
+    <string name="kind_time">Na čas</string>
+
+    <string name="trigger_arrive">Když přijedu</string>
+    <string name="trigger_leave">Když odjedu</string>
+    <string name="trigger_arrive_repeat">Opakovat při každém příjezdu</string>
+    <string name="trigger_leave_repeat">Opakovat při každém odjezdu</string>
+
+    <string name="repeat_never">Neopakovat</string>
+    <string name="repeat_daily">Každý den</string>
+    <string name="repeat_weekly">Každý týden</string>
+    <string name="repeat_weekdays">Po–Pá</string>
+    <string name="repeat_label">Opakovat</string>
+
+    <string name="alert_quiet">Tiché</string>
+    <string name="alert_default">Výchozí</string>
+    <string name="alert_urgent">Naléhavé</string>
+    <string name="alert_style_label">Druh upozornění</string>
+    <string name="alert_nagging">Připomínat, dokud nepotvrdím</string>
+
+    <string name="attachment_header">Příloha (Fotka / PDF)</string>
+    <string name="attachment_attach">Připojit fotku nebo PDF soubor</string>
+    <string name="attachment_open">Otevřít přílohu</string>
+    <string name="attachment_delete">Odstranit přílohu</string>
+
+    <!-- Location Picker -->
+    <string name="location_picker_title">Vybrat místo</string>
+    <string name="location_picker_search_hint">Hledat adresu, obchod, město…</string>
+    <string name="location_radius">Poloměr</string>
+    <string name="location_use_this">Použít toto místo</string>
+    <string name="location_favorites">Oblíbená místa</string>
+    <string name="location_recent">Nedávná místa</string>
+
+    <!-- Settings Sheet -->
+    <string name="settings_title">Nastavení</string>
+    <string name="settings_appearance">Vzhled aplikace</string>
+    <string name="settings_tts">Hlasové čtení (Text-to-Speech)</string>
+    <string name="settings_tts_enable">Hlasové čtení připomínek</string>
+    <string name="settings_tts_full">Číst i název a místo</string>
+    <string name="settings_tts_test">Vyzkoušet hlas</string>
+    <string name="settings_backup">Záloha &amp; Kalendář</string>
+    <string name="settings_export_backup">Exportovat JSON zálohu</string>
+    <string name="settings_import_backup">Importovat JSON zálohu</string>
+    <string name="settings_import_calendar">Importovat události z Kalendáře</string>
+    <string name="settings_reliability">Spolehlivost na pozadí</string>
+    <string name="settings_battery_optimization">Optimalizace baterie</string>
+    <string name="settings_app_info">O aplikaci</string>
+
+    <!-- Favorites Sheet -->
+    <string name="favorites_title">Oblíbená místa</string>
+    <string name="favorites_add">Přidat nové oblíbené místo</string>
+    <string name="favorites_empty">Zatím nemáš žádná oblíbená místa.</string>
+
+    <!-- Notifications & Calendar -->
+    <string name="calendar_import_title">Import z Kalendáře</string>
+    <string name="calendar_import_button">Importovat vybrané (%1$d)</string>
+    <string name="calendar_no_events">Žádné nadcházející události nebyly nalezeny.</string>
+
+    <!-- Discard & Search Empty -->
+    <string name="discard_dialog_title">Zahodit neuložené změny?</string>
+    <string name="discard_dialog_text">Máš rozpracované změny v připomínce. Opravdu chceš odejít bez uložení?</string>
+    <string name="discard_dialog_confirm">Zahodit</string>
+    <string name="discard_dialog_dismiss">Pokračovat v úpravách</string>
+    <string name="search_empty_title">Nic nenalezeno</string>
+    <string name="search_empty_text">Pro výraz „%1$s“ nebyly nalezeny žádné připomínky.</string>
 </resources>

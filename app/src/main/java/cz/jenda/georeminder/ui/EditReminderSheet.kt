@@ -1,6 +1,5 @@
 package cz.jenda.georeminder.ui
 
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -25,17 +24,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UnfoldMore
+import cz.jenda.georeminder.data.AttachmentHelper
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -51,17 +48,17 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import cz.jenda.georeminder.R
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -71,12 +68,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
-import cz.jenda.georeminder.data.Attachments
 import cz.jenda.georeminder.data.FavoritesStore
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.AlertStyle
-import cz.jenda.georeminder.model.Attachment
-import cz.jenda.georeminder.model.AttachmentKind
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.DEFAULT_RADIUS
 import cz.jenda.georeminder.model.FavoritePlace
@@ -84,7 +78,6 @@ import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
-import cz.jenda.georeminder.notify.NavigationLauncher
 import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.IOSSwitch
@@ -96,9 +89,6 @@ import cz.jenda.georeminder.ui.components.SheetHeader
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -111,10 +101,8 @@ import java.util.TimeZone
 fun EditReminderSheet(
     existing: Reminder?,
     initialKind: ReminderKind = ReminderKind.LOCATION,
-    initialTitle: String = "",
     initialPlaceName: String = "",
     initialCoordinate: LatLng? = null,
-    initialDueDate: Long? = null,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -123,7 +111,7 @@ fun EditReminderSheet(
     val favoritesStore = remember { FavoritesStore.get(context) }
     val favorites by favoritesStore.favorites.collectAsStateWithLifecycle()
 
-    var title by remember { mutableStateOf(existing?.title ?: initialTitle) }
+    var title by remember { mutableStateOf(existing?.title ?: "") }
     var kind by remember { mutableStateOf(existing?.kind ?: initialKind) }
     var trigger by remember { mutableStateOf(existing?.trigger ?: TriggerType.ARRIVE) }
     var repeats by remember { mutableStateOf(existing?.repeats ?: false) }
@@ -143,7 +131,6 @@ fun EditReminderSheet(
     var dueDate by remember {
         mutableStateOf(
             existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
-                ?: initialDueDate?.takeIf { it > System.currentTimeMillis() }
                 ?: (System.currentTimeMillis() + 3_600_000L)
         )
     }
@@ -161,42 +148,15 @@ fun EditReminderSheet(
 
     var alertStyle by remember { mutableStateOf(existing?.alertStyle ?: AlertStyle.DEFAULT) }
     var nagging by remember { mutableStateOf(existing?.nagging ?: false) }
+    var attachmentPath by remember { mutableStateOf<String?>(existing?.attachmentPath) }
 
-    val scope = rememberCoroutineScope()
-    // Přílohy se kopírují do úložiště appky hned při výběru (osiřelé pak uklidí
-    // Attachments.gc při návratu do popředí – viz RootScreen).
-    var attachments by remember { mutableStateOf(existing?.attachments ?: emptyList<Attachment>()) }
-    // Soubory zkopírované během této úpravy. Po zavření editoru je odregistrujeme
-    // z ochrany gc: uložené zůstanou (drží je připomínka), zrušené uklidí gc.
-    val sessionFiles = remember { mutableListOf<String>() }
-    DisposableEffect(Unit) {
-        onDispose { sessionFiles.forEach { Attachments.unmarkPending(it) } }
-    }
-    val pickAttachment = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
+    val attachmentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            scope.launch {
-                val (name, mime, size) = withContext(Dispatchers.IO) {
-                    Attachments.probe(context, uri)
-                }
-                if (size > Attachments.MAX_BYTES) {
-                    Toast.makeText(
-                        context, "Příloha je moc velká (max 10 MB)", Toast.LENGTH_LONG,
-                    ).show()
-                } else {
-                    val att = withContext(Dispatchers.IO) {
-                        Attachments.copyIn(context, uri, name, mime)
-                    }
-                    if (att != null) {
-                        attachments = attachments + att
-                        sessionFiles.add(att.fileName)
-                    } else {
-                        Toast.makeText(
-                            context, "Přílohu se nepodařilo přidat", Toast.LENGTH_LONG,
-                        ).show()
-                    }
-                }
+            val copied = AttachmentHelper.copyToInternal(context, uri)
+            if (copied != null) {
+                attachmentPath = copied
             }
         }
     }
@@ -234,7 +194,7 @@ fun EditReminderSheet(
                     weekdays = null,
                     alertStyle = alertStyle,
                     nagging = nagging,
-                    attachments = attachments,
+                    attachmentPath = attachmentPath,
                 )
             } else {
                 existing.copy(
@@ -248,7 +208,7 @@ fun EditReminderSheet(
                     } else null,
                     alertStyle = alertStyle,
                     nagging = nagging,
-                    attachments = attachments,
+                    attachmentPath = attachmentPath,
                 )
             }
             store.update(updated)
@@ -267,7 +227,7 @@ fun EditReminderSheet(
                         repeats = repeats,
                         alertStyle = alertStyle,
                         nagging = nagging,
-                        attachments = attachments,
+                        attachmentPath = attachmentPath,
                     )
                 )
             } else {
@@ -282,24 +242,73 @@ fun EditReminderSheet(
                         } else null,
                         alertStyle = alertStyle,
                         nagging = nagging,
-                        attachments = attachments,
+                        attachmentPath = attachmentPath,
                     )
                 )
             }
         }
         onClose()
     }
+    val initialTitle = existing?.title ?: ""
+    val initialKindVal = existing?.kind ?: initialKind
+    val initialPlaceVal = existing?.placeName ?: initialPlaceName
+    val initialCoordVal = if (existing != null && existing.kind == ReminderKind.LOCATION) {
+        LatLng(existing.latitude, existing.longitude)
+    } else {
+        initialCoordinate
+    }
+    val initialAttachmentVal = existing?.attachmentPath
+
+    val isDirty = title.trim() != initialTitle ||
+            kind != initialKindVal ||
+            placeName != initialPlaceVal ||
+            coordinate != initialCoordVal ||
+            attachmentPath != initialAttachmentVal
+
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
+    fun handleClose() {
+        if (isDirty) {
+            showDiscardDialog = true
+        } else {
+            onClose()
+        }
+    }
+
+    androidx.activity.compose.BackHandler(enabled = isDirty) {
+        showDiscardDialog = true
+    }
+
+    if (showDiscardDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text(stringResource(R.string.discard_dialog_title), style = GeoType.headline) },
+            text = { Text(stringResource(R.string.discard_dialog_text), style = GeoType.body) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardDialog = false
+                    onClose()
+                }) {
+                    Text(stringResource(R.string.discard_dialog_confirm), color = colors.red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text(stringResource(R.string.discard_dialog_dismiss))
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .statusBarsPadding()
     ) {
         SheetHeader(
             title = if (existing == null) "Nová připomínka" else "Upravit připomínku",
             leftText = "Zrušit",
-            onLeft = onClose,
+            onLeft = { handleClose() },
             rightText = "Uložit",
             rightEnabled = canSave,
             onRight = { save() },
@@ -437,36 +446,6 @@ fun EditReminderSheet(
                                 modifier = Modifier.weight(1f),
                             )
                             IOSSwitch(checked = repeats) { repeats = it }
-                        }
-
-                        // Existující připomínka na místě: rychlá navigace na bod
-                        if (existing != null) {
-                            CardDivider()
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .iosClickable {
-                                        coordinate?.let { c ->
-                                            NavigationLauncher.open(
-                                                context, c.latitude, c.longitude, placeName,
-                                            )
-                                        }
-                                    }
-                                    .padding(horizontal = 16.dp, vertical = 15.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    Icons.Filled.Navigation, null,
-                                    tint = colors.accent,
-                                    modifier = Modifier.size(22.dp),
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Text(
-                                    text = "Navigovat",
-                                    style = GeoType.body,
-                                    color = colors.accent,
-                                )
-                            }
                         }
                     }
                 }
@@ -717,90 +696,80 @@ fun EditReminderSheet(
                 }
             }
 
-            // Přílohy (foto, PDF, QR obrázek…) – kopírují se do úložiště appky
+            // Příloha (Fotka nebo PDF)
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Přílohy")
+            SectionHeader("Příloha (Fotka / PDF)")
             InsetCard {
-                attachments.forEach { att ->
+                if (attachmentPath == null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .iosClickable { Attachments.open(context, att) }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = when (att.kind) {
-                                    AttachmentKind.PHOTO -> Icons.Filled.Image
-                                    AttachmentKind.DOCUMENT -> Icons.Filled.PictureAsPdf
-                                    AttachmentKind.OTHER -> Icons.AutoMirrored.Filled.InsertDriveFile
-                                },
-                                contentDescription = null,
-                                tint = colors.accent,
-                                modifier = Modifier.size(22.dp),
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = att.displayName.ifBlank { "Příloha" },
-                                style = GeoType.body,
-                                color = colors.label,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .iosClickable { attachments = attachments - att }
-                                .semantics { contentDescription = "Odebrat přílohu" },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Filled.Close, null,
-                                tint = colors.secondaryLabel,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                    CardDivider()
-                }
-
-                if (attachments.size < Attachments.MAX_COUNT) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .iosClickable { pickAttachment.launch(arrayOf("*/*")) }
-                            .padding(horizontal = 16.dp, vertical = 15.dp),
+                            .iosClickable { attachmentLauncher.launch("*/*") }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            Icons.Filled.AttachFile, null,
+                            imageVector = Icons.Filled.AttachFile,
+                            contentDescription = null,
                             tint = colors.accent,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text = "Přidat přílohu",
+                            text = "Připojit fotku nebo PDF soubor",
                             style = GeoType.body,
                             color = colors.accent,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.ChevronRight,
+                            contentDescription = null,
+                            tint = colors.tertiaryLabel,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                } else {
+                    val fileName = attachmentPath?.substringAfterLast('/') ?: "Příloha"
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AttachFile,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = fileName,
+                            style = GeoType.body,
+                            color = colors.label,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.OpenInNew,
+                            contentDescription = "Otevřít přílohu",
+                            tint = colors.accent,
+                            modifier = Modifier
+                                .size(22.dp)
+                                .iosClickable { AttachmentHelper.openAttachment(context, attachmentPath!!) },
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Odstranit přílohu",
+                            tint = colors.red,
+                            modifier = Modifier
+                                .size(22.dp)
+                                .iosClickable { attachmentPath = null },
                         )
                     }
                 }
             }
-            Spacer(Modifier.size(8.dp))
-            Text(
-                text = "Přílohy se uloží do aplikace (přežijí přeinstalaci i smazání originálu). " +
-                    "Max 5 příloh, každá do 10 MB.",
-                style = GeoType.caption2,
-                color = colors.secondaryLabel,
-                modifier = Modifier.padding(horizontal = 32.dp),
-            )
         }
     }
 

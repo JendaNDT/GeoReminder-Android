@@ -4,11 +4,15 @@ import android.content.Context
 import cz.jenda.georeminder.model.FavoritePlace
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 
 /** Úložiště oblíbených míst – JSON soubor, stejný princip jako ReminderStore. */
 class FavoritesStore private constructor(context: Context) {
     private val appContext = context.applicationContext
+    private val ioScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
+    )
 
     private val _favorites = MutableStateFlow<List<FavoritePlace>>(emptyList())
     val favorites: StateFlow<List<FavoritePlace>> = _favorites
@@ -65,9 +69,16 @@ class FavoritesStore private constructor(context: Context) {
     }
 
     private fun persist() {
-        val text = SharedStorage.json.encodeToString(
-            ListSerializer(FavoritePlace.serializer()), _favorites.value
-        )
-        SharedStorage.writeText(appContext, FILE, text)
+        val snapshot = _favorites.value
+        ioScope.launch {
+            try {
+                val text = SharedStorage.json.encodeToString(
+                    ListSerializer(FavoritePlace.serializer()), snapshot
+                )
+                SharedStorage.writeText(appContext, FILE, text)
+            } catch (e: Exception) {
+                android.util.Log.w("FavoritesStore", "Chyba při zápisu oblíbených", e)
+            }
+        }
     }
 }

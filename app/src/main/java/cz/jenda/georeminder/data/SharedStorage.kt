@@ -33,15 +33,18 @@ object SharedStorage {
         } catch (_: Exception) {
             val out = mutableListOf<Reminder>()
             try {
-                for (el in json.parseToJsonElement(text).jsonArray) {
-                    try {
-                        out.add(json.decodeFromJsonElement(Reminder.serializer(), el))
-                    } catch (e: Exception) {
-                        Log.w("SharedStorage", "Přeskakuji vadný záznam připomínky", e)
+                val element = json.parseToJsonElement(text)
+                if (element is kotlinx.serialization.json.JsonArray) {
+                    for (el in element) {
+                        try {
+                            out.add(json.decodeFromJsonElement(Reminder.serializer(), el))
+                        } catch (e: Exception) {
+                            Log.w("SharedStorage", "Přeskakuji vadný záznam připomínky", e)
+                        }
                     }
                 }
             } catch (e: Exception) {
-                Log.w("SharedStorage", "Data nejsou platné pole – vracím, co se povedlo", e)
+                Log.w("SharedStorage", "Data nejsou platné pole – vracím prázdný výsledek", e)
             }
             out
         }
@@ -64,8 +67,11 @@ object SharedStorage {
 
     fun read(context: Context, filename: String): ReadResult {
         val f = file(context, filename)
+        if (!f.exists()) return ReadResult.Empty
+        val atomicFile = android.util.AtomicFile(f)
         return try {
-            if (f.exists()) ReadResult.Ok(f.readText()) else ReadResult.Empty
+            val text = atomicFile.readFully().toString(Charsets.UTF_8)
+            ReadResult.Ok(text)
         } catch (e: Exception) {
             Log.w("SharedStorage", "Čtení $filename selhalo", e)
             ReadResult.Error
@@ -77,27 +83,22 @@ object SharedStorage {
         (read(context, filename) as? ReadResult.Ok)?.text
 
     /**
-     * Atomický zápis: nejdřív do dočasného souboru, z existujícího souboru se
-     * udělá záloha `.bak`, pak přejmenování. Zápisy jsou serializované
+     * Atomický zápis přes android.util.AtomicFile: zapisuje přes dočasný soubor,
+     * při selhání zachovává původní obsah. Zápisy jsou serializované
      * (@Synchronized), aby se souběžné zápisy z UI a z receiveru nepraly.
      */
     @Synchronized
     fun writeText(context: Context, filename: String, content: String) {
+        val atomicFile = android.util.AtomicFile(file(context, filename))
+        var stream: java.io.FileOutputStream? = null
         try {
-            val f = file(context, filename)
-            val tmp = File(f.parentFile, "$filename.tmp")
-            tmp.writeText(content)
-            if (f.exists()) {
-                try {
-                    f.copyTo(File(f.parentFile, "$filename.bak"), overwrite = true)
-                } catch (_: Exception) {
-                    // Záloha je jen pojistka – její selhání nesmí zablokovat zápis.
-                }
-            }
-            if (!tmp.renameTo(f)) {
-                f.writeText(content)
-            }
+            stream = atomicFile.startWrite()
+            stream.write(content.toByteArray(Charsets.UTF_8))
+            atomicFile.finishWrite(stream)
         } catch (e: Exception) {
+            if (stream != null) {
+                atomicFile.failWrite(stream)
+            }
             Log.w("SharedStorage", "Zápis $filename selhal – změna zůstala jen v paměti", e)
         }
     }

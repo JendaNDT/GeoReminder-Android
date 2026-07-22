@@ -44,6 +44,15 @@ class ReminderScheduler(context: Context) {
         // Serializuje read-modify-write nad SharedPreferences (souběh událostí).
         private val prefsLock = Any()
 
+        @Volatile
+        private var instance: ReminderScheduler? = null
+
+        fun get(context: Context): ReminderScheduler =
+            instance ?: synchronized(this) {
+                instance ?: ReminderScheduler(context.applicationContext).also { instance = it }
+            }
+
+
         /** Nejbližší budoucí výskyt stejné hodiny a minuty (denní opakování). */
         fun nextDaily(dueMillis: Long, now: Long = System.currentTimeMillis()): Long {
             val due = Calendar.getInstance().apply { timeInMillis = dueMillis }
@@ -304,8 +313,8 @@ class ReminderScheduler(context: Context) {
                     LocationHolder.geofenceFailed.value = true
                 }
         } catch (_: SecurityException) {
-            // Bez oprávnění „Povolit vždy" – appka to ukazuje bannerem;
-            // po udělení oprávnění se geofence znovu zaregistrují (resync).
+            // Bez oprávnění „Povolit vždy" – registrace selhala, zobrazíme banner.
+            LocationHolder.geofenceFailed.value = true
         }
     }
 

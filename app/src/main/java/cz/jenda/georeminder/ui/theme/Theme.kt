@@ -52,12 +52,15 @@ private fun Context.findActivity(): Activity? {
 @Composable
 fun GeoReminderTheme(content: @Composable () -> Unit) {
     val mode by ThemeController.mode.collectAsState()
-    val dark = when (mode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    val isSystemDark = isSystemInDarkTheme()
+    val colors = when (mode) {
+        ThemeMode.LIGHT -> LightGeoColors
+        ThemeMode.DARK -> DarkGeoColors
+        ThemeMode.NEUTRAL -> NeutralGeoColors
+        ThemeMode.GLASS -> GlassGeoColors
+        ThemeMode.SYSTEM -> if (isSystemDark) DarkGeoColors else LightGeoColors
     }
-    val colors = if (dark) DarkGeoColors else LightGeoColors
+    val dark = colors.isDark || mode == ThemeMode.GLASS
 
     // Barva ikon ve stavovém řádku podle zvoleného vzhledu (ne jen podle systému)
     val view = LocalView.current
@@ -69,6 +72,7 @@ fun GeoReminderTheme(content: @Composable () -> Unit) {
             controller.isAppearanceLightNavigationBars = !dark
         }
     }
+
 
     // Materiálové schéma jen kvůli systémovým dialogům (kalendář, čas) –
     // vlastní UI používá GeoTheme.colors.

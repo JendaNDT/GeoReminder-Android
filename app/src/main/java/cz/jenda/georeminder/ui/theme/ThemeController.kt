@@ -6,13 +6,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Režim vzhledu aplikace (rozšíření Android verze – iOS se řídí jen systémem). */
 enum class ThemeMode {
-    SYSTEM, LIGHT, DARK;
+    SYSTEM, LIGHT, DARK, NEUTRAL, GLASS;
 
     val label: String
         get() = when (this) {
             SYSTEM -> "Podle systému"
             LIGHT -> "Světlý"
             DARK -> "Tmavý"
+            NEUTRAL -> "Neutrální (teplý)"
+            GLASS -> "Glass (Vlajkový)"
         }
 }
 
@@ -28,6 +30,8 @@ object ThemeController {
         mode.value = when (raw) {
             "light" -> ThemeMode.LIGHT
             "dark" -> ThemeMode.DARK
+            "neutral" -> ThemeMode.NEUTRAL
+            "glass" -> ThemeMode.GLASS
             else -> ThemeMode.SYSTEM
         }
     }
@@ -37,6 +41,8 @@ object ThemeController {
         val raw = when (newMode) {
             ThemeMode.LIGHT -> "light"
             ThemeMode.DARK -> "dark"
+            ThemeMode.NEUTRAL -> "neutral"
+            ThemeMode.GLASS -> "glass"
             ThemeMode.SYSTEM -> "system"
         }
         context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
@@ -45,3 +51,4 @@ object ThemeController {
             .apply()
     }
 }
+

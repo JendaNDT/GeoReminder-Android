@@ -49,6 +49,11 @@ object GeoType {
     /** 12 / Regular – podtitulky řádků */
     val caption = TextStyle(fontFamily = InterFamily, fontSize = 12.sp, fontWeight = FontWeight.Normal)
 
+    /** 12 / SemiBold – typové čipy (320 m, za 2 h, denně) */
+    val chip = TextStyle(fontFamily = InterFamily, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
     /** 11 / Regular – nápovědy pod sliderem */
     val caption2 = TextStyle(fontFamily = InterFamily, fontSize = 11.sp, fontWeight = FontWeight.Normal)
 }
+
+

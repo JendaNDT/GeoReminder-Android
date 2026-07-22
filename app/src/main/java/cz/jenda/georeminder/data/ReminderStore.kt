@@ -130,19 +130,16 @@ class ReminderStore private constructor(context: Context) {
             return
         }
         val snapshot = _reminders.value
-        val write = {
-            val text = SharedStorage.json.encodeToString(
-                ListSerializer(Reminder.serializer()), snapshot
-            )
-            SharedStorage.writeText(appContext, FILE, text)
-            WidgetRefresher.refresh(appContext)
-        }
-        // Z UI vlákna zapisovat na pozadí (žádný jank), z receiverů (už na IO)
-        // synchronně, aby změna určitě dopadla na disk před koncem broadcastu.
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            ioScope.launch { write() }
-        } else {
-            write()
+        ioScope.launch {
+            try {
+                val text = SharedStorage.json.encodeToString(
+                    ListSerializer(Reminder.serializer()), snapshot
+                )
+                SharedStorage.writeText(appContext, FILE, text)
+                WidgetRefresher.refresh(appContext)
+            } catch (e: Exception) {
+                Log.w("ReminderStore", "Chyba při sériovém zápisu na disk", e)
+            }
         }
     }
 }
