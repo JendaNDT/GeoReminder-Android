@@ -1,12 +1,12 @@
 # GeoReminder Android – Project Status
-*Naposled aktualizováno: 22. 07. 2026 (v2.2 – přílohy k připomínce; Fáze 2.1 plánu vylepšení)*
+*Naposled aktualizováno: 22. 07. 2026 (v2.3 – chytré seskupení notifikací; Fáze 2 plánu vylepšení hotová)*
 
 ## 🎯 Co to je
 Nativní Android verze GeoReminderu – připomínky vázané na místo i čas, vzhled 1:1 podle iOS předlohy (`design-podklady/DESIGN_SPEC.md`).
 Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmManager (přesné budíky), Glance widget, App Shortcuts, JSON úložiště formátově kompatibilní s iOS verzí. Minimum: Android 8 (API 26). Jeden modul, bez dalších služeb.
 
 ## ⏭️ Příští krok
-**Otestovat v2.2 na telefonu** – přílohy: v detailu připomínky sekce **Přílohy → Přidat přílohu** (foto/PDF), otevřít, odebrat; ověřit, že přežijí zavření a znovuotevření appky. (Plus stále v2.1: Navigovat + hlasité čtení.) Pak **Fáze 2.2 – Chytré seskupení notifikací** (viz `IMPLEMENTACNI-PLAN-VYLEPSENI.md`). Poslední funkce plánu bude F3 import z Google Kalendáře. (Google Play zůstává v backlogu, `GOOGLE-PLAY-CHECKLIST.md`.)
+**Fáze 3 – Import vybrané události z Google Kalendáře** (poslední funkce plánu vylepšení, viz `IMPLEMENTACNI-PLAN-VYLEPSENI.md`). Pak už je celý plán vylepšení hotový a zbývá **Jendův test na telefonu** všech funkcí (Jenda testuje až na úplném konci vývoje). (Google Play zůstává v backlogu, `GOOGLE-PLAY-CHECKLIST.md`.)
 
 ## ✅ Hotovo
 - Kompletní přepis všech obrazovek podle DESIGN_SPEC: onboarding (3 stránky, text upravený pro androidí oprávnění „Povolit vždy"), seznam se sekcemi **Aktivní/Hotové** + swipe Hotovo/Vrátit/Smazat, formulář (Na místě/Na čas, opakování, čipy oblíbených), výběr místa na mapě (hledání, ťuknutí, živý kruh poloměru), oblíbená místa, mapový přehled, oranžové bannery oprávnění
@@ -88,6 +88,10 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
   - otevírání přes **FileProvider**; úklid osiřelých souborů (`Attachments.gc`) při návratu do appky, s ochranou rozdělané úpravy (registr „pending") a vynuceným limitem velikosti při kopírování.
   - nové soubory: `data/Attachments.kt`, model `Attachment`/`AttachmentKind`, `res/xml/file_paths.xml`; zásah do `Reminder`, `EditReminderSheet`, `RootScreen`, manifestu (FileProvider) a zálohovacích pravidel.
   - nezávislá revize našla 4 věci (hl. riziko: gc mohl smazat rozdělanou přílohu; obcházení limitu velikosti) → opraveno. **Build SUCCESSFUL, podepsané APK 14 MB (versionCode 14).**
+- **v2.3 (22. 7. – Fáze 2.2 z plánu vylepšení, versionCode 15): Chytré seskupení notifikací.** Víc připomínek spuštěných **najednou na jednom místě** (jedna geofence událost) se zobrazí jako **jedno souhrnné upozornění** „Na tomto místě máš N…" + jednotlivé notifikace ve skupině. **Volitelné, výchozí vypnuto** (Nastavení → Funkce → „Seskupit připomínky na stejném místě").
+  - Připomínky zůstávají samostatné: každá má vlastní tlačítka i stav, **splnění jedné neukončí ostatní**; v appce se pořád zobrazují zvlášť. Žádná změna datového modelu (seskupuje se až při doručení).
+  - technicky: `NotificationHelper.showGroup` (nativní grouping – `setGroup`/`setGroupSummary`, `InboxStyle`); přepínač `groupByPlace` ve `FeatureSettings`; rozhodnutí v `GeofenceReceiver`. Ošetřeno: osiřelý souhrn po odškrtnutí všech (vyloučení právě zrušené notifikace kvůli async zrušení), dožadování (nag) drží skupinu (registr `groupedIds`), souhrn samých „Tichých" je tichý.
+  - nezávislá revize našla 3 věci (osiřelý souhrn, nag vyskočil ze skupiny, hlasitý souhrn tichých) → opraveno. **Build SUCCESSFUL, podepsané APK 14 MB (versionCode 15).**
 - **Projekt je na GitHubu (21. 7. večer):** https://github.com/JendaNDT/GeoReminder-Android – kompletní zdrojový kód a dokumentace. Tajnosti (mapový klíč, podpisový keystore) jsou záměrně mimo git a žijí jen v zipu ve složce na Macu
 
 ## 📝 TODO

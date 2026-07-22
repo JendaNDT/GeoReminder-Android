@@ -7,6 +7,7 @@ import android.util.Log
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import com.google.android.gms.location.LocationServices
+import cz.jenda.georeminder.data.FeatureSettings
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
@@ -50,7 +51,6 @@ class GeofenceReceiver : BroadcastReceiver() {
                                 && reminder.trigger == TriggerType.LEAVE)
                     if (!matches) continue
 
-                    NotificationHelper.show(context, reminder)
                     fired.add(reminder)
 
                     if (!reminder.repeats) {
@@ -60,6 +60,15 @@ class GeofenceReceiver : BroadcastReceiver() {
                         LocationServices.getGeofencingClient(context)
                             .removeGeofences(listOf(id))
                     }
+                }
+
+                // Zobrazení: když je zapnuté seskupení a spustilo se víc připomínek
+                // najednou (jedna geofence událost = stejné místo), ukázat je jako
+                // jedno souhrnné upozornění; jinak každou zvlášť (jako dosud).
+                if (FeatureSettings.groupByPlace.value && fired.size >= 2) {
+                    NotificationHelper.showGroup(context, fired)
+                } else {
+                    fired.forEach { NotificationHelper.show(context, it) }
                 }
 
                 // Hlasité čtení (volitelné). Když se najednou spustí víc připomínek

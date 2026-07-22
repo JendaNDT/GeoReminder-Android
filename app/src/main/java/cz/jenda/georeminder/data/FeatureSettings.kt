@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 object FeatureSettings {
     private const val KEY_READ_ALOUD = "readAloud"
     private const val KEY_READ_ALOUD_FULL = "readAloudFullText"
+    private const val KEY_GROUP_BY_PLACE = "groupByPlace"
 
     /** Číst připomínku nahlas po jejím spuštění (systémové TTS, lokálně). */
     val readAloud = MutableStateFlow(false)
@@ -21,10 +22,14 @@ object FeatureSettings {
     /** Číst i celý text připomínky (jinak jen název). Platí, když je [readAloud]. */
     val readAloudFullText = MutableStateFlow(false)
 
+    /** Víc připomínek spuštěných na jednom místě zobrazit jako jedno souhrnné upozornění. */
+    val groupByPlace = MutableStateFlow(false)
+
     fun init(context: Context) {
         val prefs = context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
         readAloud.value = prefs.getBoolean(KEY_READ_ALOUD, false)
         readAloudFullText.value = prefs.getBoolean(KEY_READ_ALOUD_FULL, false)
+        groupByPlace.value = prefs.getBoolean(KEY_GROUP_BY_PLACE, false)
     }
 
     fun setReadAloud(context: Context, value: Boolean) {
@@ -35,6 +40,11 @@ object FeatureSettings {
     fun setReadAloudFullText(context: Context, value: Boolean) {
         readAloudFullText.value = value
         write(context, KEY_READ_ALOUD_FULL, value)
+    }
+
+    fun setGroupByPlace(context: Context, value: Boolean) {
+        groupByPlace.value = value
+        write(context, KEY_GROUP_BY_PLACE, value)
     }
 
     private fun write(context: Context, key: String, value: Boolean) {

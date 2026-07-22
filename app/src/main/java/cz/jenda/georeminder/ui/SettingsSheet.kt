@@ -112,6 +112,7 @@ fun SettingsSheet(onClose: () -> Unit) {
         // Volitelné funkce (rozšíření Android verze)
         val readAloud by FeatureSettings.readAloud.collectAsStateWithLifecycle()
         val readFull by FeatureSettings.readAloudFullText.collectAsStateWithLifecycle()
+        val groupByPlace by FeatureSettings.groupByPlace.collectAsStateWithLifecycle()
 
         SectionHeader("Funkce", Modifier.padding(top = 20.dp))
         InsetCard {
@@ -146,11 +147,28 @@ fun SettingsSheet(onClose: () -> Unit) {
                     IOSSwitch(checked = readFull) { FeatureSettings.setReadAloudFullText(context, it) }
                 }
             }
+
+            CardDivider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Seskupit připomínky na stejném místě",
+                    style = GeoType.body,
+                    color = colors.label,
+                    modifier = Modifier.weight(1f),
+                )
+                IOSSwitch(checked = groupByPlace) { FeatureSettings.setGroupByPlace(context, it) }
+            }
         }
         Spacer(Modifier.size(8.dp))
         Text(
-            text = "Po spuštění připomínky ji telefon přečte nahlas. Výchozí stav vypnuto; " +
-                "nečte v tichém ani vibračním režimu.",
+            text = "Hlasité čtení: po spuštění připomínky ji telefon přečte nahlas (nečte v tichém " +
+                "režimu). Seskupení: víc připomínek spuštěných najednou na jednom místě se zobrazí " +
+                "jako jedno souhrnné upozornění. Obojí je výchozí vypnuté.",
             style = GeoType.caption2,
             color = colors.secondaryLabel,
             modifier = Modifier.padding(horizontal = 32.dp),
