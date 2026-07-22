@@ -23,6 +23,9 @@
     <!-- Mapy -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Čtení kalendáře pro jednorázový import události do připomínky -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <!-- Viditelnost mapových aplikací pro tlačítko „Navigovat" (Android 11+):
          jinak resolveActivity/chooser mapu „nevidí" kvůli omezení viditelnosti balíčků -->
     <queries>

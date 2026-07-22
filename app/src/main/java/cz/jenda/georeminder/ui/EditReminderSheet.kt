@@ -111,8 +111,10 @@ import java.util.TimeZone
 fun EditReminderSheet(
     existing: Reminder?,
     initialKind: ReminderKind = ReminderKind.LOCATION,
+    initialTitle: String = "",
     initialPlaceName: String = "",
     initialCoordinate: LatLng? = null,
+    initialDueDate: Long? = null,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -121,7 +123,7 @@ fun EditReminderSheet(
     val favoritesStore = remember { FavoritesStore.get(context) }
     val favorites by favoritesStore.favorites.collectAsStateWithLifecycle()
 
-    var title by remember { mutableStateOf(existing?.title ?: "") }
+    var title by remember { mutableStateOf(existing?.title ?: initialTitle) }
     var kind by remember { mutableStateOf(existing?.kind ?: initialKind) }
     var trigger by remember { mutableStateOf(existing?.trigger ?: TriggerType.ARRIVE) }
     var repeats by remember { mutableStateOf(existing?.repeats ?: false) }
@@ -141,6 +143,7 @@ fun EditReminderSheet(
     var dueDate by remember {
         mutableStateOf(
             existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
+                ?: initialDueDate?.takeIf { it > System.currentTimeMillis() }
                 ?: (System.currentTimeMillis() + 3_600_000L)
         )
     }

@@ -1,12 +1,12 @@
 # GeoReminder Android – Project Status
-*Naposled aktualizováno: 22. 07. 2026 (v2.3 – chytré seskupení notifikací; Fáze 2 plánu vylepšení hotová)*
+*Naposled aktualizováno: 22. 07. 2026 (v2.4 – import z kalendáře; CELÝ plán vylepšení hotový)*
 
 ## 🎯 Co to je
 Nativní Android verze GeoReminderu – připomínky vázané na místo i čas, vzhled 1:1 podle iOS předlohy (`design-podklady/DESIGN_SPEC.md`).
 Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmManager (přesné budíky), Glance widget, App Shortcuts, JSON úložiště formátově kompatibilní s iOS verzí. Minimum: Android 8 (API 26). Jeden modul, bez dalších služeb.
 
 ## ⏭️ Příští krok
-**Fáze 3 – Import vybrané události z Google Kalendáře** (poslední funkce plánu vylepšení, viz `IMPLEMENTACNI-PLAN-VYLEPSENI.md`). Pak už je celý plán vylepšení hotový a zbývá **Jendův test na telefonu** všech funkcí (Jenda testuje až na úplném konci vývoje). (Google Play zůstává v backlogu, `GOOGLE-PLAY-CHECKLIST.md`.)
+**Celý plán vylepšení (5 funkcí: Navigovat, hlasité čtení, přílohy, seskupení, import z kalendáře) je HOTOVÝ a na GitHubu (v2.4).** Zbývá **Jendův test na telefonu** všech funkcí naráz (Jenda testuje až na úplném konci vývoje) a podle nálezů doladit. Pak volitelně **Google Play** (`GOOGLE-PLAY-CHECKLIST.md`: účet, test 12 testerů/14 dní, privacy policy, Data safety, zapnout `isMinifyEnabled=true` + `.aab`).
 
 ## ✅ Hotovo
 - Kompletní přepis všech obrazovek podle DESIGN_SPEC: onboarding (3 stránky, text upravený pro androidí oprávnění „Povolit vždy"), seznam se sekcemi **Aktivní/Hotové** + swipe Hotovo/Vrátit/Smazat, formulář (Na místě/Na čas, opakování, čipy oblíbených), výběr místa na mapě (hledání, ťuknutí, živý kruh poloměru), oblíbená místa, mapový přehled, oranžové bannery oprávnění
@@ -92,6 +92,10 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
   - Připomínky zůstávají samostatné: každá má vlastní tlačítka i stav, **splnění jedné neukončí ostatní**; v appce se pořád zobrazují zvlášť. Žádná změna datového modelu (seskupuje se až při doručení).
   - technicky: `NotificationHelper.showGroup` (nativní grouping – `setGroup`/`setGroupSummary`, `InboxStyle`); přepínač `groupByPlace` ve `FeatureSettings`; rozhodnutí v `GeofenceReceiver`. Ošetřeno: osiřelý souhrn po odškrtnutí všech (vyloučení právě zrušené notifikace kvůli async zrušení), dožadování (nag) drží skupinu (registr `groupedIds`), souhrn samých „Tichých" je tichý.
   - nezávislá revize našla 3 věci (osiřelý souhrn, nag vyskočil ze skupiny, hlasitý souhrn tichých) → opraveno. **Build SUCCESSFUL, podepsané APK 14 MB (versionCode 15).**
+- **v2.4 (22. 7. – Fáze 3 z plánu vylepšení, versionCode 16): Import z Google Kalendáře.** V horní liště seznamu je **tlačítko kalendáře** – po povolení `READ_CALENDAR` ukáže nadcházející události (30 dní), po výběru se z události udělá **předvyplněná nová připomínka** (název, čas začátku; má-li místo, geokóduje adresu → připomínka na místo, jinak na čas). **Jednorázový import, ne synchronizace.**
+  - technicky: nové `data/CalendarImport.kt` (dotaz na `CalendarContract.Instances`, geokódování přes `Geocoder`) + `ui/CalendarPickerSheet.kt`; `EditReminderSheet` dostal parametry `initialTitle`/`initialDueDate`; napojení v `ReminderListScreen` (oprávnění, spinner při geokódování); `READ_CALENDAR` v manifestu (→ do Data safety na Play).
+  - nezávislá revize: bez blokujících nálezů; UX drobnosti (spinner, minulý čas → +1 h) doladěny. **Build SUCCESSFUL, podepsané APK 14 MB (versionCode 16).**
+- **✅ CELÝ PLÁN VYLEPŠENÍ HOTOVÝ** (`IMPLEMENTACNI-PLAN-VYLEPSENI.md`): všech 5 schválených funkcí z brainstormingu 21. 7. dodáno ve v2.1–v2.4, každá s nezávislou revizí a buildem. Čeká na Jendův souhrnný test v terénu.
 - **Projekt je na GitHubu (21. 7. večer):** https://github.com/JendaNDT/GeoReminder-Android – kompletní zdrojový kód a dokumentace. Tajnosti (mapový klíč, podpisový keystore) jsou záměrně mimo git a žijí jen v zipu ve složce na Macu
 
 ## 📝 TODO

@@ -1,10 +1,14 @@
 package cz.jenda.georeminder.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.location.Location
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOff
@@ -37,6 +42,7 @@ import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings as SettingsGear
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -71,12 +77,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
 import cz.jenda.georeminder.MainActivity
+import cz.jenda.georeminder.data.CalendarImport
 import cz.jenda.georeminder.data.FavoritesStore
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.PlaceLinkResolver
@@ -94,7 +102,9 @@ import cz.jenda.georeminder.ui.components.SectionHeader
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Hlavní obrazovka: velký titulek GeoReminder, bannery oprávnění a seznam
@@ -123,10 +133,31 @@ fun ReminderListScreen() {
     var backgroundMissing by remember { mutableStateOf(false) }
     var batteryRestricted by remember { mutableStateOf(false) }
     var sharedPrefill by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
+    var showCalendarPicker by remember { mutableStateOf(false) }
+    var calendarPrefill by remember { mutableStateOf<CalendarImport.Prefill?>(null) }
+    var importingCalendar by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var pendingDeleteIds by remember { mutableStateOf(setOf<String>()) }
+
+    // Import z kalendáře: potřebuje oprávnění READ_CALENDAR (žádá se při ťuknutí).
+    val calendarPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) showCalendarPicker = true
+    }
+
+    fun openCalendarImport() {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.READ_CALENDAR,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            showCalendarPicker = true
+        } else {
+            calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+        }
+    }
 
     fun refreshPermissionState() {
         notificationsDenied =
@@ -232,6 +263,10 @@ fun ReminderListScreen() {
                     showFavorites = true
                 }
                 Spacer(Modifier.weight(1f))
+                GlassCircleButton(Icons.Filled.CalendarMonth, "Importovat z kalendáře") {
+                    openCalendarImport()
+                }
+                Spacer(Modifier.width(12.dp))
                 GlassCircleButton(Icons.Filled.SettingsGear, "Nastavení") {
                     showSettings = true
                 }
@@ -377,13 +412,14 @@ fun ReminderListScreen() {
     }
 
     // Formulář (nová / úprava)
-    if (showNewSheet || editingReminder != null) {
+    if (showNewSheet || editingReminder != null || calendarPrefill != null) {
         ModalBottomSheet(
             onDismissRequest = {
                 showNewSheet = false
                 editingReminder = null
                 newSheetKind = null
                 sharedPrefill = null
+                calendarPrefill = null
             },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = colors.background,
@@ -391,18 +427,22 @@ fun ReminderListScreen() {
             dragHandle = null,
         ) {
             // key() zajistí čerstvý formulář, když se změní cíl (úprava vs. nová,
-            // nebo přijde sdílené místo, zatímco je formulář otevřený)
-            key(editingReminder?.id ?: "new", sharedPrefill) {
+            // sdílené místo, nebo předvyplnění z kalendáře)
+            key(editingReminder?.id ?: "new", sharedPrefill, calendarPrefill) {
                 EditReminderSheet(
                     existing = editingReminder,
-                    initialKind = if (newSheetKind == "time") ReminderKind.TIME else ReminderKind.LOCATION,
-                    initialPlaceName = sharedPrefill?.first ?: "",
-                    initialCoordinate = sharedPrefill?.second,
+                    initialKind = calendarPrefill?.kind
+                        ?: if (newSheetKind == "time") ReminderKind.TIME else ReminderKind.LOCATION,
+                    initialTitle = calendarPrefill?.title ?: "",
+                    initialPlaceName = calendarPrefill?.placeName ?: sharedPrefill?.first ?: "",
+                    initialCoordinate = calendarPrefill?.coordinate ?: sharedPrefill?.second,
+                    initialDueDate = calendarPrefill?.dueDate,
                     onClose = {
                         showNewSheet = false
                         editingReminder = null
                         newSheetKind = null
                         sharedPrefill = null
+                        calendarPrefill = null
                     },
                 )
             }
@@ -432,6 +472,45 @@ fun ReminderListScreen() {
             dragHandle = null,
         ) {
             SettingsSheet(onClose = { showSettings = false })
+        }
+    }
+
+    // Import z kalendáře (výběr události → předvyplněný formulář)
+    if (showCalendarPicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showCalendarPicker = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = colors.background,
+            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+            dragHandle = null,
+        ) {
+            CalendarPickerSheet(
+                onPick = { event ->
+                    showCalendarPicker = false
+                    importingCalendar = true
+                    scope.launch {
+                        val prefill = withContext(Dispatchers.IO) {
+                            CalendarImport.toPrefill(context, event)
+                        }
+                        importingCalendar = false
+                        calendarPrefill = prefill
+                    }
+                },
+                onClose = { showCalendarPicker = false },
+            )
+        }
+    }
+
+    // Krátký spinner, než se z vybrané události spočítá předvyplnění (geokódování
+    // adresy může chvíli trvat).
+    if (importingCalendar) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(color = colors.accent)
         }
     }
 }
