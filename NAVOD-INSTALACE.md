@@ -33,6 +33,10 @@ Kdybys něco odklikl špatně, nevadí – appka to pozná a ukáže oranžový 
 
 - **Časová připomínka:** vytvoř připomínku Na čas za 2 minuty a zamkni telefon – notifikace má přijít přesně, s tlačítky **Hotovo** a **Odložit o hodinu** (rozbal ji podržením/šipkou).
 - **Připomínka na místo:** poloměr nech aspoň **150 m**. Detekce příjezdu může mít zpoždění pár desítek sekund až jednotek minut – to je záměr Androidu (šetření baterie), ne chyba.
+- **Navigovat:** u připomínky na místo najdeš tlačítko „Navigovat" v jejím detailu i přímo na notifikaci – otevře navigaci do cíle (Google Maps, jinak výběr mapové appky).
+- **Hlasité čtení a Seskupení** zapneš v **Nastavení (⚙️ vpravo nahoře) → Funkce** (obojí je výchozí vypnuté). Hlasité čtení ti připomínku po spuštění přečte nahlas; seskupení sloučí víc připomínek na jednom místě do jednoho souhrnného upozornění.
+- **Přílohy:** v detailu připomínky je sekce **Přílohy → Přidat přílohu** (foto, PDF…). Kopírují se do appky, takže přežijí i přeinstalaci.
+- **Import z kalendáře:** ťukni na tlačítko kalendáře nahoře v seznamu; při prvním použití appka požádá o přístup ke kalendáři, pak vybereš událost a udělá se z ní připomínka.
 - **Po restartu telefonu** se všechno hlídání samo obnoví.
 
 ## 6. Kdyby notifikace nechodily

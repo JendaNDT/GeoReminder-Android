@@ -3,7 +3,7 @@
 Nativní Android verze GeoReminderu – **„Připomeň mi X, až budu u Y / v 18:30."**
 Vzhled 1:1 podle iOS verze (viz `design-podklady/DESIGN_SPEC.md` v iOS projektu), plus vlastní vylepšení navrch.
 
-**Aktuální verze: 1.6** · Stack: Kotlin + Jetpack Compose, Google Maps, GeofencingClient, AlarmManager, Glance widget · Minimum: Android 8 (API 26)
+**Aktuální verze: 2.4** · Stack: Kotlin + Jetpack Compose, Google Maps, GeofencingClient, AlarmManager, Glance widget, FileProvider, CalendarContract · Minimum: Android 8 (API 26), cíl API 35
 
 ## Co appka umí
 
@@ -15,6 +15,14 @@ Vzhled 1:1 podle iOS verze (viz `design-podklady/DESIGN_SPEC.md` v iOS projektu)
 - Oblíbená místa s čipy, mapový přehled připomínek
 - **Widget** s tlačítkem +, rychlé akce ikony, přepínač vzhledu (systém/světlý/tmavý)
 - Obnova hlídání po restartu, hlídač optimalizace baterie
+
+### Novější funkce (v2.1–v2.4)
+
+- **Navigovat** – u připomínky na místo otevřeš navigaci do cíle (Google Maps, jinak výběr mapové appky)
+- **Hlasité čtení** připomínky nahlas – volitelné (Nastavení → Funkce)
+- **Přílohy** k připomínce (foto, PDF, jiný soubor) – kopírují se do aplikace, přežijí přeinstalaci
+- **Chytré seskupení** víc připomínek na jednom místě do jednoho souhrnného upozornění – volitelné
+- **Import z Google Kalendáře** – z vybrané události uděláš připomínku (název, čas, případně místo)
 
 ## Jak sestavit APK
 
@@ -36,8 +44,19 @@ Ručně přes Android Studio:
 
 ## Struktura kódu (`app/src/main/java/cz/jenda/georeminder/`)
 
-- `model/` – datový model připomínky a oblíbeného místa, české formátování (JSON kompatibilní s iOS verzí)
-- `data/` – úložiště (JSON soubory), poloha, poslední místa, rozluštění sdílených odkazů, změřené systémové lišty
-- `notify/` – notifikace a kanály, plánovač (geofence + budíky + dožadování), přijímače událostí, obnova po restartu
-- `ui/` – obrazovky (seznam, formulář, výběr místa, oblíbená, mapa, onboarding, nastavení) + iOS-look komponenty a téma
+- `model/` – datový model připomínky, přílohy a oblíbeného místa, české formátování (JSON kompatibilní s iOS verzí)
+- `data/` – úložiště (JSON soubory), poloha, poslední místa, rozluštění sdílených odkazů, přílohy (`Attachments`), import z kalendáře (`CalendarImport`), přepínače funkcí (`FeatureSettings`)
+- `notify/` – notifikace a kanály (vč. seskupení), plánovač (geofence + budíky + dožadování), přijímače událostí, obnova po restartu, navigace (`NavigationLauncher` / `NavigateActivity`), hlasité čtení (`TtsSpeaker`)
+- `ui/` – obrazovky (seznam, formulář, výběr místa, oblíbená, mapa, onboarding, nastavení, výběr události z kalendáře) + iOS-look komponenty a téma
 - `widget/` – Glance widget „Nejbližší připomínky"
+
+## Dokumentace
+
+- `PROJECT_STATUS.md` – aktuální stav projektu (přilož na začátku další session s Claudem)
+- `IMPLEMENTACNI-PLAN.md` – plán oprav z auditu (hotovo)
+- `IMPLEMENTACNI-PLAN-VYLEPSENI.md` – plán 5 schválených vylepšení (hotovo)
+- `AUDIT1.md` – nezávislý audit aplikace
+- `NAVOD-INSTALACE.md` – jak dostat APK do telefonu a co odklikat
+- `GOOGLE-PLAY-CHECKLIST.md` – postup vydání na Google Play
+- `GOOGLE-PLAY-TEXTY.md` – hotové texty pro Play (listing, Data safety, zdůvodnění oprávnění)
+- `PRIVACY.md` / `privacy.html` – zásady ochrany soukromí (k vyvěšení na veřejnou URL)

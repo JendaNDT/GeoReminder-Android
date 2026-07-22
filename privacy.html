@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zásady ochrany soukromí – GeoReminder</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    line-height: 1.6;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 20px 64px;
+    color: #1c1c1e;
+    background: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #e5e5ea; background: #000; }
+    a { color: #4da3ff; }
+    code { background: #1c1c1e; }
+  }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  h2 { font-size: 1.2rem; margin-top: 32px; }
+  .updated { color: #8e8e93; font-size: 0.9rem; margin-top: 0; }
+  ul { padding-left: 20px; }
+  li { margin: 6px 0; }
+  a { color: #007aff; }
+  code { background: #f2f2f7; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<h1>Zásady ochrany soukromí – GeoReminder</h1>
+<p class="updated">Poslední aktualizace: 22. 7. 2026</p>
+
+<p>Tyto zásady popisují, jak aplikace <strong>GeoReminder</strong> pro Android nakládá s vašimi daty. Aplikace je navržená tak, aby vaše data zůstávala ve vašem telefonu. Nemá žádné uživatelské účty, nesbírá data na server provozovatele, neobsahuje reklamy ani nástroje pro sledování.</p>
+<p>Provozovatel aplikace: <strong>Jenda</strong> (kontakt: <a href="mailto:mcnegr@gmail.com">mcnegr@gmail.com</a>).</p>
+
+<h2>Jaká data aplikace zpracovává a kde zůstávají</h2>
+<ul>
+  <li><strong>Připomínky, oblíbená místa a jejich nastavení</strong> (název, souřadnice a poloměr místa, čas, druh upozornění) se ukládají <strong>pouze do soukromého úložiště aplikace ve vašem telefonu</strong>. Neodesílají se nikam jinam.</li>
+  <li><strong>Přílohy</strong> (fotky, PDF a jiné soubory, které si k připomínce sami přidáte) se <strong>zkopírují do soukromého úložiště aplikace</strong> a zůstávají ve vašem telefonu.</li>
+  <li><strong>Poloha</strong> se používá k tomu, aby aplikace poznala, že jste dorazili na místo připomínky nebo z něj odjeli (geofencing). Vyhodnocuje to operační systém Android přímo v zařízení. Aplikace vaši polohu <strong>neukládá a neodesílá na žádný server provozovatele</strong>.</li>
+  <li><strong>Kalendář</strong> aplikace <strong>čte pouze na vaši výslovnou akci</strong> (funkce „Import z kalendáře"), a to jen kvůli zobrazení seznamu nadcházejících událostí. Aplikace kalendář needituje a jeho obsah nikam neodesílá.</li>
+</ul>
+
+<h2>Kdy data opouštějí zařízení (služby třetích stran)</h2>
+<p>Aplikace nemá vlastní server, ale pro některé funkce využívá služby třetích stran. Předává se jen to, co je pro danou funkci nutné:</p>
+<ul>
+  <li><strong>Mapy Google (Google Maps SDK):</strong> k vykreslení mapy při výběru místa. Google při tom může zpracovávat údaje o zařízení a poloze podle vlastních zásad Google.</li>
+  <li><strong>Hledání míst – Photon</strong> (photon.komoot.io, data z OpenStreetMap): při hledání se odešle <strong>text vašeho dotazu</strong>, služba vrátí odpovídající místa.</li>
+  <li><strong>Geokódování adresy:</strong> při importu události z kalendáře (a jako záloha hledání) může aplikace použít geokódovací službu systému Android, které se předá <strong>text adresy</strong>.</li>
+  <li><strong>Rozbalení odkazu z Map Google:</strong> když do aplikace nasdílíte místo z Map Google, aplikace navštíví daný odkaz, aby z něj zjistila souřadnice.</li>
+</ul>
+<p>Veškerá tato komunikace probíhá přes zabezpečené připojení (HTTPS).</p>
+
+<h2>Zálohování</h2>
+<p>Máte-li zapnuté zálohování Androidu, systém může zálohovat vaše připomínky, oblíbená místa a přílohy do <strong>vašeho vlastního účtu Google</strong>, aby přežily výměnu telefonu. Tuto zálohu spravuje Google podle vlastních zásad; provozovatel aplikace k ní nemá přístup. Zálohování lze v nastavení telefonu vypnout.</p>
+
+<h2>Co aplikace NEdělá</h2>
+<ul>
+  <li>Nemá uživatelské účty ani přihlašování.</li>
+  <li>Neobsahuje reklamy.</li>
+  <li>Neobsahuje analytiku ani nástroje pro sledování chování.</li>
+  <li>Neprodává ani nesdílí vaše data třetím stranám pro reklamní účely.</li>
+</ul>
+
+<h2>Oprávnění a proč je aplikace používá</h2>
+<ul>
+  <li><strong>Poloha</strong> (přesná, přibližná a na pozadí / „Povolit vždy"): hlídání míst připomínek i se zavřenou aplikací.</li>
+  <li><strong>Notifikace:</strong> zobrazení připomínek.</li>
+  <li><strong>Přesné budíky:</strong> doručení časových připomínek v přesný zvolený čas.</li>
+  <li><strong>Spuštění po restartu:</strong> obnovení hlídání po restartu telefonu.</li>
+  <li><strong>Vyjmutí z optimalizace baterie:</strong> spolehlivé doručení připomínek na pozadí (volitelné).</li>
+  <li><strong>Internet:</strong> zobrazení mapy a hledání míst.</li>
+  <li><strong>Čtení kalendáře:</strong> jednorázový import události do připomínky (jen na vaši akci).</li>
+</ul>
+
+<h2>Vaše kontrola nad daty</h2>
+<p>Data můžete kdykoli odstranit – smazáním připomínek a příloh v aplikaci, vymazáním dat aplikace v nastavení telefonu, nebo odinstalací aplikace. Protože aplikace neukládá žádná vaše data na server provozovatele, odinstalací se vaše data z aplikace odstraní.</p>
+
+<h2>Děti</h2>
+<p>Aplikace není určena dětem a záměrně od nich neshromažďuje žádná data.</p>
+
+<h2>Změny těchto zásad</h2>
+<p>Tyto zásady můžeme čas od času aktualizovat. Aktuální verze je vždy dostupná na této stránce s uvedeným datem poslední aktualizace.</p>
+
+<h2>Kontakt</h2>
+<p>Dotazy k ochraně soukromí v aplikaci GeoReminder: <a href="mailto:mcnegr@gmail.com">mcnegr@gmail.com</a>.</p>
+</body>
+</html>
