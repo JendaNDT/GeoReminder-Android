@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.DatePicker
@@ -70,6 +71,7 @@ import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
+import cz.jenda.georeminder.notify.NavigationLauncher
 import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.IOSSwitch
@@ -373,6 +375,36 @@ fun EditReminderSheet(
                                 modifier = Modifier.weight(1f),
                             )
                             IOSSwitch(checked = repeats) { repeats = it }
+                        }
+
+                        // Existující připomínka na místě: rychlá navigace na bod
+                        if (existing != null) {
+                            CardDivider()
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .iosClickable {
+                                        coordinate?.let { c ->
+                                            NavigationLauncher.open(
+                                                context, c.latitude, c.longitude, placeName,
+                                            )
+                                        }
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 15.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Filled.Navigation, null,
+                                    tint = colors.accent,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    text = "Navigovat",
+                                    style = GeoType.body,
+                                    color = colors.accent,
+                                )
+                            }
                         }
                     }
                 }

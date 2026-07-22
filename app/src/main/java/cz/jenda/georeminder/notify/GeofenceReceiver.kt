@@ -8,6 +8,7 @@ import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import com.google.android.gms.location.LocationServices
 import cz.jenda.georeminder.data.ReminderStore
+import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TriggerType
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +37,8 @@ class GeofenceReceiver : BroadcastReceiver() {
                 store.reload()
                 val reminders = store.reminders.value
 
+                val fired = mutableListOf<Reminder>()
+
                 for (id in ids) {
                     val reminder = reminders.firstOrNull { it.id == id } ?: continue
                     if (reminder.isDone || reminder.kind != ReminderKind.LOCATION) continue
@@ -48,6 +51,7 @@ class GeofenceReceiver : BroadcastReceiver() {
                     if (!matches) continue
 
                     NotificationHelper.show(context, reminder)
+                    fired.add(reminder)
 
                     if (!reminder.repeats) {
                         // Jednorázová: geofence už nehlídat (notifikace „vystřelila")
@@ -56,6 +60,17 @@ class GeofenceReceiver : BroadcastReceiver() {
                         LocationServices.getGeofencingClient(context)
                             .removeGeofences(listOf(id))
                     }
+                }
+
+                // Hlasité čtení (volitelné). Když se najednou spustí víc připomínek
+                // na jednom místě, přečti jejich názvy za sebou.
+                if (fired.isNotEmpty()) {
+                    val text = if (fired.size == 1) {
+                        TtsSpeaker.textFor(fired[0].title, NotificationHelper.body(fired[0]))
+                    } else {
+                        fired.joinToString(", ") { it.title }
+                    }
+                    TtsSpeaker.speak(context, text)
                 }
             } catch (e: Exception) {
                 Log.w("GeofenceReceiver", "Chyba při zpracování geofence události", e)

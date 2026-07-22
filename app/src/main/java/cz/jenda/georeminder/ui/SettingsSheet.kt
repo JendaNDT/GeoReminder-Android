@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.selection.selectable
@@ -23,7 +25,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cz.jenda.georeminder.data.FeatureSettings
 import cz.jenda.georeminder.ui.components.CardDivider
+import cz.jenda.georeminder.ui.components.IOSSwitch
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.SectionHeader
 import cz.jenda.georeminder.ui.components.SheetHeader
@@ -53,6 +57,13 @@ fun SettingsSheet(onClose: () -> Unit) {
             leftText = "Hotovo",
             onLeft = onClose,
         )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 40.dp),
+        ) {
 
         SectionHeader("Vzhled", Modifier.padding(top = 8.dp))
         InsetCard {
@@ -97,5 +108,53 @@ fun SettingsSheet(onClose: () -> Unit) {
             color = colors.secondaryLabel,
             modifier = Modifier.padding(horizontal = 32.dp),
         )
+
+        // Volitelné funkce (rozšíření Android verze)
+        val readAloud by FeatureSettings.readAloud.collectAsStateWithLifecycle()
+        val readFull by FeatureSettings.readAloudFullText.collectAsStateWithLifecycle()
+
+        SectionHeader("Funkce", Modifier.padding(top = 20.dp))
+        InsetCard {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Číst připomínky nahlas",
+                    style = GeoType.body,
+                    color = colors.label,
+                    modifier = Modifier.weight(1f),
+                )
+                IOSSwitch(checked = readAloud) { FeatureSettings.setReadAloud(context, it) }
+            }
+            if (readAloud) {
+                CardDivider()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Číst i celý text",
+                        style = GeoType.body,
+                        color = colors.label,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IOSSwitch(checked = readFull) { FeatureSettings.setReadAloudFullText(context, it) }
+                }
+            }
+        }
+        Spacer(Modifier.size(8.dp))
+        Text(
+            text = "Po spuštění připomínky ji telefon přečte nahlas. Výchozí stav vypnuto; " +
+                "nečte v tichém ani vibračním režimu.",
+            style = GeoType.caption2,
+            color = colors.secondaryLabel,
+            modifier = Modifier.padding(horizontal = 32.dp),
+        )
+        }
     }
 }

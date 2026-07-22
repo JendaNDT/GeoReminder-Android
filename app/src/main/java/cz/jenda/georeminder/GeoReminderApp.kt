@@ -1,6 +1,7 @@
 package cz.jenda.georeminder
 
 import android.app.Application
+import cz.jenda.georeminder.data.FeatureSettings
 import cz.jenda.georeminder.notify.NotificationHelper
 import cz.jenda.georeminder.ui.theme.ThemeController
 
@@ -9,5 +10,6 @@ class GeoReminderApp : Application() {
         super.onCreate()
         NotificationHelper.createChannel(this)
         ThemeController.init(this)
+        FeatureSettings.init(this)
     }
 }

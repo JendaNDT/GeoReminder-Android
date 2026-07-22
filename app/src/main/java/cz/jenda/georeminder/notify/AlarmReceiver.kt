@@ -38,6 +38,15 @@ class AlarmReceiver : BroadcastReceiver() {
                 // show() u dožadující se připomínky sám naplánuje další připomenutí
                 NotificationHelper.show(context, reminder)
 
+                // Hlasité čtení (volitelné) – ne u dožadování, ať se to neopakuje
+                // dokola každých 5 minut.
+                if (!isNag) {
+                    TtsSpeaker.speak(
+                        context,
+                        TtsSpeaker.textFor(reminder.title, NotificationHelper.body(reminder)),
+                    )
+                }
+
                 when {
                     isSnooze -> {
                         // Odložení doručeno – zapomenout uloženou značku odložení.

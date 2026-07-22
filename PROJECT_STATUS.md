@@ -1,12 +1,12 @@
 # GeoReminder Android – Project Status
-*Naposled aktualizováno: 21. 07. 2026 v noci (v1.6 – druhy upozornění a dožadování)*
+*Naposled aktualizováno: 22. 07. 2026 (v2.1 – Navigovat + hlasité čtení; první milník z plánu vylepšení)*
 
 ## 🎯 Co to je
 Nativní Android verze GeoReminderu – připomínky vázané na místo i čas, vzhled 1:1 podle iOS předlohy (`design-podklady/DESIGN_SPEC.md`).
 Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmManager (přesné budíky), Glance widget, App Shortcuts, JSON úložiště formátově kompatibilní s iOS verzí. Minimum: Android 8 (API 26). Jeden modul, bez dalších služeb.
 
 ## ⏭️ Příští krok
-**v2.0 = Fáze 3 (příprava na Google Play).** V kódu hotovo: řízené zálohování dat, minifikace připravená (zatím vypnutá), UI polish, cílový API 35. Postup na Play je rozepsaný v **`GOOGLE-PLAY-CHECKLIST.md`** – pozor hlavně na **test 12 testerů / 14 dní** pro nové osobní účty. Otestovat v2.0 na telefonu (chová se jako v1.9 + drobný polish). Až budeš chtít publikovat: řekni a zapnu minifikaci + sestavím App Bundle (`.aab`).
+**Otestovat v2.1 na telefonu** – tlačítko Navigovat (na notifikaci u místní připomínky i v detailu) a hlasité čtení (Nastavení → Funkce → „Číst připomínky nahlas", výchozí vypnuto). Pak pokračovat **Fází 2 plánu vylepšení**: Přílohy k připomínce + Chytré seskupení notifikací (viz `IMPLEMENTACNI-PLAN-VYLEPSENI.md`). Pořadí a rozhodnutí drží ten plán. (Google Play zůstává v backlogu, `GOOGLE-PLAY-CHECKLIST.md`.)
 
 ## ✅ Hotovo
 - Kompletní přepis všech obrazovek podle DESIGN_SPEC: onboarding (3 stránky, text upravený pro androidí oprávnění „Povolit vždy"), seznam se sekcemi **Aktivní/Hotové** + swipe Hotovo/Vrátit/Smazat, formulář (Na místě/Na čas, opakování, čipy oblíbených), výběr místa na mapě (hledání, ťuknutí, živý kruh poloměru), oblíbená místa, mapový přehled, oranžové bannery oprávnění
@@ -78,6 +78,11 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
   - **`GOOGLE-PLAY-CHECKLIST.md`** = krok-za-krokem postup vydání; pozor na test 12 testerů/14 dní u nových osobních účtů
   - **build BUILD SUCCESSFUL, podepsané APK (versionCode 12)**
 
+- **v2.1 (22. 7. – první milník z plánu vylepšení, versionCode 13):** dvě rychlé funkce z brainstormingu + společný základ:
+  - **Tlačítko „Navigovat":** u připomínky na místo je nová akce na notifikaci (první tlačítko) i řádek v detailu; otevře navigaci přímo v Google Maps na souřadnice připomínky, bez Map nabídne výběr jiné mapové appky. **Nepoužívá Maps API klíč** (jen systémový intent), takže nežere kvótu. Technicky přes neviditelnou `NavigateActivity` – Android 12+ blokuje start aktivity přímo z receiveru („notification trampoline"). U míst se proto na notifikaci vejdou 3 akce Navigovat/Hotovo/Odložit (u času zůstává i „Zítra ráno").
+  - **Hlasité čtení (TTS):** volitelné (Nastavení → **Funkce**, výchozí VYPNUTO), po spuštění připomínky ji systémové TTS přečte česky nahlas (lokálně). Respektuje tichý/vibrační režim (nečte), bez českého hlasu nečte. Volba „Číst i celý text" (jinak jen název). Nový `FeatureSettings` (vzor `ThemeController`).
+  - technicky: nové soubory `data/FeatureSettings.kt`, `notify/NavigationLauncher.kt`, `notify/NavigateActivity.kt`, `notify/TtsSpeaker.kt`; zásahy do `NotificationHelper`, obou receiverů, `SettingsSheet`, `EditReminderSheet`, manifestu (`<queries>` + `NavigateActivity`). Data beze změny (přepínače jsou v SharedPreferences), iOS kompatibilita zachována.
+  - nezávislá revize našla 4 věci (trampoline u Navigovat, Toast z pozadí, 4. tlačítko navíc, komentář) → všechny opravené před buildem. **Build v cloudu: BUILD SUCCESSFUL, podepsané APK 14 MB (versionCode 13).**
 - **Projekt je na GitHubu (21. 7. večer):** https://github.com/JendaNDT/GeoReminder-Android – kompletní zdrojový kód a dokumentace. Tajnosti (mapový klíč, podpisový keystore) jsou záměrně mimo git a žijí jen v zipu ve složce na Macu
 
 ## 📝 TODO
@@ -105,6 +110,10 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
 - **Jednorázové geofence se značkou „vystřeleno"** (SharedPreferences): po spuštění se znovu neregistrují, ale připomínka zůstává v seznamu aktivní – přesně jako na iOS. Úprava nebo „Vrátit" ji znovu ozbrojí.
 - **Oprávnění v řetězu po onboardingu:** notifikace (Android 13+) → přesná poloha → zvlášť „Povolit vždy". Chybějící oprávnění hlídají oranžové bannery s tlačítkem do Nastavení.
 - **minSdk 26 (Android 8.0, ~98 % zařízení), targetSdk 35.**
+- **Rozhodnutí k vylepšením (Fáze 0.2 plánu, 22. 7.):** TTS **nečte** v tichém/vibračním režimu a bez českého hlasu; defaultně čte jen název (volitelně celý text). Navigovat = Google Maps, jinak výběr appky; u časových připomínek tlačítko není. Přepínače funkcí jsou globální (v SharedPreferences), ne per-připomínka.
+- **Přílohy (Fáze 2.1) = KOPÍROVAT do appky (Jendovo rozhodnutí 22. 7.):** místo odkazu na soubor (URI) se obsah zkopíruje do privátního úložiště appky – přílohy tak **přežijí přeinstalaci** i smazání originálu. Cena: zabírají místo (řešit rozumný limit velikosti/počtu) a je potřeba je zahrnout do řízené zálohy a uklízet při smazání připomínky. Přepisuje původní doporučení „odkaz" z `IMPLEMENTACNI-PLAN-VYLEPSENI.md`.
+- **Navigovat řešeno přes neviditelnou `NavigateActivity`, ne přes receiver** – Android 12+ (targetSdk 31+) blokuje start aktivity z BroadcastReceiveru vyvolaného notifikací („notification trampoline"). `PendingIntent.getActivity` na malou průhlednou aktivitu to obchází.
+- **Build v cloudu bez GitHubu:** Android SDK jde z `dl.google.com`, závislosti z Google Maven + Maven Central. **Gradle je nově jen na GitHub releases, a ten je v cloud session zamčený** – distribuci `gradle-8.10.2-bin.zip` proto stáhnout z mirroru `https://mirrors.aliyun.com/macports/distfiles/gradle/` (funguje, 136 MB). Keystore + `mapskey.properties` žijí na Macu v `Android/GeoReminderAndroid/` (mimo git), pro build se kopírují do klonu. AGP 8.7.3 → Gradle 8.9+ (použito 8.10.2), JDK 21 OK.
 
 ## 📁 Stav souborů
 - `GeoReminder-Android-projekt.zip` – kompletní projekt (rozbalit a otevřít v Android Studiu, nebo přiložit do další session s Claudem)

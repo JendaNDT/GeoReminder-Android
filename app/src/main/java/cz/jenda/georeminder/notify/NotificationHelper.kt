@@ -146,7 +146,7 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
+        val builder = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
             .setSmallIcon(R.drawable.ic_stat_pin)
             .setContentTitle(reminder.title)
             .setContentText(body(reminder))
@@ -161,10 +161,36 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
-            .addAction(0, "Hotovo", doneIntent)
+
+        // Připomínka na místě: první akce „Navigovat" – otevře mapy s navigací
+        // na daný bod. Míří přes PendingIntent.getActivity na NavigateActivity
+        // (ne přes receiver – Android 12+ by start aktivity z receiveru zablokoval).
+        // Systémový intent, nepoužívá Maps API klíč appky.
+        if (reminder.kind == ReminderKind.LOCATION) {
+            val navigateIntent = PendingIntent.getActivity(
+                context,
+                notifId + 4,
+                Intent(context, NavigateActivity::class.java).apply {
+                    putExtra(NavigateActivity.EXTRA_LAT, reminder.latitude)
+                    putExtra(NavigateActivity.EXTRA_LNG, reminder.longitude)
+                    putExtra(NavigateActivity.EXTRA_NAME, reminder.placeName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(0, "Navigovat", navigateIntent)
+        }
+
+        builder.addAction(0, "Hotovo", doneIntent)
             .addAction(0, "Odložit o hodinu", snoozeIntent)
-            .addAction(0, "Zítra ráno", morningIntent)
-            .build()
+
+        // „Zítra ráno" jen u časových připomínek – u míst by to bylo čtvrté tlačítko
+        // a systém zobrazí max 3 (u míst má přednost Navigovat).
+        if (reminder.kind != ReminderKind.LOCATION) {
+            builder.addAction(0, "Zítra ráno", morningIntent)
+        }
+
+        val notification = builder.build()
 
         // Naléhavé: zvuk se opakuje, dokud uživatel notifikaci nezavře
         if (reminder.alertStyle == AlertStyle.URGENT) {
