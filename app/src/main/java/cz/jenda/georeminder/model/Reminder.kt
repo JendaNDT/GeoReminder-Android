@@ -136,6 +136,14 @@ data class Reminder(
     val alertStyle: AlertStyle = AlertStyle.DEFAULT,
     /** Dožadování: nepotvrzená notifikace se vrací každých 5 minut. */
     val nagging: Boolean = false,
+
+    /**
+     * Přílohy připomínky (foto, PDF, QR obrázek…). Soubory jsou ZKOPÍROVANÉ
+     * v privátním úložišti aplikace (`filesDir/attachments/`), takže přežijí
+     * smazání originálu i přeinstalaci (přes řízenou zálohu).
+     * Rozšíření Android verze – iOS pole při čtení ignoruje.
+     */
+    val attachments: List<Attachment> = emptyList(),
 ) {
     /** Popisek do seznamu (druhý řádek) – bez vzdálenosti. */
     val subtitle: String
@@ -156,6 +164,28 @@ data class Reminder(
             }
         }
 }
+
+/** Druh přílohy – řídí ikonu v seznamu. */
+@Serializable
+enum class AttachmentKind {
+    @SerialName("photo") PHOTO,
+    @SerialName("document") DOCUMENT,
+    @SerialName("other") OTHER;
+}
+
+/**
+ * Jedna příloha připomínky. Soubor je zkopírovaný v `filesDir/attachments/`
+ * pod názvem [fileName]; [displayName] je původní název souboru pro zobrazení.
+ * Rozšíření Android verze – iOS ignoruje.
+ */
+@Serializable
+data class Attachment(
+    val id: String = newUUID(),
+    val fileName: String = "",
+    val displayName: String = "",
+    val mime: String = "",
+    val kind: AttachmentKind = AttachmentKind.OTHER,
+)
 
 /** Oblíbené místo (Domov, Práce, Obchod…) pro rychlé zadávání připomínek. */
 @Serializable

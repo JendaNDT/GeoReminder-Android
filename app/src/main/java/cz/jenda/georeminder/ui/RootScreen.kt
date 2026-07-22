@@ -47,6 +47,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.data.ActivityInsets
+import cz.jenda.georeminder.data.Attachments
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
@@ -136,6 +137,8 @@ fun RootScreen() {
                 store.reload()
                 store.resyncAll()
                 LocationHolder.refresh(context)
+                // Úklid osiřelých souborů příloh (odebrané/zrušené/smazané).
+                Attachments.gc(context, store.reminders.value)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

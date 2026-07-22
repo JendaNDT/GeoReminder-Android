@@ -1,12 +1,12 @@
 # GeoReminder Android – Project Status
-*Naposled aktualizováno: 22. 07. 2026 (v2.1 – Navigovat + hlasité čtení; první milník z plánu vylepšení)*
+*Naposled aktualizováno: 22. 07. 2026 (v2.2 – přílohy k připomínce; Fáze 2.1 plánu vylepšení)*
 
 ## 🎯 Co to je
 Nativní Android verze GeoReminderu – připomínky vázané na místo i čas, vzhled 1:1 podle iOS předlohy (`design-podklady/DESIGN_SPEC.md`).
 Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmManager (přesné budíky), Glance widget, App Shortcuts, JSON úložiště formátově kompatibilní s iOS verzí. Minimum: Android 8 (API 26). Jeden modul, bez dalších služeb.
 
 ## ⏭️ Příští krok
-**Otestovat v2.1 na telefonu** – tlačítko Navigovat (na notifikaci u místní připomínky i v detailu) a hlasité čtení (Nastavení → Funkce → „Číst připomínky nahlas", výchozí vypnuto). Pak pokračovat **Fází 2 plánu vylepšení**: Přílohy k připomínce + Chytré seskupení notifikací (viz `IMPLEMENTACNI-PLAN-VYLEPSENI.md`). Pořadí a rozhodnutí drží ten plán. (Google Play zůstává v backlogu, `GOOGLE-PLAY-CHECKLIST.md`.)
+**Otestovat v2.2 na telefonu** – přílohy: v detailu připomínky sekce **Přílohy → Přidat přílohu** (foto/PDF), otevřít, odebrat; ověřit, že přežijí zavření a znovuotevření appky. (Plus stále v2.1: Navigovat + hlasité čtení.) Pak **Fáze 2.2 – Chytré seskupení notifikací** (viz `IMPLEMENTACNI-PLAN-VYLEPSENI.md`). Poslední funkce plánu bude F3 import z Google Kalendáře. (Google Play zůstává v backlogu, `GOOGLE-PLAY-CHECKLIST.md`.)
 
 ## ✅ Hotovo
 - Kompletní přepis všech obrazovek podle DESIGN_SPEC: onboarding (3 stránky, text upravený pro androidí oprávnění „Povolit vždy"), seznam se sekcemi **Aktivní/Hotové** + swipe Hotovo/Vrátit/Smazat, formulář (Na místě/Na čas, opakování, čipy oblíbených), výběr místa na mapě (hledání, ťuknutí, živý kruh poloměru), oblíbená místa, mapový přehled, oranžové bannery oprávnění
@@ -83,6 +83,11 @@ Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmM
   - **Hlasité čtení (TTS):** volitelné (Nastavení → **Funkce**, výchozí VYPNUTO), po spuštění připomínky ji systémové TTS přečte česky nahlas (lokálně). Respektuje tichý/vibrační režim (nečte), bez českého hlasu nečte. Volba „Číst i celý text" (jinak jen název). Nový `FeatureSettings` (vzor `ThemeController`).
   - technicky: nové soubory `data/FeatureSettings.kt`, `notify/NavigationLauncher.kt`, `notify/NavigateActivity.kt`, `notify/TtsSpeaker.kt`; zásahy do `NotificationHelper`, obou receiverů, `SettingsSheet`, `EditReminderSheet`, manifestu (`<queries>` + `NavigateActivity`). Data beze změny (přepínače jsou v SharedPreferences), iOS kompatibilita zachována.
   - nezávislá revize našla 4 věci (trampoline u Navigovat, Toast z pozadí, 4. tlačítko navíc, komentář) → všechny opravené před buildem. **Build v cloudu: BUILD SUCCESSFUL, podepsané APK 14 MB (versionCode 13).**
+- **v2.2 (22. 7. – Fáze 2.1 z plánu vylepšení, versionCode 14): Přílohy k připomínce.** V detailu připomínky nová sekce **Přílohy** – přidat (foto, PDF, jakýkoli soubor), otevřít, odebrat; max 5 příloh, každá do 10 MB.
+  - **Kopírují se do appky** (Jendovo rozhodnutí): obsah se zkopíruje do privátního úložiště (`filesDir/attachments/`), takže příloha **přežije smazání originálu i přeinstalaci** (přidáno do řízené zálohy). V připomínce se drží jen malý odkaz (nové pole `attachments`; iOS ho ignoruje).
+  - otevírání přes **FileProvider**; úklid osiřelých souborů (`Attachments.gc`) při návratu do appky, s ochranou rozdělané úpravy (registr „pending") a vynuceným limitem velikosti při kopírování.
+  - nové soubory: `data/Attachments.kt`, model `Attachment`/`AttachmentKind`, `res/xml/file_paths.xml`; zásah do `Reminder`, `EditReminderSheet`, `RootScreen`, manifestu (FileProvider) a zálohovacích pravidel.
+  - nezávislá revize našla 4 věci (hl. riziko: gc mohl smazat rozdělanou přílohu; obcházení limitu velikosti) → opraveno. **Build SUCCESSFUL, podepsané APK 14 MB (versionCode 14).**
 - **Projekt je na GitHubu (21. 7. večer):** https://github.com/JendaNDT/GeoReminder-Android – kompletní zdrojový kód a dokumentace. Tajnosti (mapový klíč, podpisový keystore) jsou záměrně mimo git a žijí jen v zipu ve složce na Macu
 
 ## 📝 TODO

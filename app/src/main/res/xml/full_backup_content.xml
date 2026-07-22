@@ -3,4 +3,5 @@
 <full-backup-content>
     <include domain="file" path="reminders.json" />
     <include domain="file" path="favorites.json" />
+    <include domain="file" path="attachments/" />
 </full-backup-content>
