@@ -125,40 +125,41 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context:
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_check),
                     contentDescription = null,
-                    modifier = GlanceModifier.size(22.dp),
+                    modifier = GlanceModifier.size(28.dp),
                     colorFilter = ColorFilter.tint(secondaryColor),
                 )
                 Text(
                     text = context.getString(R.string.status_all_done),
-                    style = TextStyle(color = secondaryColor, fontSize = 12.sp),
+                    style = TextStyle(color = secondaryColor, fontSize = 14.sp),
                 )
             }
         } else {
             Column(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .padding(end = 20.dp)
+                modifier = GlanceModifier.fillMaxSize()
             ) {
-                reminders.take(limit).forEach { reminder ->
+                reminders.take(limit).forEachIndexed { index, reminder ->
                     Row(
                         modifier = GlanceModifier
                             .fillMaxWidth()
-                            .padding(bottom = 7.dp),
+                            .padding(
+                                end = if (index == 0) 38.dp else 0.dp,
+                                bottom = 8.dp,
+                            ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Image(
                             provider = ImageProvider(widgetIcon(reminder)),
                             contentDescription = null,
-                            modifier = GlanceModifier.size(15.dp),
+                            modifier = GlanceModifier.size(20.dp),
                             colorFilter = ColorFilter.tint(accentColor),
                         )
-                        Spacer(GlanceModifier.width(7.dp))
+                        Spacer(GlanceModifier.width(9.dp))
                         Column {
                             Text(
                                 text = reminder.title,
                                 style = TextStyle(
                                     color = labelColor,
-                                    fontSize = 12.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                 ),
                                 maxLines = 1,
@@ -167,7 +168,7 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context:
                                 text = reminder.localizedSubtitle(context),
                                 style = TextStyle(
                                     color = secondaryColor,
-                                    fontSize = 11.sp,
+                                    fontSize = 13.sp,
                                 ),
                                 maxLines = 1,
                             )
@@ -182,14 +183,19 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context:
             modifier = GlanceModifier.fillMaxSize(),
             contentAlignment = Alignment.TopEnd,
         ) {
-            Image(
-                provider = ImageProvider(R.drawable.ic_widget_add),
-                contentDescription = context.getString(R.string.widget_add_reminder),
+            Box(
                 modifier = GlanceModifier
-                    .size(18.dp)
+                    .size(36.dp)
                     .clickable(actionStartActivityIntent(addIntent)),
-                colorFilter = ColorFilter.tint(accentColor),
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_add),
+                    contentDescription = context.getString(R.string.widget_add_reminder),
+                    modifier = GlanceModifier.size(24.dp),
+                    colorFilter = ColorFilter.tint(accentColor),
+                )
+            }
         }
     }
 }
