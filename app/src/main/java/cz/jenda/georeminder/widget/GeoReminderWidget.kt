@@ -106,7 +106,21 @@ private val secondaryColor = ColorProvider(
 @Composable
 private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context: Context) {
     val size = LocalSize.current
-    val limit = if (size.width >= 200.dp) 3 else 2
+    val isWide = size.width >= 200.dp
+    val limit = if (isWide) 3 else 2
+    // Testovaný One UI launcher zmenšuje RemoteViews širokého widgetu přibližně
+    // na 83 %. Větší zdrojové rozměry udrží typografii čitelnou a dotykovou
+    // plochu tlačítka alespoň na doporučených 48 dp i po tomto škálování.
+    val emptyIconSize = if (isWide) 40.dp else 28.dp
+    val emptyTextSize = if (isWide) 18.sp else 14.sp
+    val reminderIconSize = if (isWide) 26.dp else 20.dp
+    val reminderIconGap = if (isWide) 12.dp else 9.dp
+    val titleTextSize = if (isWide) 18.sp else 15.sp
+    val subtitleTextSize = if (isWide) 16.sp else 13.sp
+    val rowBottomPadding = if (isWide) 12.dp else 8.dp
+    val addButtonSize = if (isWide) 58.dp else 36.dp
+    val addIconSize = if (isWide) 32.dp else 24.dp
+    val firstRowEndPadding = if (isWide) 64.dp else 38.dp
 
     Box(
         modifier = GlanceModifier
@@ -125,12 +139,12 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context:
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_check),
                     contentDescription = null,
-                    modifier = GlanceModifier.size(28.dp),
+                    modifier = GlanceModifier.size(emptyIconSize),
                     colorFilter = ColorFilter.tint(secondaryColor),
                 )
                 Text(
                     text = context.getString(R.string.status_all_done),
-                    style = TextStyle(color = secondaryColor, fontSize = 14.sp),
+                    style = TextStyle(color = secondaryColor, fontSize = emptyTextSize),
                 )
             }
         } else {
@@ -142,24 +156,24 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context:
                         modifier = GlanceModifier
                             .fillMaxWidth()
                             .padding(
-                                end = if (index == 0) 38.dp else 0.dp,
-                                bottom = 8.dp,
+                                end = if (index == 0) firstRowEndPadding else 0.dp,
+                                bottom = rowBottomPadding,
                             ),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Image(
                             provider = ImageProvider(widgetIcon(reminder)),
                             contentDescription = null,
-                            modifier = GlanceModifier.size(20.dp),
+                            modifier = GlanceModifier.size(reminderIconSize),
                             colorFilter = ColorFilter.tint(accentColor),
                         )
-                        Spacer(GlanceModifier.width(9.dp))
+                        Spacer(GlanceModifier.width(reminderIconGap))
                         Column {
                             Text(
                                 text = reminder.title,
                                 style = TextStyle(
                                     color = labelColor,
-                                    fontSize = 15.sp,
+                                    fontSize = titleTextSize,
                                     fontWeight = FontWeight.Bold,
                                 ),
                                 maxLines = 1,
@@ -168,7 +182,7 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context:
                                 text = reminder.localizedSubtitle(context),
                                 style = TextStyle(
                                     color = secondaryColor,
-                                    fontSize = 13.sp,
+                                    fontSize = subtitleTextSize,
                                 ),
                                 maxLines = 1,
                             )
@@ -185,14 +199,14 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context:
         ) {
             Box(
                 modifier = GlanceModifier
-                    .size(36.dp)
+                    .size(addButtonSize)
                     .clickable(actionStartActivityIntent(addIntent)),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_add),
                     contentDescription = context.getString(R.string.widget_add_reminder),
-                    modifier = GlanceModifier.size(24.dp),
+                    modifier = GlanceModifier.size(addIconSize),
                     colorFilter = ColorFilter.tint(accentColor),
                 )
             }
