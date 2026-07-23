@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Režim vzhledu aplikace (rozšíření Android verze – iOS se řídí jen systémem). */
 enum class ThemeMode {
-    SYSTEM, LIGHT, DARK, NEUTRAL, GLASS;
+    SYSTEM, LIGHT, DARK, NEUTRAL;
 
     @get:StringRes
     val labelRes: Int
@@ -18,7 +18,6 @@ enum class ThemeMode {
             LIGHT -> R.string.theme_light
             DARK -> R.string.theme_dark
             NEUTRAL -> R.string.theme_neutral
-            GLASS -> R.string.theme_glass
         }
 }
 
@@ -29,14 +28,18 @@ object ThemeController {
     val mode = MutableStateFlow(ThemeMode.SYSTEM)
 
     fun init(context: Context) {
-        val raw = context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
-            .getString(KEY, null)
+        val prefs = context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
+        val raw = prefs.getString(KEY, null)
         mode.value = when (raw) {
             "light" -> ThemeMode.LIGHT
             "dark" -> ThemeMode.DARK
             "neutral" -> ThemeMode.NEUTRAL
-            "glass" -> ThemeMode.GLASS
             else -> ThemeMode.SYSTEM
+        }
+        // Glass režim byl odstraněn kvůli nízkému kontrastu a nečitelným
+        // průhledným vrstvám. Starou volbu jednorázově vrať na systémový vzhled.
+        if (raw == "glass") {
+            prefs.edit { putString(KEY, "system") }
         }
     }
 
@@ -46,7 +49,6 @@ object ThemeController {
             ThemeMode.LIGHT -> "light"
             ThemeMode.DARK -> "dark"
             ThemeMode.NEUTRAL -> "neutral"
-            ThemeMode.GLASS -> "glass"
             ThemeMode.SYSTEM -> "system"
         }
         context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE).edit {

@@ -3,10 +3,15 @@ package cz.jenda.georeminder.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
@@ -54,7 +59,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import cz.jenda.georeminder.ui.components.EmptyState
-import cz.jenda.georeminder.ui.components.GlassCircleButton
+import cz.jenda.georeminder.ui.components.ToolbarCircleButton
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 import cz.jenda.georeminder.ui.theme.MapStyles
@@ -83,7 +88,13 @@ fun MapOverviewScreen() {
         reminders.filter { it.kind == ReminderKind.LOCATION && !it.isDone }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(
+                WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)
+            )
+    ) {
         if (locationReminders.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -188,7 +199,7 @@ fun MapOverviewScreen() {
             }
 
             currentLocation?.let { location ->
-                GlassCircleButton(
+                ToolbarCircleButton(
                     icon = Icons.Filled.MyLocation,
                     contentDescription = stringResource(R.string.map_center_on_me),
                     modifier = Modifier

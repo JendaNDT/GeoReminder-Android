@@ -168,7 +168,6 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_neutral">Neutral (warm)</string>
-    <string name="theme_glass">Glass (signature)</string>
     <string name="settings_widget_system">The home-screen widget follows the system appearance.</string>
     <string name="settings_tts_enable_description">Reads the reminder title when it triggers</string>
     <string name="settings_tts_full_description">Also reads the location or trigger time</string>

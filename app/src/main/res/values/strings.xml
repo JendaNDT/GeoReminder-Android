@@ -168,7 +168,6 @@
     <string name="theme_light">Světlý</string>
     <string name="theme_dark">Tmavý</string>
     <string name="theme_neutral">Neutrální (teplý)</string>
-    <string name="theme_glass">Glass (vlajkový)</string>
     <string name="settings_widget_system">Widget na ploše se řídí nastavením systému.</string>
     <string name="settings_tts_enable_description">Při spuštění přečte název připomínky</string>
     <string name="settings_tts_full_description">Přečte i místo nebo čas spuštění</string>

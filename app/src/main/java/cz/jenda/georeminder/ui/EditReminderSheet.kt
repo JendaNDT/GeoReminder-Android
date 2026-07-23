@@ -141,11 +141,12 @@ fun EditReminderSheet(
             }
         )
     }
+    val initialDueDate = remember(existing?.id) {
+        existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
+            ?: (System.currentTimeMillis() + 3_600_000L)
+    }
     var dueDate by remember {
-        mutableLongStateOf(
-            existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
-                ?: (System.currentTimeMillis() + 3_600_000L)
-        )
+        mutableLongStateOf(initialDueDate)
     }
     var timeRepeat by remember { mutableStateOf(existing?.timeRepeat ?: TimeRepeat.NEVER) }
     var weekdaysSel by remember {
@@ -298,8 +299,7 @@ fun EditReminderSheet(
     } else {
         initialCoordinate
     }
-    val initialDueDateVal = existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
-        ?: (System.currentTimeMillis() + 3_600_000L)
+    val initialDueDateVal = initialDueDate
     val initialTimeRepeatVal = existing?.timeRepeat ?: TimeRepeat.NEVER
     val initialWeekdaysVal = existing?.weekdays?.takeIf { it.isNotEmpty() }?.toSet()
         ?: setOf(ReminderScheduler.isoWeekday(initialDueDateVal))
@@ -359,6 +359,7 @@ fun EditReminderSheet(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
+            .background(colors.background)
     ) {
         SheetHeader(
             title = stringResource(

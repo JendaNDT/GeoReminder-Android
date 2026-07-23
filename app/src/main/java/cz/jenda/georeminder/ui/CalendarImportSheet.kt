@@ -45,7 +45,6 @@ import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
-import cz.jenda.georeminder.ui.components.GlassCircleButton
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.SectionHeader
 import cz.jenda.georeminder.ui.components.SheetHeader

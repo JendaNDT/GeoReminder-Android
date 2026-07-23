@@ -4,7 +4,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 /**
- * Barvy podle DESIGN_TOKENS.md – Světlý, Tmavý, Neutrální a Glass (směr Vytříbený).
+ * Barvy podle DESIGN_TOKENS.md – Světlý, Tmavý a Neutrální vzhled.
  */
 data class GeoColors(
     val accent: Color,
@@ -32,7 +32,6 @@ data class GeoColors(
     val road: Color,
     val widgetBg: Color,
     val isDark: Boolean,
-    val isGlass: Boolean = false,
 )
 
 val LightGeoColors = GeoColors(
@@ -117,35 +116,6 @@ val NeutralGeoColors = GeoColors(
     road = Color(0x9EFFFFFF),
     widgetBg = Color(0xFFF0EADB),
     isDark = false,
-)
-
-val GlassGeoColors = GeoColors(
-    accent = Color(0xFF4B43D6),
-    background = Color(0xFF5468E8),
-    card = Color(0x70FFFFFF),
-    label = Color(0xFF0F1128),
-    secondaryLabel = Color(0xF20F1128),   // WCAG AA > 4.5:1
-    tertiaryLabel = Color(0xD90F1128),    // WCAG AA > 4.5:1
-    separator = Color(0x290F1128),
-    green = Color(0xFF1B7A49),
-    red = Color(0xFFFF3B30),
-    orange = Color(0xFFE06C00),
-    yellow = Color(0xFFB88A00),
-    teal = Color(0xFF118E9B),
-    purple = Color(0xFFA85CFF),
-    segmentTrack = Color(0x57FFFFFF),
-    segmentThumb = Color(0xFFFFFFFF),
-    sliderTrack = Color(0x57FFFFFF),
-    switchTrackOff = Color(0x57FFFFFF),
-    tabBarBackground = Color(0x38FFFFFF),
-    tabActiveBubble = Color(0xB3FFFFFF),
-    glass = Color(0x9EFFFFFF),
-    shadow = Color(0x661F1946),
-    mapBg = Color(0xFFE4E8F2),
-    road = Color(0xFFFFFFFF),
-    widgetBg = Color(0x70FFFFFF),
-    isDark = false,
-    isGlass = true,
 )
 
 val LocalGeoColors = staticCompositionLocalOf { LightGeoColors }

@@ -37,22 +37,10 @@ object MapStyles {
     ]
     """
 
-    /** Vlajková Indigo stylizovaná mapa pro Glass režim. */
-    private const val GLASS_STYLE = """
-    [
-      {"elementType": "geometry", "stylers": [{"color": "#1d1d36"}]},
-      {"elementType": "labels.text.fill", "stylers": [{"color": "#8f9bb3"}]},
-      {"featureType": "park", "elementType": "geometry", "stylers": [{"color": "#142c33"}]},
-      {"featureType": "road", "elementType": "geometry", "stylers": [{"color": "#2d2d54"}]},
-      {"featureType": "water", "elementType": "geometry", "stylers": [{"color": "#0d1b2a"}]}
-    ]
-    """
-
     fun getMapStyle(mode: ThemeMode, isSystemDark: Boolean = false): MapStyleOptions? {
         return when (mode) {
             ThemeMode.DARK -> MapStyleOptions(DARK_STYLE)
             ThemeMode.NEUTRAL -> MapStyleOptions(NEUTRAL_STYLE)
-            ThemeMode.GLASS -> MapStyleOptions(GLASS_STYLE)
             ThemeMode.SYSTEM -> if (isSystemDark) MapStyleOptions(DARK_STYLE) else null
             ThemeMode.LIGHT -> null
         }

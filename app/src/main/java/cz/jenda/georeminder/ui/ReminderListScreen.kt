@@ -15,15 +15,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -111,7 +116,7 @@ import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
-import cz.jenda.georeminder.ui.components.GlassCircleButton
+import cz.jenda.georeminder.ui.components.ToolbarCircleButton
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.PermissionBanner
 import cz.jenda.georeminder.ui.components.SectionHeader
@@ -161,6 +166,9 @@ fun ReminderListScreen(
     var backgroundMissing by remember { mutableStateOf(false) }
     var batteryRestricted by remember { mutableStateOf(false) }
     var sharedPrefill by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
+    val hasStatusBanners =
+        notificationsDenied || locationDenied || backgroundMissing ||
+            batteryRestricted || geofenceFailed || storageError
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -233,10 +241,21 @@ fun ReminderListScreen(
     }
 
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(
+                WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)
+            )
+    ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 130.dp),
+        // Obsah končí nad plovoucím tab barem. Samotný contentPadding dovolí
+        // doscrollovat, ale v nízkém landscape viewportu by prvky stále kreslil
+        // přímo pod navigaci.
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = 120.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         // Kruhová „skleněná" tlačítka nahoře
         item {
@@ -246,19 +265,19 @@ fun ReminderListScreen(
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                GlassCircleButton(Icons.Filled.StarBorder, stringResource(R.string.favorites_button)) {
+                ToolbarCircleButton(Icons.Filled.StarBorder, stringResource(R.string.favorites_button)) {
                     showFavorites = true
                 }
                 Spacer(Modifier.width(10.dp))
-                GlassCircleButton(Icons.Filled.CalendarMonth, stringResource(R.string.calendar_import_button_description)) {
+                ToolbarCircleButton(Icons.Filled.CalendarMonth, stringResource(R.string.calendar_import_button_description)) {
                     showCalendarImport = true
                 }
                 Spacer(Modifier.weight(1f))
-                GlassCircleButton(Icons.Filled.SettingsGear, stringResource(R.string.settings_title)) {
+                ToolbarCircleButton(Icons.Filled.SettingsGear, stringResource(R.string.settings_title)) {
                     showSettings = true
                 }
                 Spacer(Modifier.width(10.dp))
-                GlassCircleButton(Icons.Filled.Add, stringResource(R.string.new_reminder_description)) {
+                ToolbarCircleButton(Icons.Filled.Add, stringResource(R.string.new_reminder_description)) {
                     newSheetKind = null
                     editingReminder = null
                     showNewSheet = true
@@ -321,7 +340,7 @@ fun ReminderListScreen(
             }
         }
         // Bannery oprávnění a spolehlivosti
-        if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted || geofenceFailed || storageError) {
+        if (hasStatusBanners) {
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -378,9 +397,15 @@ fun ReminderListScreen(
         if (reminders.isEmpty()) {
             item {
                 Box(
-                    modifier = Modifier
-                        .fillParentMaxHeight(0.6f)
-                        .fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().then(
+                        if (hasStatusBanners) {
+                            // Bannery už zabírají značnou část viewportu; další
+                            // relativní výška by prázdný stav zasunula pod tab bar.
+                            Modifier.padding(vertical = 48.dp)
+                        } else {
+                            Modifier.fillParentMaxHeight(0.6f)
+                        }
+                    ),
                     contentAlignment = Alignment.Center,
                 ) {
                     EmptyState(

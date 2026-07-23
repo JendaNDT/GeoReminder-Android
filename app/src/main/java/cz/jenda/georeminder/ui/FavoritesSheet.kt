@@ -61,7 +61,7 @@ import cz.jenda.georeminder.model.DEFAULT_RADIUS
 import cz.jenda.georeminder.model.FavoritePlace
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
-import cz.jenda.georeminder.ui.components.GlassCircleButton
+import cz.jenda.georeminder.ui.components.ToolbarCircleButton
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.RadiusSlider
 import cz.jenda.georeminder.ui.components.SectionHeader
@@ -96,7 +96,7 @@ fun FavoritesSheet(onClose: () -> Unit) {
             leftText = stringResource(cz.jenda.georeminder.R.string.action_done),
             onLeft = onClose,
             rightContent = {
-                GlassCircleButton(
+                ToolbarCircleButton(
                     icon = Icons.Filled.Add,
                     contentDescription = stringResource(cz.jenda.georeminder.R.string.favorites_add),
                 ) { addingNew = true }
@@ -335,6 +335,7 @@ fun EditFavoriteSheet(
             .fillMaxWidth()
             .fillMaxHeight()
             .statusBarsPadding()
+            .background(colors.background)
     ) {
         SheetHeader(
             title = if (existing == null) stringResource(cz.jenda.georeminder.R.string.favorite_new_title) else stringResource(cz.jenda.georeminder.R.string.favorite_edit_title),
