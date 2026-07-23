@@ -25,8 +25,8 @@ android {
         applicationId = "cz.jenda.georeminder"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "2.7"
+        versionCode = 20
+        versionName = "2.8"
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 

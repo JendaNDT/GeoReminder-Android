@@ -8,7 +8,7 @@ Po následné opravné iteraci už v kódu nezůstává žádný známý kritick
 
 ## Stav po opravách
 
-Původní nálezy níže zůstávají zachované jako auditní stopa a popisují stav **před opravami**; čísla řádků se po změnách přirozeně posunula. Aktuální stav je:
+Původní nálezy níže zůstávají zachované jako auditní stopa a popisují stav **před opravami**; čísla řádků se po změnách přirozeně posunula. Opravná sestava je označena jako **v2.8 / versionCode 20**. Aktuální stav je:
 
 - **Opraveno:** L1–L4, L6, A1, A3, A4, A6–A7, S1–S7, C1, C3–C5, U1–U3, U6–U7, V1, V4–V5 a související kosmetické dead-code/lokalizační nálezy.
 - **Výrazně zlepšeno, ale ne absolutně uzavřeno:** L5 (validace, deduplikace, hromadné zápisy a best-effort rollback; dva samostatné JSON soubory ale netvoří jednu filesystem transakci), A2/A5/C2 (cyklus `model → data` a mrtvý kód jsou pryč, velké composables a část sdílených utilit zůstávají), S8 (19 unit testů a CI, zatím bez receiver/Compose instrumentace), U4/U5 (loading/error, Photon offline stav a recurrence přes `Instances` opraveny; produktová semantika kalendářní adresy zůstává otevřená).
