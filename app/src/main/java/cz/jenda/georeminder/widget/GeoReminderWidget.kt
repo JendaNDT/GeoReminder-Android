@@ -7,12 +7,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.Preferences
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
+import androidx.glance.currentState
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
@@ -33,6 +35,7 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -57,16 +60,19 @@ class GeoReminderWidget : GlanceAppWidget() {
     }
 
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE))
+    override val stateDefinition = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val reminders = loadActive(context)
         // Plus v rohu widgetu → rovnou formulář nové připomínky
         val addIntent = Intent(context, MainActivity::class.java)
             .setAction(Intent.ACTION_VIEW)
             .putExtra("shortcut_kind", "location")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         provideContent {
-            WidgetContent(reminders, addIntent, context)
+            // Čtení revize naváže kompozici na stav widgetu. Její zvýšení po
+            // každém uložení zaručí nové načtení i v dlouho běžící Glance relaci.
+            currentState<Preferences>()[widgetRevisionKey]
+            WidgetContent(loadActive(context), addIntent, context)
         }
     }
 
