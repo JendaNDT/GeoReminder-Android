@@ -48,7 +48,7 @@ class ReminderListViewModel(application: Application) : AndroidViewModel(applica
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun updateSearchQuery(query: String) {
-        searchQuery.value = query
+        searchQuery.value = query.take(200)
     }
 
     fun distanceText(reminder: Reminder): String? {

@@ -13,6 +13,7 @@ local.properties
 mapskey.properties
 # podpisový keystore (jen s ním jdou aktualizace instalovat přes starou verzi)
 app/georeminder.keystore
+keystore.properties
 
 # IDE a systémové soubory
 .idea/

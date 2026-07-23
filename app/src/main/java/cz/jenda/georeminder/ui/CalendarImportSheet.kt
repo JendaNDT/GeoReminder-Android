@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,12 +52,14 @@ import cz.jenda.georeminder.ui.components.SheetHeader
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import kotlinx.coroutines.launch
 
 @Composable
 fun CalendarImportSheet(onClose: () -> Unit) {
     val context = LocalContext.current
     val colors = GeoTheme.colors
     val store = remember { ReminderStore.get(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     var hasPermission by remember {
         mutableStateOf(
@@ -66,36 +70,40 @@ fun CalendarImportSheet(onClose: () -> Unit) {
         )
     }
     var events by remember { mutableStateOf<List<CalendarEventItem>>(emptyList()) }
-    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    var importedCount by remember { mutableStateOf<Int?>(null) }
+    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var isImporting by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasPermission = isGranted
-        if (isGranted) {
-            events = CalendarImporter.getUpcomingEvents(context)
-        }
     }
 
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
+            isLoading = true
             events = CalendarImporter.getUpcomingEvents(context)
+            isLoading = false
         }
     }
 
     fun importSelected() {
         val selectedEvents = events.filter { it.id in selectedIds }
-        selectedEvents.forEach { ev ->
-            store.add(CalendarImporter.toReminder(ev))
-        }
-        val count = selectedEvents.size
-        if (count > 0) {
-            android.widget.Toast.makeText(
-                context,
-                "Naimportováno $count událostí z kalendáře",
-                android.widget.Toast.LENGTH_SHORT
-            ).show()
+        if (selectedEvents.isEmpty() || isImporting) return
+        isImporting = true
+        coroutineScope.launch {
+            val reminders = selectedEvents.map(CalendarImporter::toReminder)
+            val success = store.upsertAllDurably(reminders)
+            isImporting = false
+            if (success) {
+                android.widget.Toast.makeText(
+                    context,
+                    context.getString(cz.jenda.georeminder.R.string.calendar_imported_count, reminders.size),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                onClose()
+            }
         }
     }
 
@@ -109,10 +117,9 @@ fun CalendarImportSheet(onClose: () -> Unit) {
             leftText = stringResource(cz.jenda.georeminder.R.string.action_cancel),
             onLeft = onClose,
             rightText = if (selectedIds.isNotEmpty()) stringResource(cz.jenda.georeminder.R.string.calendar_import_button, selectedIds.size) else "",
-            rightEnabled = selectedIds.isNotEmpty(),
+            rightEnabled = selectedIds.isNotEmpty() && !isImporting,
             onRight = {
                 importSelected()
-                onClose()
             },
         )
 
@@ -127,7 +134,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                     EmptyState(
                         icon = Icons.Filled.CalendarMonth,
                         title = stringResource(cz.jenda.georeminder.R.string.calendar_import_title),
-                        text = stringResource(cz.jenda.georeminder.R.string.permission_banner_notifications),
+                        text = stringResource(cz.jenda.georeminder.R.string.calendar_permission_text),
                     )
                     Spacer(Modifier.height(16.dp))
                     androidx.compose.material3.Button(
@@ -144,6 +151,21 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                     }
                 }
             }
+        } else if (isLoading) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 90.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CircularProgressIndicator(color = colors.accent)
+                Text(
+                    text = stringResource(cz.jenda.georeminder.R.string.calendar_loading),
+                    style = GeoType.body,
+                    color = colors.secondaryLabel,
+                )
+            }
         } else if (events.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -153,8 +175,8 @@ fun CalendarImportSheet(onClose: () -> Unit) {
             ) {
                 EmptyState(
                     icon = Icons.Filled.CalendarMonth,
-                    title = "Žádné události",
-                    text = "V systémovém kalendáři na příštích 30 dní nebyly nalezeny žádné události.",
+                    title = stringResource(cz.jenda.georeminder.R.string.calendar_no_events_title),
+                    text = stringResource(cz.jenda.georeminder.R.string.calendar_no_events),
                 )
             }
         } else {
@@ -164,7 +186,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                     .verticalScroll(rememberScrollState())
                     .padding(top = 8.dp, bottom = 40.dp),
             ) {
-                SectionHeader("Nadcházející události (30 dní)")
+                SectionHeader(stringResource(cz.jenda.georeminder.R.string.calendar_upcoming_section))
                 InsetCard {
                     events.forEachIndexed { index, event ->
                         val isSelected = event.id in selectedIds
@@ -197,7 +219,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                             if (isSelected) {
                                 Icon(
                                     imageVector = Icons.Filled.Check,
-                                    contentDescription = "Vybráno",
+                                    contentDescription = stringResource(cz.jenda.georeminder.R.string.calendar_selected),
                                     tint = colors.accent,
                                     modifier = Modifier.size(22.dp),
                                 )

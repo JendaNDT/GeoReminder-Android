@@ -24,8 +24,7 @@ class AlarmReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
-                val reminder = store.reminders.value.firstOrNull { it.id == id }
+                val reminder = store.reloadAndGet().firstOrNull { it.id == id }
                     ?: return@launch
                 if (reminder.isDone) return@launch
 
@@ -36,10 +35,14 @@ class AlarmReceiver : BroadcastReceiver() {
                 if (isOneTime && scheduler.isAlarmFired(id)) return@launch
 
                 // show() u dožadující se připomínky sám naplánuje další připomenutí
-                NotificationHelper.show(context, reminder)
+                val delivered = if (isOneTime) {
+                    scheduler.deliverOneTimeAlarm(reminder)
+                } else {
+                    NotificationHelper.show(context, reminder)
+                }
 
                 when {
-                    isSnooze -> {
+                    isSnooze && delivered -> {
                         // Odložení doručeno – zapomenout uloženou značku odložení.
                         scheduler.clearSnooze(id)
                     }
@@ -49,11 +52,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     reminder.timeRepeat != TimeRepeat.NEVER -> {
                         scheduler.scheduleNextOccurrence(reminder)
                     }
-                    else -> {
-                        // Jednorázový budík se odpálil – ať ho catch-up po restartu
-                        // telefonu neposlal znovu.
-                        scheduler.markAlarmFired(id)
-                    }
+                    delivered -> Unit // jednorázová značka vznikla atomicky při doručení
                 }
             } catch (e: Exception) {
                 Log.w("AlarmReceiver", "Chyba při doručení připomínky", e)

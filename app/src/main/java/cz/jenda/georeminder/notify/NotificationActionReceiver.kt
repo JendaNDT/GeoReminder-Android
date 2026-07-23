@@ -25,16 +25,17 @@ class NotificationActionReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
-                val reminder = store.reminders.value.firstOrNull { it.id == id }
+                val reminder = store.reloadAndGet().firstOrNull { it.id == id }
                     ?: return@launch
 
+                var handled = false
                 when (action) {
                     NotificationHelper.ACTION_DONE -> {
-                        store.markDone(reminder)
+                        handled = store.markDoneByIdDurably(id)
                     }
                     NotificationHelper.ACTION_SNOOZE -> {
                         store.snooze(reminder, minutes = ReminderScheduler.SNOOZE_MINUTES)
+                        handled = true
                     }
                     NotificationHelper.ACTION_SNOOZE_MORNING -> {
                         // Nejbližší ráno v 8:00 (po půlnoci = ještě dnes)
@@ -48,9 +49,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
                             set(Calendar.MILLISECOND, 0)
                         }
                         store.snoozeAt(reminder, morning.timeInMillis)
+                        handled = true
                     }
                 }
-                NotificationHelper.cancel(context, id)
+                if (handled) NotificationHelper.cancel(context, id)
             } catch (e: Exception) {
                 Log.w("NotifActionReceiver", "Chyba při obsluze tlačítka notifikace", e)
             } finally {

@@ -36,19 +36,19 @@ data class GeoColors(
 )
 
 val LightGeoColors = GeoColors(
-    accent = Color(0xFF007AFF),
+    accent = Color(0xFF0066CC),
     background = Color(0xFFF2F2F7),
     card = Color(0xFFFFFFFF),
     label = Color(0xFF000000),
     secondaryLabel = Color(0xC23C3C43),   // 76 % (WCAG AA > 4.5:1 na bílé)
     tertiaryLabel = Color(0xA63C3C43),    // 65 % (WCAG AA > 4.5:1 na bílé)
     separator = Color(0x4A3C3C43),        // 29 %
-    green = Color(0xFF34C759),
-    red = Color(0xFFFF3B30),
-    orange = Color(0xFFFF9500),
-    yellow = Color(0xFFFFCC00),
-    teal = Color(0xFF30B0C7),
-    purple = Color(0xFFAF52DE),
+    green = Color(0xFF198754),
+    red = Color(0xFFC62828),
+    orange = Color(0xFFAD6200),
+    yellow = Color(0xFF806000),
+    teal = Color(0xFF087C8C),
+    purple = Color(0xFF7E3AA8),
     segmentTrack = Color(0x1F767680),     // 12 %
     segmentThumb = Color(0xFFFFFFFF),
     sliderTrack = Color(0x33787880),      // 20 %
@@ -149,4 +149,3 @@ val GlassGeoColors = GeoColors(
 )
 
 val LocalGeoColors = staticCompositionLocalOf { LightGeoColors }
-

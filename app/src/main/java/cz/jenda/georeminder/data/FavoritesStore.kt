@@ -1,24 +1,33 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
+import android.util.Log
 import cz.jenda.georeminder.model.FavoritePlace
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 
 /** Úložiště oblíbených míst – JSON soubor, stejný princip jako ReminderStore. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class FavoritesStore private constructor(context: Context) {
     private val appContext = context.applicationContext
-    private val ioScope = kotlinx.coroutines.CoroutineScope(
-        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
-    )
+    private val ioDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val ioScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     @Volatile
     private var loadFailed = false
 
     private val _favorites = MutableStateFlow<List<FavoritePlace>>(emptyList())
     val favorites: StateFlow<List<FavoritePlace>> = _favorites
+
+    private val _storageError = MutableStateFlow(false)
+    val storageError: StateFlow<Boolean> = _storageError
 
     init {
         reload()
@@ -37,71 +46,135 @@ class FavoritesStore private constructor(context: Context) {
     }
 
     fun reload() {
+        ioScope.launch { reloadFromDisk() }
+    }
+
+    suspend fun reloadAndGet(): List<FavoritePlace> = withContext(ioDispatcher) {
+        reloadFromDisk()
+    }
+
+    fun add(place: FavoritePlace) {
+        ioScope.launch { addOnIo(place) }
+    }
+
+    suspend fun addDurably(place: FavoritePlace): Boolean = withContext(ioDispatcher) {
+        addOnIo(place)
+    }
+
+    fun update(place: FavoritePlace) {
+        ioScope.launch { updateOnIo(place) }
+    }
+
+    suspend fun updateDurably(place: FavoritePlace): Boolean = withContext(ioDispatcher) {
+        updateOnIo(place)
+    }
+
+    fun delete(place: FavoritePlace) {
         ioScope.launch {
-            synchronized(this@FavoritesStore) {
-                when (val res = SharedStorage.read(appContext, FILE)) {
-                    is SharedStorage.ReadResult.Ok -> {
-                        try {
-                            val decoded = SharedStorage.json.decodeFromString(
-                                ListSerializer(FavoritePlace.serializer()), res.text
-                            )
-                            _favorites.value = decoded
-                            loadFailed = false
-                        } catch (e: Exception) {
-                            loadFailed = true
-                            android.util.Log.w("FavoritesStore", "Dekódování oblíbených míst selhalo", e)
-                        }
+            if (!canWrite()) return@launch
+            val next = _favorites.value.filterNot { it.id == place.id }
+            if (persistSnapshot(next)) _favorites.value = next
+        }
+    }
+
+    suspend fun upsertAllDurably(imported: List<FavoritePlace>): Boolean =
+        withContext(ioDispatcher) {
+            reloadFromDisk()
+            if (!canWrite()) return@withContext false
+
+            val merged = LinkedHashMap<String, FavoritePlace>()
+            _favorites.value.forEach { merged[it.id] = it }
+            imported.forEach { merged[it.id] = it }
+            val next = merged.values.toList()
+
+            if (persistSnapshot(next)) {
+                _favorites.value = next
+                true
+            } else {
+                false
+            }
+        }
+
+    suspend fun replaceAllDurably(replacement: List<FavoritePlace>): Boolean =
+        withContext(ioDispatcher) {
+            if (!canWrite()) return@withContext false
+            if (persistSnapshot(replacement)) {
+                _favorites.value = replacement
+                true
+            } else {
+                false
+            }
+        }
+
+    private fun canWrite(): Boolean {
+        if (loadFailed) {
+            _storageError.value = true
+            Log.w("FavoritesStore", "Uložení přeskočeno – poslední čtení oblíbených selhalo")
+            return false
+        }
+        return true
+    }
+
+    private fun addOnIo(place: FavoritePlace): Boolean {
+        if (!canWrite()) return false
+        if (_favorites.value.any { it.id == place.id }) return false
+        val next = _favorites.value + place
+        if (!persistSnapshot(next)) return false
+        _favorites.value = next
+        return true
+    }
+
+    private fun updateOnIo(place: FavoritePlace): Boolean {
+        if (!canWrite()) return false
+        val list = _favorites.value.toMutableList()
+        val index = list.indexOfFirst { it.id == place.id }
+        if (index < 0) return false
+        list[index] = place
+        if (!persistSnapshot(list)) return false
+        _favorites.value = list
+        return true
+    }
+
+    private fun reloadFromDisk(): List<FavoritePlace> {
+        when (val result = SharedStorage.read(appContext, FILE)) {
+            is SharedStorage.ReadResult.Ok -> {
+                when (val decoded = SharedStorage.decodeFavoritesResult(result.text)) {
+                    is SharedStorage.DecodeResult.Ok -> {
+                        _favorites.value = decoded.value
+                        loadFailed = decoded.hadInvalidEntries
+                        _storageError.value = decoded.hadInvalidEntries
                     }
-                    SharedStorage.ReadResult.Empty -> {
-                        _favorites.value = emptyList()
-                        loadFailed = false
-                    }
-                    SharedStorage.ReadResult.Error -> {
+                    SharedStorage.DecodeResult.Error -> {
                         loadFailed = true
-                        android.util.Log.w("FavoritesStore", "Čtení oblíbených míst selhalo – uložení dočasně zablokováno")
+                        _storageError.value = true
+                        Log.w("FavoritesStore", "Dekódování oblíbených selhalo – soubor nebude přepsán")
                     }
                 }
             }
-        }
-    }
-
-    @Synchronized
-    fun add(place: FavoritePlace) {
-        _favorites.value = _favorites.value + place
-        persist()
-    }
-
-    @Synchronized
-    fun update(place: FavoritePlace) {
-        val list = _favorites.value.toMutableList()
-        val index = list.indexOfFirst { it.id == place.id }
-        if (index < 0) return
-        list[index] = place
-        _favorites.value = list
-        persist()
-    }
-
-    @Synchronized
-    fun delete(place: FavoritePlace) {
-        _favorites.value = _favorites.value.filterNot { it.id == place.id }
-        persist()
-    }
-
-    private fun persist() {
-        if (loadFailed) {
-            android.util.Log.w("FavoritesStore", "Uložení přeskočeno – poslední čtení oblíbených selhalo")
-            return
-        }
-        val snapshot = _favorites.value
-        ioScope.launch {
-            try {
-                val text = SharedStorage.json.encodeToString(
-                    ListSerializer(FavoritePlace.serializer()), snapshot
-                )
-                SharedStorage.writeText(appContext, FILE, text)
-            } catch (e: Exception) {
-                android.util.Log.w("FavoritesStore", "Chyba při zápisu oblíbených", e)
+            SharedStorage.ReadResult.Empty -> {
+                _favorites.value = emptyList()
+                loadFailed = false
+                _storageError.value = false
+            }
+            SharedStorage.ReadResult.Error -> {
+                loadFailed = true
+                _storageError.value = true
+                Log.w("FavoritesStore", "Čtení oblíbených selhalo – soubor nebude přepsán")
             }
         }
+        return _favorites.value
+    }
+
+    private fun persistSnapshot(snapshot: List<FavoritePlace>): Boolean = try {
+        val text = SharedStorage.json.encodeToString(
+            ListSerializer(FavoritePlace.serializer()), snapshot
+        )
+        SharedStorage.writeText(appContext, FILE, text).also { success ->
+            _storageError.value = !success
+        }
+    } catch (e: Exception) {
+        _storageError.value = true
+        Log.w("FavoritesStore", "Chyba při zápisu oblíbených", e)
+        false
     }
 }

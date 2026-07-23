@@ -84,15 +84,4 @@ class ReminderTest {
         assertEquals(AlertStyle.DEFAULT, decoded.alertStyle) // default fallback
     }
 
-    @Test
-    fun testSubtitleGeneration() {
-        val locReminder = Reminder(
-            title = "Nákup",
-            kind = ReminderKind.LOCATION,
-            placeName = "Globus",
-            trigger = TriggerType.LEAVE,
-            repeats = true
-        )
-        assertEquals("Globus • Když odjedu • opakuje se", locReminder.subtitle)
-    }
 }

@@ -26,8 +26,8 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
-                store.resyncAll()
+                val reminders = store.reloadAndGet()
+                ReminderScheduler(context).resync(reminders)
             } catch (e: Exception) {
                 Log.w("BootReceiver", "Chyba při obnově připomínek po restartu", e)
             } finally {

@@ -2,10 +2,12 @@ package cz.jenda.georeminder.data
 
 import android.content.Context
 import android.util.Log
+import cz.jenda.georeminder.model.FavoritePlace
 import cz.jenda.georeminder.model.Reminder
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonArray
 import java.io.File
 
 /**
@@ -14,6 +16,14 @@ import java.io.File
  * procesu/balíčku). Formát JSON je shodný s iOS verzí.
  */
 object SharedStorage {
+    private fun warn(message: String, error: Throwable? = null) {
+        // android.util.Log nemá implementaci v čistých JVM testech.
+        runCatching {
+            if (error == null) Log.w("SharedStorage", message)
+            else Log.w("SharedStorage", message, error)
+        }
+    }
+
     val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -22,33 +32,62 @@ object SharedStorage {
     /** Jeden název SharedPreferences pro celou appku (nastavení, značky…). */
     const val PREFS = "georeminder"
 
+    sealed class DecodeResult<out T> {
+        data class Ok<T>(
+            val value: List<T>,
+            /** Soubor byl pole, ale alespoň jeden záznam byl poškozený. */
+            val hadInvalidEntries: Boolean = false
+        ) : DecodeResult<T>()
+
+        object Error : DecodeResult<Nothing>()
+    }
+
     /**
-     * Odolné dekódování seznamu připomínek: zkusí celý list a při chybě přejde
-     * na čtení po jednom záznamu (vadný přeskočí). Sdílí appka i widget.
+     * Odolné dekódování, které nezaměňuje poškozený soubor za legitimní
+     * prázdný seznam. Při poškození jednotlivé položky vrátí platné
+     * záznamy, ale označí výsledek, aby store soubor automaticky nepřepsal.
      */
-    fun decodeReminders(text: String): List<Reminder> {
-        if (text.isBlank()) return emptyList()
+    private fun <T> decodeList(text: String, serializer: KSerializer<T>): DecodeResult<T> {
+        if (text.isBlank()) return DecodeResult.Error
+
         return try {
-            json.decodeFromString(ListSerializer(Reminder.serializer()), text)
-        } catch (_: Exception) {
-            val out = mutableListOf<Reminder>()
-            try {
-                val element = json.parseToJsonElement(text)
-                if (element is kotlinx.serialization.json.JsonArray) {
-                    for (el in element) {
-                        try {
-                            out.add(json.decodeFromJsonElement(Reminder.serializer(), el))
-                        } catch (e: Exception) {
-                            Log.w("SharedStorage", "Přeskakuji vadný záznam připomínky", e)
-                        }
+            DecodeResult.Ok(json.decodeFromString(ListSerializer(serializer), text))
+        } catch (wholeListError: Exception) {
+            val array = try {
+                json.parseToJsonElement(text) as? JsonArray
+            } catch (e: Exception) {
+                warn("Data nejsou platné JSON pole", e)
+                null
+            } ?: return DecodeResult.Error
+
+            if (array.isEmpty()) return DecodeResult.Ok(emptyList())
+
+            var invalidEntries = false
+            val out = buildList {
+                array.forEach { element ->
+                    try {
+                        add(json.decodeFromJsonElement(serializer, element))
+                    } catch (e: Exception) {
+                        invalidEntries = true
+                        warn("Přeskakuji poškozený záznam", e)
                     }
                 }
-            } catch (e: Exception) {
-                Log.w("SharedStorage", "Data nejsou platné pole – vracím prázdný výsledek", e)
             }
-            out
+
+            if (out.isEmpty()) DecodeResult.Error
+            else DecodeResult.Ok(out, hadInvalidEntries = invalidEntries)
         }
     }
+
+    fun decodeRemindersResult(text: String): DecodeResult<Reminder> =
+        decodeList(text, Reminder.serializer())
+
+    fun decodeFavoritesResult(text: String): DecodeResult<FavoritePlace> =
+        decodeList(text, FavoritePlace.serializer())
+
+    /** Kompatibilní dekódování pro widget, který data pouze zobrazuje. */
+    fun decodeReminders(text: String): List<Reminder> =
+        (decodeRemindersResult(text) as? DecodeResult.Ok)?.value.orEmpty()
 
     /**
      * Výsledek čtení. Záměrně rozlišuje „prázdno" (soubor ještě neexistuje –
@@ -73,7 +112,7 @@ object SharedStorage {
             val text = atomicFile.readFully().toString(Charsets.UTF_8)
             ReadResult.Ok(text)
         } catch (e: Exception) {
-            Log.w("SharedStorage", "Čtení $filename selhalo", e)
+            warn("Čtení $filename selhalo", e)
             ReadResult.Error
         }
     }
@@ -88,18 +127,20 @@ object SharedStorage {
      * (@Synchronized), aby se souběžné zápisy z UI a z receiveru nepraly.
      */
     @Synchronized
-    fun writeText(context: Context, filename: String, content: String) {
+    fun writeText(context: Context, filename: String, content: String): Boolean {
         val atomicFile = android.util.AtomicFile(file(context, filename))
         var stream: java.io.FileOutputStream? = null
-        try {
+        return try {
             stream = atomicFile.startWrite()
             stream.write(content.toByteArray(Charsets.UTF_8))
             atomicFile.finishWrite(stream)
+            true
         } catch (e: Exception) {
             if (stream != null) {
                 atomicFile.failWrite(stream)
             }
-            Log.w("SharedStorage", "Zápis $filename selhal – změna zůstala jen v paměti", e)
+            warn("Zápis $filename selhal – změna zůstala jen v paměti", e)
+            false
         }
     }
 }

@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,6 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.jenda.georeminder.ui.theme.MapStyles
 import cz.jenda.georeminder.ui.theme.ThemeController
@@ -133,6 +135,9 @@ fun LocationPickerSheet(
 ) {
     val context = LocalContext.current
     val colors = GeoTheme.colors
+    val selectedPlaceLabel = stringResource(R.string.selected_place_default)
+    val favoriteSubtitle = stringResource(R.string.favorite_place_subtitle)
+    val recentSubtitle = stringResource(R.string.recent_place_subtitle)
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -140,7 +145,7 @@ fun LocationPickerSheet(
 
     var selected by remember { mutableStateOf(initialCoordinate) }
     var selectedName by remember { mutableStateOf(if (initialCoordinate != null) initialName else "") }
-    var radius by remember { mutableStateOf(initialRadius) }
+    var radius by remember { mutableDoubleStateOf(initialRadius) }
     var searchText by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<GeoSearchResult>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
@@ -252,7 +257,7 @@ fun LocationPickerSheet(
             selected?.let { coord ->
                 Marker(
                     state = MarkerState(position = coord),
-                    title = selectedName.ifEmpty { "Vybrané místo" },
+                    title = selectedName.ifEmpty { selectedPlaceLabel },
                 )
                 Circle(
                     center = coord,
@@ -276,16 +281,20 @@ fun LocationPickerSheet(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 CapsulePillButton(
-                    text = "Zrušit",
+                    text = stringResource(R.string.action_cancel),
                     modifier = Modifier.align(Alignment.CenterStart),
                     onClick = onCancel,
                 )
                 Text(
-                    text = "Vybrat místo",
+                    text = stringResource(R.string.location_picker_title),
                     style = GeoType.headline,
                     color = colors.label,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.card.copy(alpha = 0.94f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
 
@@ -302,14 +311,14 @@ fun LocationPickerSheet(
             ) {
                 Icon(
                     Icons.Filled.Search,
-                    contentDescription = "Hledat místo",
+                    contentDescription = stringResource(R.string.location_search_description),
                     tint = colors.secondaryLabel,
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 BasicTextField(
                     value = searchText,
-                    onValueChange = { searchText = it },
+                    onValueChange = { searchText = it.take(200) },
                     textStyle = GeoType.body.copy(color = colors.label),
                     cursorBrush = SolidColor(colors.accent),
                     singleLine = true,
@@ -321,7 +330,7 @@ fun LocationPickerSheet(
                         Box {
                             if (searchText.isEmpty()) {
                                 Text(
-                                    "Hledat adresu nebo místo…",
+                                    stringResource(R.string.location_picker_search_hint),
                                     style = GeoType.body,
                                     color = colors.tertiaryLabel,
                                 )
@@ -339,7 +348,7 @@ fun LocationPickerSheet(
                 } else if (searchText.isNotEmpty()) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(48.dp)
                             .iosClickable {
                                 searchText = ""
                                 results = emptyList()
@@ -348,7 +357,7 @@ fun LocationPickerSheet(
                     ) {
                         Icon(
                             Icons.Filled.Cancel,
-                            contentDescription = "Smazat hledání",
+                            contentDescription = stringResource(R.string.action_clear),
                             tint = colors.secondaryLabel,
                             modifier = Modifier.size(20.dp),
                         )
@@ -422,9 +431,9 @@ fun LocationPickerSheet(
                 ) {
                     Text(
                         if (networkError) {
-                            "Vypadá to na výpadek připojení – zkontroluj internet, nebo ťukni rovnou do mapy."
+                            stringResource(R.string.location_network_error)
                         } else {
-                            "Nic jsem nenašel – zkus jiný název, nebo ťukni rovnou do mapy."
+                            stringResource(R.string.location_no_results)
                         },
                         style = GeoType.footnote,
                         color = colors.secondaryLabel,
@@ -453,7 +462,7 @@ fun LocationPickerSheet(
                             icon = Icons.Filled.Star,
                             iconTint = colors.yellow,
                             title = place.name,
-                            subtitle = "oblíbené místo",
+                            subtitle = favoriteSubtitle,
                         ) {
                             radius = place.radius
                             select(LatLng(place.latitude, place.longitude), place.name)
@@ -468,7 +477,7 @@ fun LocationPickerSheet(
                             icon = Icons.Filled.History,
                             iconTint = colors.secondaryLabel,
                             title = recent.name,
-                            subtitle = "nedávné místo",
+                            subtitle = recentSubtitle,
                         ) {
                             select(LatLng(recent.latitude, recent.longitude), recent.name)
                         }
@@ -501,14 +510,14 @@ fun LocationPickerSheet(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = selectedName.ifEmpty { "Vybrané místo" },
+                    text = selectedName.ifEmpty { selectedPlaceLabel },
                     style = GeoType.headline,
                     color = colors.label,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Poloměr", style = GeoType.subheadline, color = colors.label)
+                    Text(stringResource(R.string.location_radius), style = GeoType.subheadline, color = colors.label)
                     Spacer(Modifier.width(10.dp))
                     RadiusSlider(
                         radius = radius,
@@ -524,9 +533,9 @@ fun LocationPickerSheet(
                         )
                     }
                 }
-                PrimaryButton(text = "Použít toto místo") {
+                PrimaryButton(text = stringResource(R.string.location_use_this)) {
                     val coord = selected ?: return@PrimaryButton
-                    val finalName = selectedName.ifEmpty { "Vybrané místo" }
+                    val finalName = selectedName.ifEmpty { selectedPlaceLabel }
                     RecentPlaces.add(context, finalName, coord.latitude, coord.longitude)
                     onConfirm(finalName, coord, radius)
                 }
@@ -615,6 +624,8 @@ private suspend fun searchPlaces(
                 category = placeCategory(item.osmKey, item.osmValue),
             )
         }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
     } catch (_: Exception) {
         photonFailed = true
         emptyList()
@@ -665,7 +676,7 @@ private fun geocoderSearch(
     near: android.location.Location?,
 ): List<GeoSearchResult> {
     return try {
-        val geocoder = Geocoder(context, Locale("cs", "CZ"))
+        val geocoder = Geocoder(context, Locale.getDefault())
         val nearby: List<Address> = if (near != null) {
             val dLat = 0.135
             val dLng = 0.135 / cos(Math.toRadians(near.latitude)).coerceAtLeast(0.1)
@@ -681,7 +692,7 @@ private fun geocoderSearch(
         }
         addresses.map { address ->
             GeoSearchResult(
-                title = addressTitle(address),
+                title = addressTitle(address, context.getString(R.string.location_unnamed)),
                 subtitle = address.getAddressLine(0) ?: "",
                 position = LatLng(address.latitude, address.longitude),
             )
@@ -698,17 +709,17 @@ private suspend fun reverseGeocode(
     coord: LatLng,
 ): String? = withContext(Dispatchers.IO) {
     try {
-        val geocoder = Geocoder(context, Locale("cs", "CZ"))
+        val geocoder = Geocoder(context, Locale.getDefault())
         val address = geocoder.getFromLocation(coord.latitude, coord.longitude, 1)
             ?.firstOrNull() ?: return@withContext null
-        addressTitle(address)
+        addressTitle(address, context.getString(R.string.location_unnamed))
     } catch (_: Exception) {
         null
     }
 }
 
 /** Čitelný titulek adresy: „Sokolovská 55" / název místa / město. */
-private fun addressTitle(address: Address): String {
+private fun addressTitle(address: Address, unnamed: String): String {
     val street = listOfNotNull(address.thoroughfare, address.subThoroughfare)
         .joinToString(" ")
     val feature = address.featureName
@@ -718,6 +729,6 @@ private fun addressTitle(address: Address): String {
         street.isNotBlank() -> street
         !feature.isNullOrBlank() -> feature
         !address.locality.isNullOrBlank() -> address.locality
-        else -> "Bez názvu"
+        else -> unnamed
     }
 }

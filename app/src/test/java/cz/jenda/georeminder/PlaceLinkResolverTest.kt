@@ -38,4 +38,14 @@ class PlaceLinkResolverTest {
 
         assertNull(resolved)
     }
+
+    @Test
+    fun externalUrlIsRejectedWithoutFollowingRedirects() = runBlocking {
+        assertNull(PlaceLinkResolver.resolve("https://example.com/maps?q=50.08,14.43"))
+    }
+
+    @Test
+    fun outOfRangeGeoCoordinatesAreRejected() = runBlocking {
+        assertNull(PlaceLinkResolver.resolve("geo:999,999"))
+    }
 }

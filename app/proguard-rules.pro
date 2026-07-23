@@ -1,4 +1,4 @@
-# Pravidla pro R8/ProGuard (uplatní se, až se zapne isMinifyEnabled).
+# Pravidla pro R8/ProGuard.
 # Většina knihoven (kotlinx.serialization, Compose, Glance, Play services)
 # si své keep-rules dodává sama; níže je pojistka pro naše serializovatelné
 # modely, aby minifikace nerozbila čtení/zápis JSON připomínek.

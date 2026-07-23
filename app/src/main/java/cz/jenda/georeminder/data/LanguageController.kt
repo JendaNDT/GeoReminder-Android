@@ -1,8 +1,9 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
-import android.content.res.Configuration
-import android.os.Build
+import android.content.res.Resources
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import java.util.Locale
 
 /**
@@ -19,20 +20,21 @@ object LanguageController {
         applyLanguage(context, langCode)
     }
 
+    /** AppCompat zajistí okamžitou rekreaci Activity i kompatibilitu před Androidem 13. */
     fun applyLanguage(context: Context, langCode: String) {
-        val locale = getLocale(langCode)
-        Locale.setDefault(locale)
-
-        val config = Configuration(context.resources.configuration)
-        config.setLocale(locale)
-        context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        val locales = when (langCode) {
+            LANG_CS -> LocaleListCompat.forLanguageTags("cs-CZ")
+            LANG_EN -> LocaleListCompat.forLanguageTags("en-US")
+            else -> LocaleListCompat.getEmptyLocaleList()
+        }
+        AppCompatDelegate.setApplicationLocales(locales)
     }
 
     fun getLocale(langCode: String): Locale {
         return when (langCode) {
-            LANG_CS -> Locale("cs", "CZ")
-            LANG_EN -> Locale("en", "US")
-            else -> Locale.getDefault()
+            LANG_CS -> Locale.forLanguageTag("cs-CZ")
+            LANG_EN -> Locale.forLanguageTag("en-US")
+            else -> Resources.getSystem().configuration.locales[0] ?: Locale.getDefault()
         }
     }
 }

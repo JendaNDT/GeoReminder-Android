@@ -39,6 +39,7 @@ import androidx.glance.text.TextStyle
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.SharedStorage
+import cz.jenda.georeminder.data.localizedSubtitle
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TriggerType
@@ -65,7 +66,7 @@ class GeoReminderWidget : GlanceAppWidget() {
             .putExtra("shortcut_kind", "location")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         provideContent {
-            WidgetContent(reminders, addIntent)
+            WidgetContent(reminders, addIntent, context)
         }
     }
 
@@ -97,7 +98,7 @@ private val secondaryColor = ColorProvider(
 )
 
 @Composable
-private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
+private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent, context: Context) {
     val size = LocalSize.current
     val limit = if (size.width >= 200.dp) 3 else 2
 
@@ -122,7 +123,7 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
                     colorFilter = ColorFilter.tint(secondaryColor),
                 )
                 Text(
-                    text = "Vše vyřízeno",
+                    text = context.getString(R.string.status_all_done),
                     style = TextStyle(color = secondaryColor, fontSize = 12.sp),
                 )
             }
@@ -157,7 +158,7 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
                                 maxLines = 1,
                             )
                             Text(
-                                text = reminder.subtitle,
+                                text = reminder.localizedSubtitle(context),
                                 style = TextStyle(
                                     color = secondaryColor,
                                     fontSize = 11.sp,
@@ -177,7 +178,7 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
         ) {
             Image(
                 provider = ImageProvider(R.drawable.ic_widget_add),
-                contentDescription = "Nová připomínka",
+                contentDescription = context.getString(R.string.widget_add_reminder),
                 modifier = GlanceModifier
                     .size(18.dp)
                     .clickable(actionStartActivityIntent(addIntent)),

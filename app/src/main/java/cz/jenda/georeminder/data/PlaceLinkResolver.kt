@@ -1,6 +1,7 @@
 package cz.jenda.georeminder.data
 
 import com.google.android.gms.maps.model.LatLng
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
@@ -17,7 +18,9 @@ object PlaceLinkResolver {
     suspend fun resolve(sharedText: String): Pair<String, LatLng>? =
         withContext(Dispatchers.IO) {
             try {
-                resolveInternal(sharedText.trim())
+                resolveInternal(sharedText.trim().take(10_000))
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 null
             }
@@ -32,6 +35,7 @@ object PlaceLinkResolver {
         // 2) Najít odkaz v textu
         val url = Regex("""https?://\S+""").find(text)?.value
             ?.trimEnd(')', '.', ',', ';') ?: return null
+        if (!isAllowedGoogleMapsUrl(url)) return null
 
         // Krátké odkazy (maps.app.goo.gl apod.) rozbalit přes přesměrování
         var coords = parseCoordsFromUrl(url)
@@ -65,12 +69,13 @@ object PlaceLinkResolver {
                     it
                 }
             }
-            return label to LatLng(lat, lng)
+            if (!validCoordinates(lat, lng)) return null
+            return label.take(200) to LatLng(lat, lng)
         }
         val m = Regex("""geo:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)""").find(uri) ?: return null
         val lat = m.groupValues[1].toDoubleOrNull() ?: return null
         val lng = m.groupValues[2].toDoubleOrNull() ?: return null
-        if (lat == 0.0 && lng == 0.0) return null
+        if (!validCoordinates(lat, lng) || lat == 0.0 && lng == 0.0) return null
         return "" to LatLng(lat, lng)
     }
 
@@ -78,6 +83,7 @@ object PlaceLinkResolver {
     private fun expandRedirects(startUrl: String): String {
         var current = startUrl
         repeat(6) {
+            if (!isAllowedGoogleMapsUrl(current)) return startUrl
             val conn = URL(current).openConnection() as HttpURLConnection
             conn.instanceFollowRedirects = false
             conn.connectTimeout = 5000
@@ -88,11 +94,13 @@ object PlaceLinkResolver {
                 val code = conn.responseCode
                 if (code in 300..399) {
                     val location = conn.getHeaderField("Location") ?: return current
-                    current = if (location.startsWith("http")) {
+                    val next = if (location.startsWith("http")) {
                         location
                     } else {
                         URL(URL(current), location).toString()
                     }
+                    if (!isAllowedGoogleMapsUrl(next)) return current
+                    current = next
                 } else {
                     return current
                 }
@@ -103,19 +111,48 @@ object PlaceLinkResolver {
         return current
     }
 
+    private fun isAllowedGoogleMapsUrl(raw: String): Boolean {
+        return try {
+            val url = URL(raw)
+            if (url.protocol != "https") {
+                false
+            } else {
+                val host = url.host.lowercase().trimEnd('.')
+                val isGoogleDomain = host == "google.com" ||
+                    host.endsWith(".google.com") ||
+                    Regex("(^|\\.)google\\.[a-z.]{2,12}$").matches(host)
+                host == "maps.app.goo.gl" ||
+                    (host == "goo.gl" && url.path.startsWith("/maps")) ||
+                    (isGoogleDomain && (host.startsWith("maps.") || url.path.startsWith("/maps")))
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun validCoordinates(latitude: Double, longitude: Double): Boolean =
+        latitude.isFinite() && longitude.isFinite() &&
+            latitude in -90.0..90.0 && longitude in -180.0..180.0
+
     /** Vytáhne souřadnice z odkazu na Mapy Google. */
     private fun parseCoordsFromUrl(url: String): LatLng? {
         // !3d…!4d… = souřadnice špendlíku (nejpřesnější)
         Regex("""!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)""").find(url)?.let {
-            return LatLng(it.groupValues[1].toDouble(), it.groupValues[2].toDouble())
+            val lat = it.groupValues[1].toDouble()
+            val lng = it.groupValues[2].toDouble()
+            return if (validCoordinates(lat, lng)) LatLng(lat, lng) else null
         }
         // ?q=lat,lng nebo &ll=lat,lng
         Regex("""[?&](?:q|ll|query)=(-?\d+\.\d+),(-?\d+\.\d+)""").find(url)?.let {
-            return LatLng(it.groupValues[1].toDouble(), it.groupValues[2].toDouble())
+            val lat = it.groupValues[1].toDouble()
+            val lng = it.groupValues[2].toDouble()
+            return if (validCoordinates(lat, lng)) LatLng(lat, lng) else null
         }
         // /@lat,lng,zoom = střed mapy (záloha)
         Regex("""/@(-?\d+\.\d+),(-?\d+\.\d+)""").find(url)?.let {
-            return LatLng(it.groupValues[1].toDouble(), it.groupValues[2].toDouble())
+            val lat = it.groupValues[1].toDouble()
+            val lng = it.groupValues[2].toDouble()
+            return if (validCoordinates(lat, lng)) LatLng(lat, lng) else null
         }
         return null
     }
@@ -129,6 +166,6 @@ object PlaceLinkResolver {
         } catch (_: Exception) {
             raw
         }
-        return decoded.takeIf { it.isNotBlank() }
+        return decoded.trim().take(200).takeIf { it.isNotBlank() }
     }
 }

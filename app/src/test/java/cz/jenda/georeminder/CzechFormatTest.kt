@@ -2,9 +2,25 @@ package cz.jenda.georeminder
 
 import cz.jenda.georeminder.model.CzechFormat
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
+import java.util.Locale
 
 class CzechFormatTest {
+    private lateinit var originalLocale: Locale
+
+    @Before
+    fun setUpLocale() {
+        originalLocale = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("cs-CZ"))
+    }
+
+    @After
+    fun restoreLocale() {
+        Locale.setDefault(originalLocale)
+    }
 
     @Test
     fun testDistanceFormatting() {
@@ -29,5 +45,13 @@ class CzechFormatTest {
 
         val formattedSingle = CzechFormat.weeklyLabel(millis, listOf(1))
         assert(formattedSingle.startsWith("pondělí"))
+    }
+
+    @Test
+    fun testEnglishFormattingUsesEnglishLabels() {
+        Locale.setDefault(Locale.US)
+        assertEquals("1.2 km away", CzechFormat.distance(1200f))
+        val formatted = CzechFormat.weeklyLabel(1700000000000L, listOf(1, 3, 5))
+        assertTrue(formatted.startsWith("Mon, Wed, Fri"))
     }
 }

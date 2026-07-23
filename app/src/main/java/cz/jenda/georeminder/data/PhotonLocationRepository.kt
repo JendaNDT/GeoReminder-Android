@@ -1,6 +1,7 @@
 package cz.jenda.georeminder.data
 
 import android.location.Location
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -84,9 +85,13 @@ object PhotonLocationRepository {
                 )
             }
             results
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             android.util.Log.w("PhotonRepo", "Hledání v Photon API selhalo", e)
-            emptyList()
+            // Volající rozliší výpadek služby od legitimního prázdného výsledku
+            // a může po neúspěchu lokálního geokodéru ukázat offline stav.
+            throw e
         } finally {
             connection.disconnect()
         }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,12 +26,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import cz.jenda.georeminder.ui.components.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UnfoldMore
 import cz.jenda.georeminder.data.AttachmentHelper
@@ -49,9 +50,13 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +76,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
 import cz.jenda.georeminder.data.FavoritesStore
 import cz.jenda.georeminder.data.ReminderStore
+import cz.jenda.georeminder.data.labelRes
+import cz.jenda.georeminder.data.repeatLabelRes
 import cz.jenda.georeminder.model.AlertStyle
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.DEFAULT_RADIUS
@@ -90,6 +97,9 @@ import cz.jenda.georeminder.ui.components.SheetHeader
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -104,10 +114,12 @@ fun EditReminderSheet(
     initialKind: ReminderKind = ReminderKind.LOCATION,
     initialPlaceName: String = "",
     initialCoordinate: LatLng? = null,
+    dismissRequest: Int = 0,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
     val colors = GeoTheme.colors
+    val coroutineScope = rememberCoroutineScope()
     val store = remember { ReminderStore.get(context) }
     val favoritesStore = remember { FavoritesStore.get(context) }
     val favorites by favoritesStore.favorites.collectAsStateWithLifecycle()
@@ -116,7 +128,7 @@ fun EditReminderSheet(
     var kind by remember { mutableStateOf(existing?.kind ?: initialKind) }
     var trigger by remember { mutableStateOf(existing?.trigger ?: TriggerType.ARRIVE) }
     var repeats by remember { mutableStateOf(existing?.repeats ?: false) }
-    var radius by remember { mutableStateOf(existing?.radius ?: DEFAULT_RADIUS) }
+    var radius by remember { mutableDoubleStateOf(existing?.radius ?: DEFAULT_RADIUS) }
     var placeName by remember {
         mutableStateOf(existing?.placeName ?: initialPlaceName)
     }
@@ -130,7 +142,7 @@ fun EditReminderSheet(
         )
     }
     var dueDate by remember {
-        mutableStateOf(
+        mutableLongStateOf(
             existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
                 ?: (System.currentTimeMillis() + 3_600_000L)
         )
@@ -152,12 +164,19 @@ fun EditReminderSheet(
     var attachmentPath by remember { mutableStateOf<String?>(existing?.attachmentPath) }
 
     val attachmentLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            val copied = AttachmentHelper.copyToInternal(context, uri)
-            if (copied != null) {
-                attachmentPath = copied
+            coroutineScope.launch {
+                val copied = withContext(Dispatchers.IO) {
+                    AttachmentHelper.copyToInternal(context, uri)
+                }
+                if (copied != null) {
+                    val previousPending = attachmentPath
+                        ?.takeIf { it != existing?.attachmentPath }
+                    attachmentPath = copied
+                    previousPending?.let { AttachmentHelper.deleteAttachment(context, it) }
+                }
             }
         }
     }
@@ -167,20 +186,26 @@ fun EditReminderSheet(
     var showTimeDialog by remember { mutableStateOf(false) }
     var repeatMenuOpen by remember { mutableStateOf(false) }
     var alertMenuOpen by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
 
     val timeInPast = kind == ReminderKind.TIME &&
             timeRepeat == TimeRepeat.NEVER &&
             dueDate <= System.currentTimeMillis()
     val canSave = title.trim().isNotEmpty() &&
             (kind == ReminderKind.TIME || coordinate != null) &&
-            !timeInPast
+            !timeInPast && !isSaving
+    val defaultSelectedPlace = stringResource(R.string.selected_place_default)
+    val urgentDescription = stringResource(R.string.alert_urgent_description)
+    val naggingDescription = stringResource(R.string.alert_nagging_description)
 
     fun save() {
-        val cleanTitle = title.trim()
-        val cleanPlace = placeName.ifEmpty { "Vybrané místo" }
+        if (!canSave) return
+        val cleanTitle = title.trim().take(200)
+        val cleanPlace = placeName.trim().take(200).ifEmpty { defaultSelectedPlace }
 
-        if (existing != null) {
-            val updated = if (kind == ReminderKind.LOCATION) {
+        val reminderToSave = if (existing != null) {
+            if (kind == ReminderKind.LOCATION) {
                 val coord = coordinate ?: return
                 existing.copy(
                     title = cleanTitle,
@@ -192,6 +217,7 @@ fun EditReminderSheet(
                     trigger = trigger,
                     repeats = repeats,
                     dueDate = null,
+                    timeRepeat = TimeRepeat.NEVER,
                     weekdays = null,
                     alertStyle = alertStyle,
                     nagging = nagging,
@@ -201,6 +227,11 @@ fun EditReminderSheet(
                 existing.copy(
                     title = cleanTitle,
                     kind = kind,
+                    placeName = "",
+                    latitude = 0.0,
+                    longitude = 0.0,
+                    radius = DEFAULT_RADIUS,
+                    trigger = TriggerType.ARRIVE,
                     dueDate = dueDate,
                     timeRepeat = timeRepeat,
                     repeats = false,
@@ -212,43 +243,49 @@ fun EditReminderSheet(
                     attachmentPath = attachmentPath,
                 )
             }
-            store.update(updated)
         } else {
             if (kind == ReminderKind.LOCATION) {
                 val coord = coordinate ?: return
-                store.add(
-                    Reminder(
-                        title = cleanTitle,
-                        kind = ReminderKind.LOCATION,
-                        placeName = cleanPlace,
-                        latitude = coord.latitude,
-                        longitude = coord.longitude,
-                        radius = radius,
-                        trigger = trigger,
-                        repeats = repeats,
-                        alertStyle = alertStyle,
-                        nagging = nagging,
-                        attachmentPath = attachmentPath,
-                    )
+                Reminder(
+                    title = cleanTitle,
+                    kind = ReminderKind.LOCATION,
+                    placeName = cleanPlace,
+                    latitude = coord.latitude,
+                    longitude = coord.longitude,
+                    radius = radius,
+                    trigger = trigger,
+                    repeats = repeats,
+                    alertStyle = alertStyle,
+                    nagging = nagging,
+                    attachmentPath = attachmentPath,
                 )
             } else {
-                store.add(
-                    Reminder(
-                        title = cleanTitle,
-                        kind = ReminderKind.TIME,
-                        dueDate = dueDate,
-                        timeRepeat = timeRepeat,
-                        weekdays = if (timeRepeat == TimeRepeat.WEEKLY) {
-                            weekdaysSel.sorted()
-                        } else null,
-                        alertStyle = alertStyle,
-                        nagging = nagging,
-                        attachmentPath = attachmentPath,
-                    )
+                Reminder(
+                    title = cleanTitle,
+                    kind = ReminderKind.TIME,
+                    dueDate = dueDate,
+                    timeRepeat = timeRepeat,
+                    weekdays = if (timeRepeat == TimeRepeat.WEEKLY) {
+                        weekdaysSel.sorted()
+                    } else null,
+                    alertStyle = alertStyle,
+                    nagging = nagging,
+                    attachmentPath = attachmentPath,
                 )
             }
         }
-        onClose()
+
+        isSaving = true
+        saveFailed = false
+        coroutineScope.launch {
+            val success = if (existing != null) {
+                store.updateDurably(reminderToSave)
+            } else {
+                store.addDurably(reminderToSave)
+            }
+            isSaving = false
+            if (success) onClose() else saveFailed = true
+        }
     }
     val initialTitle = existing?.title ?: ""
     val initialKindVal = existing?.kind ?: initialKind
@@ -287,6 +324,7 @@ fun EditReminderSheet(
     var showDiscardDialog by remember { mutableStateOf(false) }
 
     fun handleClose() {
+        if (isSaving) return
         if (isDirty) {
             showDiscardDialog = true
         } else {
@@ -297,8 +335,11 @@ fun EditReminderSheet(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = isDirty) {
-        showDiscardDialog = true
+    // Systémové zavření rodičovského dialogu musí projít stejnou kontrolou
+    // rozepsaného formuláře jako tlačítko Zrušit.
+    val initialDismissRequest = remember { dismissRequest }
+    LaunchedEffect(dismissRequest) {
+        if (dismissRequest != initialDismissRequest) handleClose()
     }
 
     if (showDiscardDialog) {
@@ -320,17 +361,27 @@ fun EditReminderSheet(
             .fillMaxHeight()
     ) {
         SheetHeader(
-            title = if (existing == null) "Nová připomínka" else "Upravit připomínku",
-            leftText = "Zrušit",
+            title = stringResource(
+                if (existing == null) R.string.title_new_reminder else R.string.title_edit_reminder
+            ),
+            leftText = stringResource(R.string.action_cancel),
             onLeft = { handleClose() },
-            rightText = "Uložit",
+            rightText = stringResource(R.string.action_save),
             rightEnabled = canSave,
             onRight = { save() },
         )
 
         if (timeInPast) {
             Text(
-                text = "Vybraný čas už uplynul – zvol čas v budoucnu.",
+                text = stringResource(R.string.selected_time_past),
+                style = GeoType.caption,
+                color = colors.red,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp),
+            )
+        }
+        if (saveFailed) {
+            Text(
+                text = stringResource(R.string.storage_error),
                 style = GeoType.caption,
                 color = colors.red,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp),
@@ -343,19 +394,19 @@ fun EditReminderSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 40.dp),
         ) {
-            SectionHeader("Co ti mám připomenout", Modifier.padding(top = 8.dp))
+            SectionHeader(stringResource(R.string.section_reminder_title), Modifier.padding(top = 8.dp))
             InsetCard {
                 FormTextField(
                     value = title,
-                    onValueChange = { title = it },
-                    placeholder = "Např. koupit mléko",
+                    onValueChange = { title = it.take(200) },
+                    placeholder = stringResource(R.string.field_title_example),
                 )
             }
 
             Spacer(Modifier.height(20.dp))
             InsetCard {
                 SegmentedControl(
-                    options = ReminderKind.entries.map { it.label },
+                    options = ReminderKind.entries.map { stringResource(it.labelRes) },
                     selectedIndex = ReminderKind.entries.indexOf(kind),
                     modifier = Modifier.padding(10.dp),
                 ) { kind = ReminderKind.entries[it] }
@@ -364,7 +415,7 @@ fun EditReminderSheet(
             Spacer(Modifier.height(24.dp))
 
             if (kind == ReminderKind.LOCATION) {
-                SectionHeader("Kde")
+                SectionHeader(stringResource(R.string.section_where))
                 InsetCard {
                     // Čipy oblíbených míst
                     if (favorites.isNotEmpty()) {
@@ -401,7 +452,11 @@ fun EditReminderSheet(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text = if (coordinate == null) "Vybrat místo na mapě" else placeName.ifEmpty { "Vybrané místo" },
+                            text = if (coordinate == null) {
+                                stringResource(R.string.location_picker_title)
+                            } else {
+                                placeName.ifEmpty { defaultSelectedPlace }
+                            },
                             style = GeoType.body,
                             color = colors.accent,
                             maxLines = 1,
@@ -418,7 +473,7 @@ fun EditReminderSheet(
                     if (coordinate != null) {
                         CardDivider()
                         SegmentedControl(
-                            options = TriggerType.entries.map { it.label },
+                            options = TriggerType.entries.map { stringResource(it.labelRes) },
                             selectedIndex = TriggerType.entries.indexOf(trigger),
                             modifier = Modifier.padding(10.dp),
                         ) { trigger = TriggerType.entries[it] }
@@ -431,7 +486,7 @@ fun EditReminderSheet(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Text(
-                                text = "Poloměr: ${radius.toInt()} m",
+                                text = stringResource(R.string.radius_value, radius.toInt()),
                                 style = GeoType.subheadline,
                                 color = colors.label,
                             )
@@ -440,7 +495,7 @@ fun EditReminderSheet(
                                 onRadiusChange = { radius = it },
                             )
                             Text(
-                                text = "Doporučeno alespoň 100 m – menší kruhy systém hlídá hůř.",
+                                text = stringResource(R.string.radius_recommendation),
                                 style = GeoType.caption2,
                                 color = colors.secondaryLabel,
                             )
@@ -454,17 +509,20 @@ fun EditReminderSheet(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = trigger.repeatLabel,
+                                text = stringResource(trigger.repeatLabelRes),
                                 style = GeoType.body,
                                 color = colors.label,
                                 modifier = Modifier.weight(1f),
                             )
-                            IOSSwitch(checked = repeats) { repeats = it }
+                            IOSSwitch(
+                                checked = repeats,
+                                label = stringResource(trigger.repeatLabelRes),
+                            ) { repeats = it }
                         }
                     }
                 }
             } else {
-                SectionHeader("Kdy")
+                SectionHeader(stringResource(R.string.section_when))
                 InsetCard {
                     // Datum a čas – kompaktní kapsle jako na iOS
                     Row(
@@ -474,7 +532,7 @@ fun EditReminderSheet(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Datum a čas",
+                            text = stringResource(R.string.date_time_label),
                             style = GeoType.body,
                             color = colors.label,
                             modifier = Modifier.weight(1f),
@@ -492,7 +550,7 @@ fun EditReminderSheet(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Opakování",
+                            text = stringResource(R.string.repeat_options_label),
                             style = GeoType.body,
                             color = colors.label,
                             modifier = Modifier.weight(1f),
@@ -503,7 +561,7 @@ fun EditReminderSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    text = timeRepeat.label,
+                                    text = stringResource(timeRepeat.labelRes),
                                     style = GeoType.body,
                                     color = colors.secondaryLabel,
                                 )
@@ -520,7 +578,7 @@ fun EditReminderSheet(
                             ) {
                                 TimeRepeat.entries.forEach { option ->
                                     DropdownMenuItem(
-                                        text = { Text(option.label, style = GeoType.body) },
+                                        text = { Text(stringResource(option.labelRes), style = GeoType.body) },
                                         trailingIcon = {
                                             if (option == timeRepeat) {
                                                 Icon(
@@ -549,9 +607,23 @@ fun EditReminderSheet(
                                 .padding(top = 2.dp, bottom = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
-                            val dayLabels = listOf("Po", "Út", "St", "Čt", "Pá", "So", "Ne")
+                            val dayLabels = listOf(
+                                stringResource(R.string.day_mon),
+                                stringResource(R.string.day_tue),
+                                stringResource(R.string.day_wed),
+                                stringResource(R.string.day_thu),
+                                stringResource(R.string.day_fri),
+                                stringResource(R.string.day_sat),
+                                stringResource(R.string.day_sun),
+                            )
                             val dayFull = listOf(
-                                "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle",
+                                stringResource(R.string.day_mon_full),
+                                stringResource(R.string.day_tue_full),
+                                stringResource(R.string.day_wed_full),
+                                stringResource(R.string.day_thu_full),
+                                stringResource(R.string.day_fri_full),
+                                stringResource(R.string.day_sat_full),
+                                stringResource(R.string.day_sun_full),
                             )
                             for (day in 1..7) {
                                 val selected = day in weekdaysSel
@@ -601,9 +673,9 @@ fun EditReminderSheet(
                     if (timeRepeat != TimeRepeat.NEVER) {
                         Text(
                             text = if (timeRepeat == TimeRepeat.DAILY) {
-                                "Připomínka přijde každý den ve vybraný čas."
+                                stringResource(R.string.repeat_daily_description)
                             } else {
-                                "Připomínka přijde každý týden ve vybrané dny a čas."
+                                stringResource(R.string.repeat_weekly_description)
                             },
                             style = GeoType.caption2,
                             color = colors.secondaryLabel,
@@ -617,7 +689,7 @@ fun EditReminderSheet(
 
             // Druh upozornění + dožadování (rozšíření Android verze)
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Upozornění")
+            SectionHeader(stringResource(R.string.alert_section))
             InsetCard {
                 Row(
                     modifier = Modifier
@@ -626,7 +698,7 @@ fun EditReminderSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Druh",
+                        text = stringResource(R.string.alert_kind),
                         style = GeoType.body,
                         color = colors.label,
                         modifier = Modifier.weight(1f),
@@ -637,7 +709,7 @@ fun EditReminderSheet(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = alertStyle.label,
+                                text = stringResource(alertStyle.labelRes),
                                 style = GeoType.body,
                                 color = colors.secondaryLabel,
                             )
@@ -654,7 +726,7 @@ fun EditReminderSheet(
                         ) {
                             AlertStyle.entries.forEach { option ->
                                 DropdownMenuItem(
-                                    text = { Text(option.label, style = GeoType.body) },
+                                    text = { Text(stringResource(option.labelRes), style = GeoType.body) },
                                     trailingIcon = {
                                         if (option == alertStyle) {
                                             Icon(
@@ -682,23 +754,26 @@ fun EditReminderSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Připomínat, dokud nepotvrdím",
+                        text = stringResource(R.string.alert_nagging),
                         style = GeoType.body,
                         color = colors.label,
                         modifier = Modifier.weight(1f),
                     )
-                    IOSSwitch(checked = nagging) { nagging = it }
+                    IOSSwitch(
+                        checked = nagging,
+                        label = stringResource(R.string.alert_nagging),
+                    ) { nagging = it }
                 }
 
                 if (alertStyle == AlertStyle.URGENT || nagging) {
                     Text(
                         text = buildString {
                             if (alertStyle == AlertStyle.URGENT) {
-                                append("Hlasitý budíkový zvuk hraje, dokud notifikaci nezavřeš.")
+                                append(urgentDescription)
                             }
                             if (nagging) {
                                 if (isNotEmpty()) append(" ")
-                                append("Nepotvrzená připomínka se vrátí každých 5 minut.")
+                                append(naggingDescription)
                             }
                         },
                         style = GeoType.caption2,
@@ -712,13 +787,17 @@ fun EditReminderSheet(
 
             // Příloha (Fotka nebo PDF)
             Spacer(Modifier.height(24.dp))
-            SectionHeader("Příloha (Fotka / PDF)")
+            SectionHeader(stringResource(R.string.attachment_header))
             InsetCard {
                 if (attachmentPath == null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .iosClickable { attachmentLauncher.launch("*/*") }
+                            .iosClickable {
+                                attachmentLauncher.launch(
+                                    arrayOf("image/jpeg", "image/png", "application/pdf")
+                                )
+                            }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -730,7 +809,7 @@ fun EditReminderSheet(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text = "Připojit fotku nebo PDF soubor",
+                            text = stringResource(R.string.attachment_attach),
                             style = GeoType.body,
                             color = colors.accent,
                             modifier = Modifier.weight(1f),
@@ -743,7 +822,8 @@ fun EditReminderSheet(
                         )
                     }
                 } else {
-                    val fileName = attachmentPath?.substringAfterLast('/') ?: "Příloha"
+                    val fileName = attachmentPath?.substringAfterLast('/')
+                        ?: stringResource(R.string.attachment_default_name)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -765,27 +845,28 @@ fun EditReminderSheet(
                             maxLines = 1,
                         )
                         Icon(
-                            imageVector = Icons.Filled.OpenInNew,
-                            contentDescription = "Otevřít přílohu",
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = stringResource(R.string.attachment_open),
                             tint = colors.accent,
                             modifier = Modifier
-                                .size(22.dp)
-                                .iosClickable { AttachmentHelper.openAttachment(context, attachmentPath!!) },
+                                .size(48.dp)
+                                .iosClickable { AttachmentHelper.openAttachment(context, attachmentPath!!) }
+                                .padding(13.dp),
                         )
-                        Spacer(Modifier.width(14.dp))
                         Icon(
                             imageVector = Icons.Filled.Delete,
-                            contentDescription = "Odstranit přílohu",
+                            contentDescription = stringResource(R.string.attachment_delete),
                             tint = colors.red,
                             modifier = Modifier
-                                .size(22.dp)
+                                .size(48.dp)
                                 .iosClickable {
                                     val toDelete = attachmentPath
                                     attachmentPath = null
                                     if (toDelete != null && toDelete != existing?.attachmentPath) {
                                         AttachmentHelper.deleteAttachment(context, toDelete)
                                     }
-                                },
+                                }
+                                .padding(13.dp),
                         )
                     }
                 }
@@ -849,10 +930,12 @@ fun EditReminderSheet(
                         dueDate = mergeSelectedDate(dueDate, selected)
                     }
                     showDateDialog = false
-                }) { Text("Hotovo") }
+                }) { Text(stringResource(R.string.action_done)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDateDialog = false }) { Text("Zrušit") }
+                TextButton(onClick = { showDateDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             },
         ) {
             DatePicker(state = dateState, showModeToggle = false)
@@ -880,11 +963,13 @@ fun EditReminderSheet(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = { showTimeDialog = false }) { Text("Zrušit") }
+                    TextButton(onClick = { showTimeDialog = false }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
                     TextButton(onClick = {
                         dueDate = mergeSelectedTime(dueDate, timeState.hour, timeState.minute)
                         showTimeDialog = false
-                    }) { Text("Hotovo") }
+                    }) { Text(stringResource(R.string.action_done)) }
                 }
             }
         }
@@ -897,6 +982,7 @@ private fun DateCapsule(text: String, onClick: () -> Unit) {
     val colors = GeoTheme.colors
     Box(
         modifier = Modifier
+            .defaultMinSize(minHeight = 48.dp)
             .clip(RoundedCornerShape(9.dp))
             .background(colors.segmentTrack)
             .iosClickable(onClick = onClick)

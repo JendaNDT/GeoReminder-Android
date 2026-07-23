@@ -4,6 +4,8 @@ import android.content.Context
 import android.media.AudioManager
 import android.speech.tts.TextToSpeech
 import cz.jenda.georeminder.data.FeatureSettings
+import cz.jenda.georeminder.data.LanguageController
+import cz.jenda.georeminder.data.localizedSubtitle
 import cz.jenda.georeminder.model.Reminder
 import java.util.Locale
 
@@ -20,8 +22,8 @@ object TtsSpeaker {
         val appContext = context.applicationContext
         tts = TextToSpeech(appContext) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                val csLocale = Locale("cs", "CZ")
-                val res = tts?.setLanguage(csLocale)
+                val locale = LanguageController.getLocale(FeatureSettings.appLanguage.value)
+                val res = tts?.setLanguage(locale)
                 if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
                     tts?.setLanguage(Locale.getDefault())
                 }
@@ -37,14 +39,14 @@ object TtsSpeaker {
     }
 
     fun speakIfEnabled(context: Context, reminder: Reminder) {
-        init(context)
         if (!FeatureSettings.ttsEnabled.value) return
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         if (audioManager?.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
+        init(context)
 
         val textToSpeak = if (FeatureSettings.ttsReadFullText.value) {
-            "${reminder.title}. ${reminder.subtitle}"
+            "${reminder.title}. ${reminder.localizedSubtitle(context)}"
         } else {
             reminder.title
         }

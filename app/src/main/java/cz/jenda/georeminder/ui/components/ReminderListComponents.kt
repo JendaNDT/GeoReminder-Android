@@ -39,9 +39,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -52,6 +54,7 @@ import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
+import cz.jenda.georeminder.data.localizedSubtitle
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 import java.util.Calendar
@@ -185,7 +188,11 @@ fun nextMorningMillis(): Long {
 @Composable
 fun rememberCategoryStyle(reminder: Reminder): Triple<ImageVector, Color, String?> {
     val colors = GeoTheme.colors
-    return remember(reminder, colors) {
+    val doneLabel = stringResource(R.string.chip_done)
+    val repeatingLabel = stringResource(R.string.chip_repeating)
+    val weekdaysLabel = stringResource(R.string.repeat_weekdays)
+    val leaveLabel = stringResource(R.string.chip_leave)
+    return remember(reminder, colors, doneLabel, repeatingLabel, weekdaysLabel, leaveLabel) {
         val isRepeating = reminder.repeats || reminder.timeRepeat != TimeRepeat.NEVER || !reminder.weekdays.isNullOrEmpty()
         when {
             reminder.isDone -> Triple(
@@ -196,12 +203,12 @@ fun rememberCategoryStyle(reminder: Reminder): Triple<ImageVector, Color, String
                     else -> Icons.Filled.LocationOn
                 },
                 colors.secondaryLabel,
-                "hotovo"
+                doneLabel
             )
             isRepeating -> Triple(
                 Icons.Filled.Autorenew,
                 colors.purple,
-                if (!reminder.weekdays.isNullOrEmpty()) "Po–Pá" else "opakuje"
+                if (!reminder.weekdays.isNullOrEmpty()) weekdaysLabel else repeatingLabel
             )
             reminder.kind == ReminderKind.TIME -> Triple(
                 Icons.Filled.Schedule,
@@ -211,7 +218,7 @@ fun rememberCategoryStyle(reminder: Reminder): Triple<ImageVector, Color, String
             reminder.trigger == TriggerType.LEAVE -> Triple(
                 Icons.AutoMirrored.Filled.DirectionsWalk,
                 colors.teal,
-                "odjezd"
+                leaveLabel
             )
             else -> Triple(
                 Icons.Filled.LocationOn,
@@ -234,6 +241,12 @@ fun SwipeReminderRow(
     onDelete: () -> Unit,
 ) {
     val colors = GeoTheme.colors
+    val greenContent = if (colors.green.luminance() > 0.18f) Color.Black else Color.White
+    val redContent = if (colors.red.luminance() > 0.18f) Color.Black else Color.White
+    val toggleAction = stringResource(
+        if (reminder.isDone) R.string.action_undo else R.string.action_done
+    )
+    val deleteAction = stringResource(R.string.action_delete_short)
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
@@ -266,13 +279,13 @@ fun SwipeReminderRow(
                         Icon(
                             imageVector = if (reminder.isDone) Icons.AutoMirrored.Filled.Undo else Icons.Filled.Check,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = greenContent,
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = if (reminder.isDone) "Vrátit" else "Hotovo",
+                            text = toggleAction,
                             style = GeoType.footnoteBold,
-                            color = Color.White,
+                            color = greenContent,
                         )
                     }
                 }
@@ -285,9 +298,9 @@ fun SwipeReminderRow(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        Icon(Icons.Filled.Delete, null, tint = Color.White)
+                        Icon(Icons.Filled.Delete, null, tint = redContent)
                         Spacer(Modifier.width(6.dp))
-                        Text("Smazat", style = GeoType.footnoteBold, color = Color.White)
+                        Text(stringResource(R.string.action_delete_short), style = GeoType.footnoteBold, color = redContent)
                     }
                 }
                 else -> {}
@@ -302,9 +315,9 @@ fun SwipeReminderRow(
             modifier = Modifier.semantics {
                 customActions = listOf(
                     CustomAccessibilityAction(
-                        if (reminder.isDone) "Vrátit" else "Hotovo"
+                        toggleAction
                     ) { onToggleDone(); true },
-                    CustomAccessibilityAction("Smazat") { onDelete(); true },
+                    CustomAccessibilityAction(deleteAction) { onDelete(); true },
                 )
             },
         )
@@ -322,6 +335,7 @@ fun ReminderRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = GeoTheme.colors
+    val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
     val (icon, categoryColor, defaultBadge) = rememberCategoryStyle(reminder)
     val chipText = distance ?: defaultBadge
@@ -358,7 +372,13 @@ fun ReminderRow(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = if (reminder.isDone) "Dokončená připomínka" else "Připomínka ${if (reminder.kind == ReminderKind.LOCATION) "na místo" else "na čas"}",
+                contentDescription = stringResource(
+                    when {
+                        reminder.isDone -> R.string.reminder_done_description
+                        reminder.kind == ReminderKind.LOCATION -> R.string.reminder_location_description
+                        else -> R.string.reminder_time_description
+                    }
+                ),
                 tint = if (reminder.isDone) colors.secondaryLabel else categoryColor,
                 modifier = Modifier.size(20.dp),
             )
@@ -385,7 +405,7 @@ fun ReminderRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = reminder.subtitle,
+                text = reminder.localizedSubtitle(context),
                 style = GeoType.caption,
                 color = colors.secondaryLabel,
                 maxLines = 1,

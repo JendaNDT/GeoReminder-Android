@@ -2,15 +2,16 @@ package cz.jenda.georeminder
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import cz.jenda.georeminder.data.ReminderStore
+import cz.jenda.georeminder.notify.NotificationHelper
 import cz.jenda.georeminder.ui.RootScreen
 import cz.jenda.georeminder.ui.theme.GeoReminderTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     companion object {
         /** Požadavek ze zástupce na ploše: "time" / "location" → otevřít formulář. */
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        NotificationHelper.createChannel(this)
         ReminderStore.get(this) // zahřátí úložiště
         handleIntent(intent)
         setContent {

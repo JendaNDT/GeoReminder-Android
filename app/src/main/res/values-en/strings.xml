@@ -12,9 +12,7 @@
     <string name="tab_reminders">Reminders</string>
     <string name="tab_map">Map</string>
     <string name="search_placeholder">Search reminders…</string>
-    <string name="status_active">%1$d active</string>
     <string name="status_all_done">All completed</string>
-    <string name="status_done_suffix">• %1$d completed</string>
     <string name="section_active">Active</string>
     <string name="section_done">Completed</string>
     <string name="empty_reminders_title">No reminders yet</string>
@@ -38,7 +36,6 @@
     <!-- Edit Reminder Sheet -->
     <string name="title_new_reminder">New Reminder</string>
     <string name="title_edit_reminder">Edit Reminder</string>
-    <string name="field_title_hint">What would you like to be reminded of?</string>
     <string name="kind_location">At Location</string>
     <string name="kind_time">At Time</string>
 
@@ -51,12 +48,10 @@
     <string name="repeat_daily">Every day</string>
     <string name="repeat_weekly">Every week</string>
     <string name="repeat_weekdays">Mon–Fri</string>
-    <string name="repeat_label">Repeat</string>
 
     <string name="alert_quiet">Quiet</string>
     <string name="alert_default">Default</string>
     <string name="alert_urgent">Urgent</string>
-    <string name="alert_style_label">Alert Style</string>
     <string name="alert_nagging">Remind until confirmed</string>
 
     <string name="attachment_header">Attachment (Photo / PDF)</string>
@@ -69,8 +64,6 @@
     <string name="location_picker_search_hint">Search address, store, city…</string>
     <string name="location_radius">Radius</string>
     <string name="location_use_this">Use this location</string>
-    <string name="location_favorites">Favorite Places</string>
-    <string name="location_recent">Recent Places</string>
 
     <!-- Settings Sheet -->
     <string name="settings_title">Settings</string>
@@ -80,7 +73,6 @@
     <string name="lang_cs">Čeština (Czech)</string>
     <string name="lang_en">English</string>
 
-    <string name="settings_tts">Voice Readout (Text-to-Speech)</string>
     <string name="settings_tts_enable">Read reminders aloud</string>
     <string name="settings_tts_full">Read title and place</string>
     <string name="settings_tts_test">Test voice</string>
@@ -90,14 +82,12 @@
     <string name="settings_export_backup">Export JSON backup</string>
     <string name="settings_import_backup">Import JSON backup</string>
     <string name="settings_import_calendar">Import Calendar events</string>
-    <string name="settings_reliability">Background Reliability</string>
     <string name="settings_battery_optimization">Battery Optimization</string>
     <string name="settings_app_info">About App</string>
 
     <!-- Favorites Sheet -->
     <string name="favorites_title">Favorite Places</string>
     <string name="favorites_add">Add new favorite place</string>
-    <string name="favorites_empty">No favorite places saved yet.</string>
     <string name="favorites_delete_title">Delete favorite place?</string>
     <string name="favorites_delete_message">Are you sure you want to delete place \"%1$s\"?</string>
     <string name="favorite_edit_title">Edit Favorite Place</string>
@@ -120,20 +110,13 @@
     <string name="search_empty_text">No reminders found matching \"%1$s\".</string>
 
     <!-- Banners & Toasts -->
-    <string name="battery_banner_title">Reliable background delivery</string>
-    <string name="battery_banner_text">System may delay notifications. Disable battery optimization for GeoReminder.</string>
-    <string name="battery_banner_action">Disable optimization</string>
-    <string name="permission_banner_location">GeoReminder needs background location access to trigger geofence reminders.</string>
-    <string name="permission_banner_notifications">GeoReminder needs permission to send notifications.</string>
     <string name="permission_banner_grant">Grant access</string>
 
     <!-- Toasts & Messages -->
     <string name="toast_backup_export_success">Backup successfully exported</string>
     <string name="toast_backup_import_success">Backup successfully imported</string>
-    <string name="toast_backup_error">Error processing backup</string>
     <string name="toast_no_navigation_app">No navigation app found</string>
     <string name="tts_test_message">This is a test readout of a reminder.</string>
-    <string name="backup_json_notice">Exports text data (reminders and favorite places). Attachment files are not bundled.</string>
 
     <!-- Days of the week -->
     <string name="day_mon">Mon</string>
@@ -154,4 +137,113 @@
     <string name="onboarding_button_continue">Continue</string>
     <string name="onboarding_button_finish">Allow &amp; Start</string>
     <string name="onboarding_button_skip">Skip</string>
+
+    <!-- Remaining localized UI and model presentation -->
+    <string name="action_clear">Clear</string>
+    <string name="action_delete_short">Delete</string>
+    <string name="section_reminder_title">What should I remind you about?</string>
+    <string name="field_title_example">E.g. buy milk</string>
+    <string name="section_where">Where</string>
+    <string name="section_when">When</string>
+    <string name="selected_place_default">Selected location</string>
+    <string name="selected_time_past">The selected time has passed. Choose a time in the future.</string>
+    <string name="radius_value">Radius: %1$d m</string>
+    <string name="radius_default_value">Default radius: %1$d m</string>
+    <string name="radius_default_compact">default radius %1$d m</string>
+    <string name="radius_recommendation">At least 100 m is recommended; the system may monitor smaller areas less reliably.</string>
+    <string name="date_time_label">Date and time</string>
+    <string name="repeat_options_label">Repeat</string>
+    <string name="alert_section">Alert</string>
+    <string name="alert_kind">Style</string>
+    <string name="attachment_default_name">Attachment</string>
+    <string name="subtitle_repeats">repeats</string>
+    <string name="subtitle_no_due">No due date</string>
+    <string name="subtitle_daily">%1$s • every day</string>
+    <string name="subtitle_weekly">%1$s • every week</string>
+    <string name="reminder_location_description">Location reminder</string>
+    <string name="reminder_time_description">Time reminder</string>
+    <string name="reminder_done_description">Completed reminder</string>
+
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_neutral">Neutral (warm)</string>
+    <string name="theme_glass">Glass (signature)</string>
+    <string name="settings_widget_system">The home-screen widget follows the system appearance.</string>
+    <string name="settings_tts_enable_description">Reads the reminder title when it triggers</string>
+    <string name="settings_tts_full_description">Also reads the location or trigger time</string>
+    <string name="settings_group_description">Combines reminders at the same place into one group</string>
+    <string name="settings_export_backup_description">Saves reminders and favorite places without attachment files</string>
+    <string name="settings_import_backup_description">Loads reminders and favorite places from a backup JSON</string>
+    <string name="settings_permissions">Reliability &amp; permissions</string>
+    <string name="settings_notification_system">Phone notification settings</string>
+    <string name="settings_all_permissions">All permissions in Settings</string>
+    <string name="settings_version">App version</string>
+    <string name="settings_version_value">v%1$s</string>
+    <string name="settings_github">Source code on GitHub</string>
+    <string name="backup_export_failed">Backup export failed</string>
+    <string name="backup_import_failed">Backup restore failed</string>
+
+    <string name="favorites_empty_title">No favorite places</string>
+    <string name="favorites_empty_text">Tap + to save Home, Work, or another place and create reminders faster.</string>
+    <string name="favorite_selected_place">Location selected</string>
+    <string name="favorite_place_subtitle">favorite place</string>
+    <string name="recent_place_subtitle">recent place</string>
+
+    <string name="calendar_loading">Loading events…</string>
+    <string name="calendar_permission_text">Allow GeoReminder to read your calendar to show events.</string>
+    <string name="calendar_upcoming_section">Upcoming events (30 days)</string>
+    <string name="calendar_selected">Selected</string>
+    <string name="map_empty_title">No places to show</string>
+    <string name="map_empty_text">Active location reminders will appear here on the map.</string>
+    <string name="map_title">Reminder Map</string>
+    <string name="map_center_on_me">Center map on my location</string>
+    <string name="location_search_description">Search for a place</string>
+
+    <string name="share_reminder_prefix">Reminder: %1$s</string>
+    <string name="share_place_prefix">Place: %1$s</string>
+    <string name="share_chooser">Share reminder</string>
+    <string name="storage_error">Data could not be loaded or saved safely. Changes are temporarily blocked.</string>
+
+    <string name="notification_channel_default">Reminders</string>
+    <string name="notification_channel_default_description">Location and time reminders</string>
+    <string name="notification_channel_quiet">Quiet reminders</string>
+    <string name="notification_channel_quiet_description">Reminders without sound</string>
+    <string name="notification_channel_urgent">Urgent reminders</string>
+    <string name="notification_channel_urgent_description">Important reminders with a loud sound</string>
+    <string name="notification_arrive">Arriving at: %1$s</string>
+    <string name="notification_leave">Leaving location: %1$s</string>
+    <string name="notification_once">Reminder for %1$s</string>
+    <string name="notification_daily">Repeats every day at %1$s</string>
+    <string name="notification_weekly">Repeats every week: %1$s</string>
+    <string name="widget_add_reminder">New reminder</string>
+    <string name="repeat_daily_description">The reminder will arrive every day at the selected time.</string>
+    <string name="repeat_weekly_description">The reminder will arrive every week on the selected days and time.</string>
+    <string name="alert_urgent_description">The alarm sound continues until you dismiss the notification.</string>
+    <string name="alert_nagging_description">An unconfirmed reminder returns every 5 minutes.</string>
+    <string name="day_mon_full">Monday</string>
+    <string name="day_tue_full">Tuesday</string>
+    <string name="day_wed_full">Wednesday</string>
+    <string name="day_thu_full">Thursday</string>
+    <string name="day_fri_full">Friday</string>
+    <string name="day_sat_full">Saturday</string>
+    <string name="day_sun_full">Sunday</string>
+    <string name="reminder_deleted">Reminder deleted</string>
+    <string name="favorites_button">Favorite places</string>
+    <string name="calendar_import_button_description">Import from calendar</string>
+    <string name="new_reminder_description">New reminder</string>
+    <string name="notifications_disabled">Notifications are off, so the app cannot alert you.</string>
+    <string name="location_disabled">Location access is denied, so location reminders will not work.</string>
+    <string name="background_location_missing">Location is not set to “Allow all the time,” so location reminders will not arrive while the app is closed.</string>
+    <string name="battery_restricted">Battery saving may restrict reminders in the background.</string>
+    <string name="geofence_failed">Location monitoring could not be configured. Check location access and save the reminder again.</string>
+    <string name="chip_done">done</string>
+    <string name="chip_repeating">repeats</string>
+    <string name="chip_leave">leaving</string>
+    <string name="calendar_default_event_title">Event</string>
+    <string name="calendar_imported_count">Events imported: %1$d</string>
+    <string name="calendar_no_events_title">No events</string>
+    <string name="location_no_results">No results. Try another name or tap the map directly.</string>
+    <string name="location_network_error">There seems to be a connection problem. Check your internet or tap the map directly.</string>
+    <string name="location_unnamed">Unnamed place</string>
 </resources>

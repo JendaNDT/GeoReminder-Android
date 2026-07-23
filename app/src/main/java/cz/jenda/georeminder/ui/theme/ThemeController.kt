@@ -1,6 +1,9 @@
 package cz.jenda.georeminder.ui.theme
 
 import android.content.Context
+import androidx.annotation.StringRes
+import androidx.core.content.edit
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.SharedStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -8,13 +11,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 enum class ThemeMode {
     SYSTEM, LIGHT, DARK, NEUTRAL, GLASS;
 
-    val label: String
+    @get:StringRes
+    val labelRes: Int
         get() = when (this) {
-            SYSTEM -> "Podle systému"
-            LIGHT -> "Světlý"
-            DARK -> "Tmavý"
-            NEUTRAL -> "Neutrální (teplý)"
-            GLASS -> "Glass (Vlajkový)"
+            SYSTEM -> R.string.theme_system
+            LIGHT -> R.string.theme_light
+            DARK -> R.string.theme_dark
+            NEUTRAL -> R.string.theme_neutral
+            GLASS -> R.string.theme_glass
         }
 }
 
@@ -45,10 +49,8 @@ object ThemeController {
             ThemeMode.GLASS -> "glass"
             ThemeMode.SYSTEM -> "system"
         }
-        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY, raw)
-            .apply()
+        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE).edit {
+            putString(KEY, raw)
+        }
     }
 }
-

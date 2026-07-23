@@ -33,8 +33,7 @@ class GeofenceReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
-                val reminders = store.reminders.value
+                val reminders = store.reloadAndGet()
 
                 for (id in ids) {
                     val reminder = reminders.firstOrNull { it.id == id } ?: continue
@@ -47,12 +46,16 @@ class GeofenceReceiver : BroadcastReceiver() {
                                 && reminder.trigger == TriggerType.LEAVE)
                     if (!matches) continue
 
-                    NotificationHelper.show(context, reminder)
+                    val scheduler = ReminderScheduler(context)
+                    val delivered = if (reminder.repeats) {
+                        NotificationHelper.show(context, reminder)
+                    } else {
+                        scheduler.deliverGeofenceOnce(reminder)
+                    }
 
-                    if (!reminder.repeats) {
+                    if (delivered && !reminder.repeats) {
                         // Jednorázová: geofence už nehlídat (notifikace „vystřelila")
                         // a zapamatovat si to, aby ji resync znovu nezaregistroval
-                        ReminderScheduler(context).markGeofenceFired(id)
                         LocationServices.getGeofencingClient(context)
                             .removeGeofences(listOf(id))
                     }

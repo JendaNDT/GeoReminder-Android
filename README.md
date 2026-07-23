@@ -3,15 +3,15 @@
 Nativní Android verze GeoReminderu – **„Připomeň mi X, až budu u Y / v 18:30."**
 Vzhled 1:1 podle iOS verze (viz `design-podklady/DESIGN_SPEC.md` v iOS projektu), plus vlastní vylepšení navrch.
 
-**Aktuální verze: 2.7** (versionCode 19) · Stack: Kotlin + Jetpack Compose, Google Maps, GeofencingClient, AlarmManager, Glance widget · Minimum: Android 8 (API 26), target 35
+**Aktuální verze: 2.7** (versionCode 19) · Stack: Kotlin + Jetpack Compose, Google Maps, GeofencingClient, AlarmManager, Glance widget · Minimum: Android 8 (API 26), target 36
 
-> **Aktuální stav:** viz `PROJECT_STATUS.md` a `AUDIT3.md` (finální audit a kompletní realizace oprav pro logiku, stabilitu, přístupnost i WCAG AAA/AA kontrast). Appka je stabilní, bezpečně ukládá data, neblokuje UI a je připravena k terénnímu testování před vydáním.
+> **Aktuální stav:** viz `PROJECT_STATUS.md` a `AUDIT4.md`. Kritické nálezy AUDIT4 jsou opravené a debug/release gate prochází; před veřejným vydáním ještě zbývá terénní ověření alarmů, geofence a chování konkrétních výrobců telefonů.
 
 ## Co appka umí
 
 - Připomínky **na místo** (příjezd/odjezd, poloměr 50–1000 m, opakování) a **na čas** (jednorázově / denně / týdně ve vybrané dny)
 - **Druhy upozornění**: Tiché / Výchozí / Naléhavé (budíkový zvuk do zavření) + **dožadování** (nepotvrzená připomínka se vrací à 5 min)
-- Tlačítka na notifikaci: Hotovo · Odložit o hodinu · Zítra ráno · Navigovat (u míst)
+- Tlačítka na notifikaci: Hotovo · Odložit o hodinu · Zítra ráno
 - **Živé našeptávání míst** (Photon – i názvy podniků, vzdálenosti, ikony, poslední a oblíbená místa)
 - **Sdílení místa z Map Google** rovnou do připomínky, příjem geo: odkazů
 - **Přílohy** k připomínce (foto/PDF/soubor, kopie do appky), **hlasité čtení (TTS)**, **jednorázový import z Google Kalendáře** (volitelné v Nastavení)
@@ -20,24 +20,28 @@ Vzhled 1:1 podle iOS verze (viz `design-podklady/DESIGN_SPEC.md` v iOS projektu)
 - Obnova hlídání po restartu telefonu
 - Odolné asynchronní ukládání dat mimo hlavního UI vlákno, sanitace záloh a bezpečné mazání rozpracovaných příloh
 
-## Jak sestavit APK
+## Jak sestavit a ověřit aplikaci
 
-Nejjednodušší: **přilož tenhle projekt do session s AI asistentem** a napiš, co je potřeba. Asistent projekt sestaví v cloudu a pošle hotové APK.
+Projekt obsahuje Gradle Wrapper, takže není potřeba instalovat vlastní verzi Gradlu:
 
-Ručně přes Android Studio:
-1. Otevři tuhle složku v Android Studiu (Open → vybrat složku projektu).
-2. Počkej, až se stáhnou závislosti (poprvé pár minut).
-3. Build → Generate App Bundles or APKs → Generate APKs.
-4. Hotové APK: `app/build/outputs/apk/release/app-release.apk`.
+```bash
+./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug bundleRelease
+```
+
+- Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
+- Play bundle: `app/build/outputs/bundle/release/app-release.aab`
+- Stejný gate běží také v `.github/workflows/android.yml`.
+
+Pro podepsaný release nastav `GEOR_SIGNING_STORE_PASSWORD`, `GEOR_SIGNING_KEY_PASSWORD` a `GEOR_SIGNING_KEY_ALIAS` jako Gradle properties nebo proměnné prostředí. Bez nich vznikne bezpečně nepodepsaný release artefakt; debug vždy používá vlastní debug klíč.
 
 ## Důležité soubory
 
 - `mapskey.properties` – Google Maps klíč (`MAPS_API_KEY=AIza…`). Bez něj se appka sestaví, ale mapa bude prázdná.
-- `app/georeminder.keystore` – podpisový klíč. Jen s ním jdou aktualizace instalovat přes starší verzi. Při nové verzi zvyš `versionCode` v `app/build.gradle.kts`.
+- `app/georeminder.keystore` – podpisový klíč. Jen s ním a odpovídajícími tajnými hodnotami jdou aktualizace instalovat přes starší verzi. Při nové verzi zvyš `versionCode` v `app/build.gradle.kts`.
 - `PROJECT_STATUS.md` – aktuální stav projektu.
-- `AUDIT3.md` – finální kompletní audit a přehled nálezů (logika, provázanost, stabilita, čistota, UX, UI).
+- `AUDIT4.md` – nejnovější komplexní audit včetně stavu následných oprav.
 
-> **Pozor:** `mapskey.properties` a `app/georeminder.keystore` jsou záměrně **mimo git** (`.gitignore`) – jsou to tajnosti. Kompletní kopie projektu **včetně nich** je na Jendově Macu. Po naklonování repozitáře je potřeba tyhle dva soubory doplnit odtamtud (bez keystore se APK podepíše jen vývojářským podpisem a nepůjde nainstalovat přes stávající verzi).
+> **Pozor:** `mapskey.properties`, `app/georeminder.keystore` a signing hesla jsou záměrně **mimo git** (`.gitignore`). Bez produkčního podpisu nelze nový release nainstalovat jako aktualizaci stávající produkční instalace.
 
 ## Struktura kódu (`app/src/main/java/cz/jenda/georeminder/`)
 

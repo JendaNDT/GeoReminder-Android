@@ -19,45 +19,51 @@ val mapsKey: String = run {
 
 android {
     namespace = "cz.jenda.georeminder"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "cz.jenda.georeminder"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 19
         versionName = "2.7"
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 
     // Podpisový keystore není v git repozitáři (bezpečnost) – žije v Jendově
-    // lokální kopii projektu. Bez něj se použije běžný debug podpis.
+    // lokální kopii projektu. Hesla se berou jen z Gradle properties nebo env.
     val keystoreFile = file("georeminder.keystore")
+    val signingStorePassword = providers.gradleProperty("GEOR_SIGNING_STORE_PASSWORD").orNull
+        ?: System.getenv("GEOR_SIGNING_STORE_PASSWORD")
+    val signingKeyPassword = providers.gradleProperty("GEOR_SIGNING_KEY_PASSWORD").orNull
+        ?: System.getenv("GEOR_SIGNING_KEY_PASSWORD")
+    val signingKeyAlias = providers.gradleProperty("GEOR_SIGNING_KEY_ALIAS").orNull
+        ?: System.getenv("GEOR_SIGNING_KEY_ALIAS")
+    val canSignRelease = keystoreFile.isFile &&
+        !signingStorePassword.isNullOrBlank() &&
+        !signingKeyPassword.isNullOrBlank() &&
+        !signingKeyAlias.isNullOrBlank()
 
     signingConfigs {
-        create("georeminder") {
-            storeFile = keystoreFile
-            storePassword = "georeminder"
-            keyAlias = "georeminder"
-            keyPassword = "georeminder"
+        if (canSignRelease) {
+            create("georeminder") {
+                storeFile = keystoreFile
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
         }
     }
 
     buildTypes {
         release {
-            // Minifikace/R8 zatím VYPNUTÁ – zapnout až po úspěšném testu na zařízení
-            // (proguard-rules.pro chrání JSON modely kompatibilní s iOS).
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            if (keystoreFile.exists()) {
-                signingConfig = signingConfigs.getByName("georeminder")
-            }
-        }
-        debug {
-            if (keystoreFile.exists()) {
+            if (canSignRelease) {
                 signingConfig = signingConfigs.getByName("georeminder")
             }
         }
@@ -72,10 +78,18 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    // Appka má vlastní přepínač jazyka; oba překlady proto musí být
+    // dostupné i v AAB instalaci bez dodatečného stahování splitu.
+    bundle {
+        language {
+            enableSplit = false
+        }
     }
     lint {
-        checkReleaseBuilds = false
-        abortOnError = false
+        checkReleaseBuilds = true
+        abortOnError = true
     }
 }
 
@@ -86,6 +100,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
@@ -94,9 +109,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
-    implementation("androidx.glance:glance-appwidget:1.1.0")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
-

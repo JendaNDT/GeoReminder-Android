@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import cz.jenda.georeminder.ui.components.*
 import androidx.compose.ui.res.stringResource
@@ -29,21 +28,24 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -67,6 +69,7 @@ import cz.jenda.georeminder.ui.components.SheetHeader
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import kotlinx.coroutines.launch
 
 /**
  * Správa oblíbených míst: seznam, přidání, úprava, mazání (DESIGN_SPEC §5.5).
@@ -81,6 +84,7 @@ fun FavoritesSheet(onClose: () -> Unit) {
 
     var addingNew by remember { mutableStateOf(false) }
     var editingPlace by remember { mutableStateOf<FavoritePlace?>(null) }
+    var editorDismissRequest by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -88,13 +92,13 @@ fun FavoritesSheet(onClose: () -> Unit) {
             .fillMaxHeight()
     ) {
         SheetHeader(
-            title = "Oblíbená místa",
-            leftText = "Hotovo",
+            title = stringResource(cz.jenda.georeminder.R.string.favorites_title),
+            leftText = stringResource(cz.jenda.georeminder.R.string.action_done),
             onLeft = onClose,
             rightContent = {
                 GlassCircleButton(
                     icon = Icons.Filled.Add,
-                    contentDescription = "Nové oblíbené místo",
+                    contentDescription = stringResource(cz.jenda.georeminder.R.string.favorites_add),
                 ) { addingNew = true }
             },
         )
@@ -108,8 +112,8 @@ fun FavoritesSheet(onClose: () -> Unit) {
             ) {
                 EmptyState(
                     icon = Icons.Filled.StarBorder,
-                    title = "Žádná oblíbená místa",
-                    text = "Ťukni na + a ulož si třeba Domov nebo Práci. Připomínky pak zadáš na dva ťuky.",
+                    title = stringResource(cz.jenda.georeminder.R.string.favorites_empty_title),
+                    text = stringResource(cz.jenda.georeminder.R.string.favorites_empty_text),
                 )
             }
         } else {
@@ -136,18 +140,16 @@ fun FavoritesSheet(onClose: () -> Unit) {
     }
 
     if (addingNew || editingPlace != null) {
-        ModalBottomSheet(
-            onDismissRequest = {
-                addingNew = false
-                editingPlace = null
-            },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = colors.background,
-            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
-            dragHandle = null,
+        Dialog(
+            onDismissRequest = { editorDismissRequest++ },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnClickOutside = false,
+            ),
         ) {
             EditFavoriteSheet(
                 existing = editingPlace,
+                dismissRequest = editorDismissRequest,
                 onClose = {
                     addingNew = false
                     editingPlace = null
@@ -165,6 +167,8 @@ private fun SwipeFavoriteRow(
     onDelete: () -> Unit,
 ) {
     val colors = GeoTheme.colors
+    val redContent = if (colors.red.luminance() > 0.18f) Color.Black else Color.White
+    val deleteLabel = stringResource(cz.jenda.georeminder.R.string.action_delete_short)
     var showConfirmDialog by remember { mutableStateOf(false) }
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -202,9 +206,9 @@ private fun SwipeFavoriteRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
-                Icon(Icons.Filled.Delete, null, tint = Color.White)
+                Icon(Icons.Filled.Delete, null, tint = redContent)
                 Spacer(Modifier.width(6.dp))
-                Text("Smazat", style = GeoType.footnoteBold, color = Color.White)
+                Text(deleteLabel, style = GeoType.footnoteBold, color = redContent)
             }
         },
     ) {
@@ -215,7 +219,7 @@ private fun SwipeFavoriteRow(
                 .iosClickable(onClick = onTap)
                 .semantics {
                     customActions = listOf(
-                        CustomAccessibilityAction("Smazat") { showConfirmDialog = true; true }
+                        CustomAccessibilityAction(deleteLabel) { showConfirmDialog = true; true }
                     )
                 }
                 .defaultMinSize(minHeight = 58.dp)
@@ -237,7 +241,10 @@ private fun SwipeFavoriteRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "výchozí poloměr ${place.radius.toInt()} m",
+                    text = stringResource(
+                        cz.jenda.georeminder.R.string.radius_default_compact,
+                        place.radius.toInt()
+                    ),
                     style = GeoType.caption,
                     color = colors.secondaryLabel,
                 )
@@ -251,29 +258,34 @@ private fun SwipeFavoriteRow(
 @Composable
 fun EditFavoriteSheet(
     existing: FavoritePlace?,
+    dismissRequest: Int = 0,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
     val colors = GeoTheme.colors
     val store = remember { FavoritesStore.get(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var placeName by remember { mutableStateOf(existing?.name ?: "") }
     var coordinate by remember {
         mutableStateOf(existing?.let { LatLng(it.latitude, it.longitude) })
     }
-    var radius by remember { mutableStateOf(existing?.radius ?: DEFAULT_RADIUS) }
+    var radius by remember { mutableDoubleStateOf(existing?.radius ?: DEFAULT_RADIUS) }
     var showPicker by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
 
     val initialName = remember { existing?.name ?: "" }
     val initialCoord = remember { existing?.let { LatLng(it.latitude, it.longitude) } }
     val initialRadius = remember { existing?.radius ?: DEFAULT_RADIUS }
 
     val isDirty = name.trim() != initialName.trim() || coordinate != initialCoord || radius != initialRadius
-    val canSave = name.trim().isNotEmpty() && coordinate != null
+    val canSave = name.trim().isNotEmpty() && coordinate != null && !isSaving
 
     fun handleClose() {
+        if (isSaving) return
         if (isDirty) {
             showDiscardDialog = true
         } else {
@@ -281,33 +293,41 @@ fun EditFavoriteSheet(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = true) {
-        handleClose()
+    val initialDismissRequest = remember { dismissRequest }
+    LaunchedEffect(dismissRequest) {
+        if (dismissRequest != initialDismissRequest) handleClose()
     }
 
     fun save() {
         val coord = coordinate ?: return
-        val cleanName = name.trim()
-        if (existing != null) {
-            store.update(
-                existing.copy(
+        if (!canSave) return
+        val cleanName = name.trim().take(200)
+        val placeToSave = if (existing != null) {
+            existing.copy(
                     name = cleanName,
                     latitude = coord.latitude,
                     longitude = coord.longitude,
                     radius = radius,
-                )
             )
         } else {
-            store.add(
-                FavoritePlace(
+            FavoritePlace(
                     name = cleanName,
                     latitude = coord.latitude,
                     longitude = coord.longitude,
                     radius = radius,
-                )
             )
         }
-        onClose()
+        isSaving = true
+        saveFailed = false
+        coroutineScope.launch {
+            val success = if (existing != null) {
+                store.updateDurably(placeToSave)
+            } else {
+                store.addDurably(placeToSave)
+            }
+            isSaving = false
+            if (success) onClose() else saveFailed = true
+        }
     }
 
     Column(
@@ -335,7 +355,7 @@ fun EditFavoriteSheet(
             InsetCard {
                 FormTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = { name = it.take(200) },
                     placeholder = stringResource(cz.jenda.georeminder.R.string.favorite_name_hint),
                 )
             }
@@ -360,7 +380,7 @@ fun EditFavoriteSheet(
                         text = when {
                             coordinate == null -> stringResource(cz.jenda.georeminder.R.string.location_picker_title)
                             placeName.isNotEmpty() -> placeName
-                            else -> "Místo vybráno"
+                            else -> stringResource(cz.jenda.georeminder.R.string.favorite_selected_place)
                         },
                         style = GeoType.body,
                         color = colors.accent,
@@ -384,7 +404,10 @@ fun EditFavoriteSheet(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            text = "Výchozí poloměr: ${radius.toInt()} m",
+                            text = stringResource(
+                                cz.jenda.georeminder.R.string.radius_default_value,
+                                radius.toInt()
+                            ),
                             style = GeoType.subheadline,
                             color = colors.label,
                         )
@@ -395,6 +418,14 @@ fun EditFavoriteSheet(
                     }
                 }
             }
+        }
+        if (saveFailed) {
+            Text(
+                text = stringResource(cz.jenda.georeminder.R.string.storage_error),
+                style = GeoType.caption,
+                color = colors.red,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
         }
     }
 

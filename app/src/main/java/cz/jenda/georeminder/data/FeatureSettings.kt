@@ -1,6 +1,7 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
+import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Rozšiřující nastavení funkcí aplikace GeoReminder. */
@@ -26,6 +27,7 @@ object FeatureSettings {
     fun setTtsEnabled(context: Context, enabled: Boolean) {
         ttsEnabled.value = enabled
         saveBoolean(context, KEY_TTS_ENABLED, enabled)
+        if (!enabled) cz.jenda.georeminder.notify.TtsSpeaker.shutdown()
     }
 
     fun setTtsReadFullText(context: Context, readFull: Boolean) {
@@ -40,16 +42,14 @@ object FeatureSettings {
 
     fun setAppLanguage(context: Context, lang: String) {
         appLanguage.value = lang
-        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_APP_LANGUAGE, lang)
-            .apply()
+        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE).edit {
+            putString(KEY_APP_LANGUAGE, lang)
+        }
     }
 
     private fun saveBoolean(context: Context, key: String, value: Boolean) {
-        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(key, value)
-            .apply()
+        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE).edit {
+            putBoolean(key, value)
+        }
     }
 }

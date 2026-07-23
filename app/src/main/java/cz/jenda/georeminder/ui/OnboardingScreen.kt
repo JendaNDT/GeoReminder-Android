@@ -50,7 +50,10 @@ private data class OnboardingPage(
  * Uvítací průvodce při prvním spuštění – 3 stránky s plnou lokalizací (CZ/EN).
  */
 @Composable
-fun OnboardingScreen(onFinish: () -> Unit) {
+fun OnboardingScreen(
+    onFinish: () -> Unit,
+    onSkip: () -> Unit,
+) {
     val colors = GeoTheme.colors
     val pages = listOf(
         OnboardingPage(
@@ -167,7 +170,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 style = GeoType.footnote,
                 color = colors.secondaryLabel,
                 modifier = Modifier
-                    .iosClickable(onClick = onFinish)
+                    .iosClickable(onClick = onSkip)
                     .padding(horizontal = 24.dp, vertical = 14.dp),
             )
         }

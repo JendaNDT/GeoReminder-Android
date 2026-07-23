@@ -73,6 +73,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -89,7 +90,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -139,10 +143,14 @@ fun ReminderListScreen(
     val done by viewModel.doneReminders.collectAsStateWithLifecycle()
     val geofenceFailed by viewModel.geofenceFailed.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val storageError by store.storageError.collectAsStateWithLifecycle()
+    val deletedMessage = stringResource(R.string.reminder_deleted)
+    val undoLabel = stringResource(R.string.action_undo)
 
     var showNewSheet by rememberSaveable { mutableStateOf(false) }
     var newSheetKind by rememberSaveable { mutableStateOf<String?>(null) }
     var editingReminder by remember { mutableStateOf<Reminder?>(null) }
+    var editorDismissRequest by remember { mutableIntStateOf(0) }
     var showFavorites by rememberSaveable { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showCalendarImport by rememberSaveable { mutableStateOf(false) }
@@ -212,8 +220,8 @@ fun ReminderListScreen(
         viewModel.markPendingDelete(reminder)
         scope.launch {
             val res = snackbarHostState.showSnackbar(
-                message = "Připomínka smazána",
-                actionLabel = "Vrátit zpět",
+                message = deletedMessage,
+                actionLabel = undoLabel,
                 duration = SnackbarDuration.Short,
             )
             if (res == SnackbarResult.ActionPerformed) {
@@ -238,19 +246,19 @@ fun ReminderListScreen(
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                GlassCircleButton(Icons.Filled.StarBorder, "Oblíbená místa") {
+                GlassCircleButton(Icons.Filled.StarBorder, stringResource(R.string.favorites_button)) {
                     showFavorites = true
                 }
                 Spacer(Modifier.width(10.dp))
-                GlassCircleButton(Icons.Filled.CalendarMonth, "Import z kalendáře") {
+                GlassCircleButton(Icons.Filled.CalendarMonth, stringResource(R.string.calendar_import_button_description)) {
                     showCalendarImport = true
                 }
                 Spacer(Modifier.weight(1f))
-                GlassCircleButton(Icons.Filled.SettingsGear, "Nastavení") {
+                GlassCircleButton(Icons.Filled.SettingsGear, stringResource(R.string.settings_title)) {
                     showSettings = true
                 }
                 Spacer(Modifier.width(10.dp))
-                GlassCircleButton(Icons.Filled.Add, "Nová připomínka") {
+                GlassCircleButton(Icons.Filled.Add, stringResource(R.string.new_reminder_description)) {
                     newSheetKind = null
                     editingReminder = null
                     showNewSheet = true
@@ -268,7 +276,6 @@ fun ReminderListScreen(
         }
         // Vyhledávací pole (Search bar)
         item {
-            val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
             InsetCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 Row(
                     modifier = Modifier
@@ -286,7 +293,7 @@ fun ReminderListScreen(
                     Box(modifier = Modifier.weight(1f)) {
                         if (searchQuery.isEmpty()) {
                             Text(
-                                text = "Hledat v připomínkách...",
+                                text = stringResource(R.string.search_placeholder),
                                 style = GeoType.body,
                                 color = colors.tertiaryLabel,
                             )
@@ -302,18 +309,19 @@ fun ReminderListScreen(
                     if (searchQuery.isNotEmpty()) {
                         Icon(
                             imageVector = Icons.Filled.Close,
-                            contentDescription = "Vymazat",
+                            contentDescription = stringResource(R.string.action_clear),
                             tint = colors.tertiaryLabel,
                             modifier = Modifier
-                                .size(18.dp)
-                                .iosClickable { viewModel.updateSearchQuery("") },
+                                .size(48.dp)
+                                .iosClickable { viewModel.updateSearchQuery("") }
+                                .padding(14.dp),
                         )
                     }
                 }
             }
         }
         // Bannery oprávnění a spolehlivosti
-        if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted || geofenceFailed) {
+        if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted || geofenceFailed || storageError) {
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -322,48 +330,45 @@ fun ReminderListScreen(
                     if (notificationsDenied) {
                         PermissionBanner(
                             icon = Icons.Filled.NotificationsOff,
-                            message = "Notifikace jsou vypnuté – appka ti nemůže nic připomenout.",
+                            message = stringResource(R.string.notifications_disabled),
                         )
                     }
                     if (locationDenied) {
                         PermissionBanner(
                             icon = Icons.Filled.LocationOff,
-                            message = "Přístup k poloze je zakázaný – připomínky na místa nebudou fungovat.",
+                            message = stringResource(R.string.location_disabled),
                         )
                     } else if (backgroundMissing) {
                         PermissionBanner(
                             icon = Icons.Filled.LocationOff,
-                            message = "Poloha není povolená „Vždy“ – připomínky na místa nepřijdou se zavřenou appkou.",
+                            message = stringResource(R.string.background_location_missing),
                         )
                     }
                     if (batteryRestricted) {
                         PermissionBanner(
                             icon = Icons.Filled.BatteryAlert,
-                            message = "Telefon může kvůli šetření baterie blokovat připomínky na pozadí.",
-                            actionLabel = "Povolit",
+                            message = stringResource(R.string.battery_restricted),
+                            actionLabel = stringResource(R.string.permission_banner_grant),
                             onAction = {
-                                val direct = Intent(
-                                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                    Uri.parse("package:${context.packageName}"),
-                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 try {
-                                    context.startActivity(direct)
-                                } catch (_: Exception) {
-                                    try {
-                                        context.startActivity(
-                                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        )
-                                    } catch (_: Exception) {
-                                    }
-                                }
+                                    context.startActivity(
+                                        Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                } catch (_: Exception) {}
                             },
                         )
                     }
                     if (geofenceFailed) {
                         PermissionBanner(
                             icon = Icons.Filled.LocationOff,
-                            message = "Hlídání místa se nepodařilo nastavit – zkontroluj polohu a zkus připomínku uložit znovu.",
+                            message = stringResource(R.string.geofence_failed),
+                        )
+                    }
+                    if (storageError) {
+                        PermissionBanner(
+                            icon = Icons.Filled.Autorenew,
+                            message = stringResource(R.string.storage_error),
                         )
                     }
                 }
@@ -380,8 +385,8 @@ fun ReminderListScreen(
                 ) {
                     EmptyState(
                         icon = Icons.Filled.PinDrop,
-                        title = "Zatím žádné připomínky",
-                        text = "Ťukni na + a vytvoř první připomínku na místo nebo na čas.",
+                        title = stringResource(R.string.empty_reminders_title),
+                        text = stringResource(R.string.empty_reminders_text),
                     )
                 }
             }
@@ -402,7 +407,7 @@ fun ReminderListScreen(
             }
         } else {
             if (active.isNotEmpty()) {
-                item { SectionHeader("Aktivní") }
+                item { SectionHeader(stringResource(R.string.section_active)) }
                 item {
                     InsetCard {
                         active.forEachIndexed { index, reminder ->
@@ -423,7 +428,7 @@ fun ReminderListScreen(
                 item { Spacer(Modifier.height(28.dp)) }
             }
             if (done.isNotEmpty()) {
-                item { SectionHeader("Hotové") }
+                item { SectionHeader(stringResource(R.string.section_done)) }
                 item {
                     InsetCard {
                         done.forEachIndexed { index, reminder ->
@@ -455,17 +460,15 @@ fun ReminderListScreen(
 
     // Formulář (nová / úprava)
     if (showNewSheet || editingReminder != null) {
-        ModalBottomSheet(
-            onDismissRequest = {
-                showNewSheet = false
-                editingReminder = null
-                newSheetKind = null
-                sharedPrefill = null
-            },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = colors.background,
-            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
-            dragHandle = null,
+        // Compose Dialog zůstane přítomný, dokud guard formuláře výslovně
+        // nezavolá onClose. Bottom sheet se při systémovém Zpět schoval ještě
+        // před volbou „Pokračovat v úpravách“.
+        Dialog(
+            onDismissRequest = { editorDismissRequest++ },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnClickOutside = false,
+            ),
         ) {
             // key() zajistí čerstvý formulář, když se změní cíl (úprava vs. nová,
             // nebo přijde sdílené místo, zatímco je formulář otevřený)
@@ -475,6 +478,7 @@ fun ReminderListScreen(
                     initialKind = if (newSheetKind == "time") ReminderKind.TIME else ReminderKind.LOCATION,
                     initialPlaceName = sharedPrefill?.first ?: "",
                     initialCoordinate = sharedPrefill?.second,
+                    dismissRequest = editorDismissRequest,
                     onClose = {
                         showNewSheet = false
                         editingReminder = null
@@ -534,7 +538,7 @@ fun ReminderListScreen(
             shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
             dragHandle = null,
         ) {
-            ReminderActionSheet(
+            QuickActionSheet(
                 reminder = target,
                 onClose = { longPressedReminder = null },
                 onEdit = { editingReminder = target },
@@ -547,19 +551,19 @@ fun ReminderListScreen(
                 },
                 onNavigate = if (target.kind == ReminderKind.LOCATION) {
                     {
-                        val uri = Uri.parse("geo:${target.latitude},${target.longitude}?q=${target.latitude},${target.longitude}(${Uri.encode(target.placeName.ifEmpty { target.title })})")
+                        val uri = "geo:${target.latitude},${target.longitude}?q=${target.latitude},${target.longitude}(${Uri.encode(target.placeName.ifEmpty { target.title })})".toUri()
                         try {
                             context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         } catch (e: Exception) {
-                            android.widget.Toast.makeText(context, "Nenašla se aplikace pro navigaci", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(context, context.getString(R.string.toast_no_navigation_app), android.widget.Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else null,
                 onShare = {
                     val shareText = buildString {
-                        append("Připomínka: ").append(target.title)
+                        append(context.getString(R.string.share_reminder_prefix, target.title))
                         if (target.placeName.isNotEmpty()) {
-                            append("\nMísto: ").append(target.placeName)
+                            append("\n").append(context.getString(R.string.share_place_prefix, target.placeName))
                             append("\nhttps://maps.google.com/?q=").append(target.latitude).append(",").append(target.longitude)
                         }
                     }
@@ -568,127 +572,10 @@ fun ReminderListScreen(
                         putExtra(Intent.EXTRA_TEXT, shareText)
                         type = "text/plain"
                     }
-                    context.startActivity(Intent.createChooser(sendIntent, "Sdílet připomínku").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    context.startActivity(Intent.createChooser(sendIntent, context.getString(R.string.share_chooser)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 },
                 onDelete = { requestDelete(target) },
             )
         }
     }
 }
-
-/** Kontextová nabídka akcí pro vybranou připomínku po dlouhém stisknutí. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ReminderActionSheet(
-    reminder: Reminder,
-    onClose: () -> Unit,
-    onEdit: () -> Unit,
-    onSnoozeTomorrow: () -> Unit,
-    onNavigate: (() -> Unit)?,
-    onShare: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val colors = GeoTheme.colors
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(bottom = 24.dp),
-    ) {
-        SheetHeader(
-            title = reminder.title,
-            leftText = "Zavřít",
-            onLeft = onClose,
-        )
-
-        SectionHeader("Rychlé akce", Modifier.padding(top = 8.dp))
-        InsetCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-            // 1. Odložit na zítra ráno
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .iosClickable {
-                        onSnoozeTomorrow()
-                        onClose()
-                    }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.Schedule, null, tint = colors.orange, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(12.dp))
-                Text("Odložit na zítra ráno (8:00)", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
-            }
-
-            // 2. Navigovat (pokud je připomínka na místo)
-            if (reminder.kind == ReminderKind.LOCATION && onNavigate != null) {
-                CardDivider()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .iosClickable {
-                            onNavigate()
-                            onClose()
-                        }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.DirectionsWalk, null, tint = colors.accent, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text("Spustit navigaci na místo", style = GeoType.body, color = colors.accent, modifier = Modifier.weight(1f))
-                }
-            }
-
-            // 3. Sdílet
-            CardDivider()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .iosClickable {
-                        onShare()
-                        onClose()
-                    }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.Share, null, tint = colors.purple, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(12.dp))
-                Text("Sdílet připomínku", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
-            }
-
-            // 4. Upravit
-            CardDivider()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .iosClickable {
-                        onEdit()
-                        onClose()
-                    }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.Edit, null, tint = colors.label, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(12.dp))
-                Text("Upravit připomínku", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
-            }
-
-            // 5. Smazat
-            CardDivider()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .iosClickable {
-                        onDelete()
-                        onClose()
-                    }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.Delete, null, tint = colors.red, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(12.dp))
-                Text("Smazat připomínku", style = GeoType.body, color = colors.red, modifier = Modifier.weight(1f))
-            }
-        }
-    }
-}
-

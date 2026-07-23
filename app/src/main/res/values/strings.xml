@@ -12,9 +12,7 @@
     <string name="tab_reminders">Připomínky</string>
     <string name="tab_map">Mapa</string>
     <string name="search_placeholder">Hledat v připomínkách…</string>
-    <string name="status_active">%1$d aktivní</string>
     <string name="status_all_done">Vše vyřízeno</string>
-    <string name="status_done_suffix">• %1$d hotovo</string>
     <string name="section_active">Aktivní</string>
     <string name="section_done">Hotové</string>
     <string name="empty_reminders_title">Zatím žádné připomínky</string>
@@ -38,7 +36,6 @@
     <!-- Edit Reminder Sheet -->
     <string name="title_new_reminder">Nová připomínka</string>
     <string name="title_edit_reminder">Úprava připomínky</string>
-    <string name="field_title_hint">Co si přeješ připomenout?</string>
     <string name="kind_location">Na místě</string>
     <string name="kind_time">Na čas</string>
 
@@ -51,12 +48,10 @@
     <string name="repeat_daily">Každý den</string>
     <string name="repeat_weekly">Každý týden</string>
     <string name="repeat_weekdays">Po–Pá</string>
-    <string name="repeat_label">Opakovat</string>
 
     <string name="alert_quiet">Tiché</string>
     <string name="alert_default">Výchozí</string>
     <string name="alert_urgent">Naléhavé</string>
-    <string name="alert_style_label">Druh upozornění</string>
     <string name="alert_nagging">Připomínat, dokud nepotvrdím</string>
 
     <string name="attachment_header">Příloha (Fotka / PDF)</string>
@@ -69,8 +64,6 @@
     <string name="location_picker_search_hint">Hledat adresu, obchod, město…</string>
     <string name="location_radius">Poloměr</string>
     <string name="location_use_this">Použít toto místo</string>
-    <string name="location_favorites">Oblíbená místa</string>
-    <string name="location_recent">Nedávná místa</string>
 
     <!-- Settings Sheet -->
     <string name="settings_title">Nastavení</string>
@@ -80,7 +73,6 @@
     <string name="lang_cs">Čeština</string>
     <string name="lang_en">English</string>
 
-    <string name="settings_tts">Hlasové čtení (Text-to-Speech)</string>
     <string name="settings_tts_enable">Hlasové čtení připomínek</string>
     <string name="settings_tts_full">Číst i název a místo</string>
     <string name="settings_tts_test">Vyzkoušet hlas</string>
@@ -90,14 +82,12 @@
     <string name="settings_export_backup">Exportovat JSON zálohu</string>
     <string name="settings_import_backup">Importovat JSON zálohu</string>
     <string name="settings_import_calendar">Importovat události z Kalendáře</string>
-    <string name="settings_reliability">Spolehlivost na pozadí</string>
     <string name="settings_battery_optimization">Optimalizace baterie</string>
     <string name="settings_app_info">O aplikaci</string>
 
     <!-- Favorites Sheet -->
     <string name="favorites_title">Oblíbená místa</string>
     <string name="favorites_add">Přidat nové oblíbené místo</string>
-    <string name="favorites_empty">Zatím nemáš žádná oblíbená místa.</string>
     <string name="favorites_delete_title">Smazat oblíbené místo?</string>
     <string name="favorites_delete_message">Opravdu chcete smazat místo „%1$s“?</string>
     <string name="favorite_edit_title">Upravit oblíbené místo</string>
@@ -120,20 +110,13 @@
     <string name="search_empty_text">Pro výraz „%1$s“ nebyly nalezeny žádné připomínky.</string>
 
     <!-- Banners & Toasts -->
-    <string name="battery_banner_title">Spolehlivé doručení na pozadí</string>
-    <string name="battery_banner_text">Systém může zpožďovat notifikace. Vypni optimalizaci baterie pro GeoReminder.</string>
-    <string name="battery_banner_action">Vypnout optimalizaci</string>
-    <string name="permission_banner_location">GeoReminder potřebuje přístup k poloze na pozadí pro fungování geofence.</string>
-    <string name="permission_banner_notifications">GeoReminder potřebuje oprávnění k zasílání notifikací.</string>
     <string name="permission_banner_grant">Povolit přístup</string>
 
     <!-- Toasts & Messages -->
     <string name="toast_backup_export_success">Záloha byla úspěšně exportována</string>
     <string name="toast_backup_import_success">Záloha byla úspěšně importována</string>
-    <string name="toast_backup_error">Chyba při práci se zálohou</string>
     <string name="toast_no_navigation_app">Nenašla se aplikace pro navigaci</string>
     <string name="tts_test_message">Toto je zkušební hlasité přečtení připomínky.</string>
-    <string name="backup_json_notice">Exportuje textová data (připomínky a oblíbená místa). Soubory příloh se nebalí.</string>
 
     <!-- Days of the week -->
     <string name="day_mon">Po</string>
@@ -154,4 +137,113 @@
     <string name="onboarding_button_continue">Pokračovat</string>
     <string name="onboarding_button_finish">Povolit a začít</string>
     <string name="onboarding_button_skip">Přeskočit</string>
+
+    <!-- Remaining localized UI and model presentation -->
+    <string name="action_clear">Vymazat</string>
+    <string name="action_delete_short">Smazat</string>
+    <string name="section_reminder_title">Co ti mám připomenout</string>
+    <string name="field_title_example">Např. koupit mléko</string>
+    <string name="section_where">Kde</string>
+    <string name="section_when">Kdy</string>
+    <string name="selected_place_default">Vybrané místo</string>
+    <string name="selected_time_past">Vybraný čas už uplynul – zvol čas v budoucnu.</string>
+    <string name="radius_value">Poloměr: %1$d m</string>
+    <string name="radius_default_value">Výchozí poloměr: %1$d m</string>
+    <string name="radius_default_compact">výchozí poloměr %1$d m</string>
+    <string name="radius_recommendation">Doporučeno alespoň 100 m – menší kruhy systém hlídá hůř.</string>
+    <string name="date_time_label">Datum a čas</string>
+    <string name="repeat_options_label">Opakování</string>
+    <string name="alert_section">Upozornění</string>
+    <string name="alert_kind">Druh</string>
+    <string name="attachment_default_name">Příloha</string>
+    <string name="subtitle_repeats">opakuje se</string>
+    <string name="subtitle_no_due">Bez termínu</string>
+    <string name="subtitle_daily">%1$s • každý den</string>
+    <string name="subtitle_weekly">%1$s • každý týden</string>
+    <string name="reminder_location_description">Připomínka na místo</string>
+    <string name="reminder_time_description">Připomínka na čas</string>
+    <string name="reminder_done_description">Dokončená připomínka</string>
+
+    <string name="theme_system">Podle systému</string>
+    <string name="theme_light">Světlý</string>
+    <string name="theme_dark">Tmavý</string>
+    <string name="theme_neutral">Neutrální (teplý)</string>
+    <string name="theme_glass">Glass (vlajkový)</string>
+    <string name="settings_widget_system">Widget na ploše se řídí nastavením systému.</string>
+    <string name="settings_tts_enable_description">Při spuštění přečte název připomínky</string>
+    <string name="settings_tts_full_description">Přečte i místo nebo čas spuštění</string>
+    <string name="settings_group_description">Více připomínek na jednom místě spojí do jedné skupiny</string>
+    <string name="settings_export_backup_description">Uloží připomínky a oblíbená místa bez souborů příloh</string>
+    <string name="settings_import_backup_description">Načte připomínky a oblíbená místa ze záložního JSONu</string>
+    <string name="settings_permissions">Spolehlivost &amp; oprávnění</string>
+    <string name="settings_notification_system">Nastavení notifikací telefonu</string>
+    <string name="settings_all_permissions">Všechna oprávnění v Nastavení</string>
+    <string name="settings_version">Verze aplikace</string>
+    <string name="settings_version_value">v%1$s</string>
+    <string name="settings_github">Zdrojový kód na GitHubu</string>
+    <string name="backup_export_failed">Export zálohy selhal</string>
+    <string name="backup_import_failed">Obnovení zálohy selhalo</string>
+
+    <string name="favorites_empty_title">Žádná oblíbená místa</string>
+    <string name="favorites_empty_text">Ťukni na + a ulož si třeba Domov nebo Práci. Připomínku pak zadáš rychleji.</string>
+    <string name="favorite_selected_place">Místo vybráno</string>
+    <string name="favorite_place_subtitle">oblíbené místo</string>
+    <string name="recent_place_subtitle">nedávné místo</string>
+
+    <string name="calendar_loading">Načítám události…</string>
+    <string name="calendar_permission_text">Pro zobrazení událostí povol GeoReminderu čtení kalendáře.</string>
+    <string name="calendar_upcoming_section">Nadcházející události (30 dní)</string>
+    <string name="calendar_selected">Vybráno</string>
+    <string name="map_empty_title">Žádná místa k zobrazení</string>
+    <string name="map_empty_text">Aktivní připomínky na místa se ukážou tady na mapě.</string>
+    <string name="map_title">Mapa připomínek</string>
+    <string name="map_center_on_me">Vycentrovat mapu na moji polohu</string>
+    <string name="location_search_description">Hledat místo</string>
+
+    <string name="share_reminder_prefix">Připomínka: %1$s</string>
+    <string name="share_place_prefix">Místo: %1$s</string>
+    <string name="share_chooser">Sdílet připomínku</string>
+    <string name="storage_error">Data se nepodařilo bezpečně načíst nebo uložit. Změny jsou dočasně zablokované.</string>
+
+    <string name="notification_channel_default">Připomínky</string>
+    <string name="notification_channel_default_description">Připomínky na místa a časy</string>
+    <string name="notification_channel_quiet">Tiché připomínky</string>
+    <string name="notification_channel_quiet_description">Připomínky bez zvuku</string>
+    <string name="notification_channel_urgent">Naléhavé připomínky</string>
+    <string name="notification_channel_urgent_description">Důležité připomínky s hlasitým zvukem</string>
+    <string name="notification_arrive">Jsi u místa: %1$s</string>
+    <string name="notification_leave">Odjíždíš od místa: %1$s</string>
+    <string name="notification_once">Připomínka na %1$s</string>
+    <string name="notification_daily">Opakuje se každý den v %1$s</string>
+    <string name="notification_weekly">Opakuje se každý týden: %1$s</string>
+    <string name="widget_add_reminder">Nová připomínka</string>
+    <string name="repeat_daily_description">Připomínka přijde každý den ve vybraný čas.</string>
+    <string name="repeat_weekly_description">Připomínka přijde každý týden ve vybrané dny a čas.</string>
+    <string name="alert_urgent_description">Hlasitý budíkový zvuk hraje, dokud notifikaci nezavřeš.</string>
+    <string name="alert_nagging_description">Nepotvrzená připomínka se vrátí každých 5 minut.</string>
+    <string name="day_mon_full">pondělí</string>
+    <string name="day_tue_full">úterý</string>
+    <string name="day_wed_full">středa</string>
+    <string name="day_thu_full">čtvrtek</string>
+    <string name="day_fri_full">pátek</string>
+    <string name="day_sat_full">sobota</string>
+    <string name="day_sun_full">neděle</string>
+    <string name="reminder_deleted">Připomínka smazána</string>
+    <string name="favorites_button">Oblíbená místa</string>
+    <string name="calendar_import_button_description">Import z kalendáře</string>
+    <string name="new_reminder_description">Nová připomínka</string>
+    <string name="notifications_disabled">Notifikace jsou vypnuté – appka ti nemůže nic připomenout.</string>
+    <string name="location_disabled">Přístup k poloze je zakázaný – připomínky na místa nebudou fungovat.</string>
+    <string name="background_location_missing">Poloha není povolená „Vždy“ – připomínky na místa nepřijdou se zavřenou appkou.</string>
+    <string name="battery_restricted">Telefon může kvůli šetření baterie blokovat připomínky na pozadí.</string>
+    <string name="geofence_failed">Hlídání místa se nepodařilo nastavit – zkontroluj polohu a zkus připomínku uložit znovu.</string>
+    <string name="chip_done">hotovo</string>
+    <string name="chip_repeating">opakuje</string>
+    <string name="chip_leave">odjezd</string>
+    <string name="calendar_default_event_title">Událost</string>
+    <string name="calendar_imported_count">Naimportováno událostí: %1$d</string>
+    <string name="calendar_no_events_title">Žádné události</string>
+    <string name="location_no_results">Nic jsem nenašel – zkus jiný název, nebo ťukni rovnou do mapy.</string>
+    <string name="location_network_error">Vypadá to na výpadek připojení – zkontroluj internet, nebo ťukni rovnou do mapy.</string>
+    <string name="location_unnamed">Bez názvu</string>
 </resources>

@@ -40,19 +40,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
 
@@ -151,29 +153,33 @@ fun SheetHeader(
     onRight: (() -> Unit)? = null,
     rightContent: (@Composable () -> Unit)? = null,
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (leftText != null && onLeft != null) {
+                CapsulePillButton(text = leftText, onClick = onLeft)
+            }
+        }
         Text(
             text = title,
             style = GeoType.headline,
             color = GeoTheme.colors.label,
+            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = 72.dp),
+            modifier = Modifier.weight(1.25f),
         )
-        if (leftText != null && onLeft != null) {
-            CapsulePillButton(
-                text = leftText,
-                modifier = Modifier.align(Alignment.CenterStart),
-                onClick = onLeft,
-            )
-        }
-        Box(modifier = Modifier.align(Alignment.CenterEnd)) {
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
             when {
                 rightContent != null -> rightContent()
                 rightText != null && onRight != null -> CapsulePillButton(
@@ -228,6 +234,7 @@ fun CardDivider(startIndent: Dp = 16.dp) {
 @Composable
 fun IOSSwitch(
     checked: Boolean,
+    label: String,
     modifier: Modifier = Modifier,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -242,7 +249,19 @@ fun IOSSwitch(
         label = "switchThumb",
     )
     Box(
-        modifier = modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+        modifier = modifier
+            .defaultMinSize(minWidth = 51.dp, minHeight = 48.dp)
+            .semantics { contentDescription = label }
+            .toggleable(
+                value = checked,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Switch,
+                onValueChange = {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onCheckedChange(it)
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -250,22 +269,12 @@ fun IOSSwitch(
                 .width(51.dp)
                 .height(31.dp)
                 .clip(CircleShape)
-                .background(trackColor)
-                .toggleable(
-                    value = checked,
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Switch,
-                    onValueChange = {
-                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onCheckedChange(it)
-                    },
-                ),
+                .background(trackColor),
         ) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = thumbOffset)
+                    .offset { androidx.compose.ui.unit.IntOffset(thumbOffset.roundToPx(), 0) }
                     .size(27.dp)
                     .shadow(3.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.3f))
                     .background(Color.White, CircleShape),
@@ -350,8 +359,8 @@ fun SegmentedControl(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 44.dp)
-            .height(38.dp)
+            .defaultMinSize(minHeight = 48.dp)
+            .height(48.dp)
             .clip(CircleShape)
             .background(colors.segmentTrack),
     ) {
@@ -362,7 +371,7 @@ fun SegmentedControl(
         )
         Box(
             modifier = Modifier
-                .offset(x = thumbOffset)
+                .offset { androidx.compose.ui.unit.IntOffset(thumbOffset.roundToPx(), 0) }
                 .width(segmentWidth)
                 .fillMaxHeight()
                 .padding(2.dp)
@@ -463,7 +472,11 @@ fun PrimaryButton(
             .iosClickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = text, style = GeoType.headline, color = Color.White)
+        Text(
+            text = text,
+            style = GeoType.headline,
+            color = if (colors.accent.luminance() > 0.18f) Color.Black else Color.White,
+        )
     }
 }
 
@@ -496,7 +509,7 @@ fun IOSDiscardDialog(
 fun IOSConfirmDialog(
     title: String,
     message: String,
-    confirmText: String = "Potvrdit",
+    confirmText: String,
     isDestructive: Boolean = false,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -513,7 +526,7 @@ fun IOSConfirmDialog(
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Zrušit")
+                Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.action_cancel))
             }
         }
     )

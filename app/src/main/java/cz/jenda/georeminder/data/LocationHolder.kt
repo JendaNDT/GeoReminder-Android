@@ -33,6 +33,23 @@ object LocationHolder {
      * hlídání místa neselhalo potichu.
      */
     val geofenceFailed = MutableStateFlow(false)
+    private val geofenceFailureLock = Any()
+    private val failedGeofenceIds = mutableSetOf<String>()
+
+    fun resetGeofenceFailures() = synchronized(geofenceFailureLock) {
+        failedGeofenceIds.clear()
+        geofenceFailed.value = false
+    }
+
+    fun markGeofenceFailed(id: String) = synchronized(geofenceFailureLock) {
+        failedGeofenceIds.add(id)
+        geofenceFailed.value = true
+    }
+
+    fun clearGeofenceFailure(id: String) = synchronized(geofenceFailureLock) {
+        failedGeofenceIds.remove(id)
+        geofenceFailed.value = failedGeofenceIds.isNotEmpty()
+    }
 
     fun hasFineLocation(context: Context): Boolean =
         ContextCompat.checkSelfPermission(

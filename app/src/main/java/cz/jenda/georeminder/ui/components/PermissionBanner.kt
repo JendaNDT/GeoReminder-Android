@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -20,9 +21,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import cz.jenda.georeminder.R
 
 /**
  * Oranžový banner zobrazený, když uživatel odmítl oprávnění.
@@ -33,10 +36,11 @@ fun PermissionBanner(
     icon: ImageVector,
     message: String,
     modifier: Modifier = Modifier,
-    actionLabel: String = "Nastavení",
+    actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val resolvedActionLabel = actionLabel ?: stringResource(R.string.settings_title)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -62,12 +66,13 @@ fun PermissionBanner(
                 .padding(horizontal = 10.dp),
         )
         Text(
-            text = actionLabel,
+            text = resolvedActionLabel,
             style = GeoType.footnoteBold,
             color = bannerTextColor,
             modifier = Modifier
                 .clip(CircleShape)
                 .border(1.dp, bannerTextColor, CircleShape)
+                .defaultMinSize(minHeight = 48.dp)
                 .iosClickable {
                     if (onAction != null) {
                         onAction()

@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Map
@@ -50,7 +52,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.content.edit
 import cz.jenda.georeminder.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -143,8 +149,7 @@ fun RootScreen() {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                store.reload()
-                store.resyncAll()
+                store.reloadAndResync()
                 LocationHolder.refresh(context)
             }
         }
@@ -186,12 +191,14 @@ fun RootScreen() {
             )
     ) {
         if (!hasSeenOnboarding) {
+            fun completeOnboarding(requestPermissions: Boolean) {
+                prefs.edit { putBoolean("hasSeenOnboarding", true) }
+                hasSeenOnboarding = true
+                if (requestPermissions) startPermissionChain()
+            }
             OnboardingScreen(
-                onFinish = {
-                    prefs.edit().putBoolean("hasSeenOnboarding", true).apply()
-                    hasSeenOnboarding = true
-                    startPermissionChain()
-                }
+                onFinish = { completeOnboarding(requestPermissions = true) },
+                onSkip = { completeOnboarding(requestPermissions = false) },
             )
         } else {
             var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -244,7 +251,7 @@ private fun FloatingTabBar(
         shape = CircleShape,
         color = colors.tabBarBackground,
     ) {
-        Row(modifier = Modifier.padding(5.dp)) {
+        Row(modifier = Modifier.padding(5.dp).selectableGroup()) {
             TabBarItem(
                 icon = Icons.Filled.Checklist,
                 label = stringResource(R.string.tab_reminders),
@@ -274,13 +281,18 @@ private fun TabBarItem(
             .height(56.dp)
             .clip(CircleShape)
             .background(if (active) colors.tabActiveBubble else Color.Transparent)
-            .iosClickable(onClick = onClick),
+            .selectable(
+                selected = active,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .semantics(mergeDescendants = true) { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 imageVector = icon,
-                contentDescription = label,
+                contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(24.dp),
             )

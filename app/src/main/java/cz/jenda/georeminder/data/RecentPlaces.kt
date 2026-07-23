@@ -1,6 +1,7 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
+import androidx.core.content.edit
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.abs
@@ -29,8 +30,10 @@ object RecentPlaces {
                 val name = obj.optString("name")
                 val lat = obj.optDouble("lat")
                 val lng = obj.optDouble("lng")
-                if (name.isBlank() || lat.isNaN() || lng.isNaN()) null
-                else Entry(name, lat, lng)
+                if (name.isBlank() || !lat.isFinite() || !lng.isFinite() ||
+                    lat !in -90.0..90.0 || lng !in -180.0..180.0
+                ) null
+                else Entry(name.take(200), lat, lng)
             }
         } catch (_: Exception) {
             emptyList()
@@ -38,14 +41,17 @@ object RecentPlaces {
     }
 
     fun add(context: Context, name: String, latitude: Double, longitude: Double) {
-        if (name.isBlank()) return
+        if (name.isBlank() || !latitude.isFinite() || !longitude.isFinite() ||
+            latitude !in -90.0..90.0 || longitude !in -180.0..180.0
+        ) return
+        val cleanName = name.trim().take(200)
         val current = load(context).filterNot {
             // stejné místo (podle jména, nebo ~stejných souřadnic) nedublovat
-            it.name.equals(name, ignoreCase = true) ||
+            it.name.equals(cleanName, ignoreCase = true) ||
                     (abs(it.latitude - latitude) < 0.0005 &&
                             abs(it.longitude - longitude) < 0.0005)
         }
-        val updated = (listOf(Entry(name, latitude, longitude)) + current).take(LIMIT)
+        val updated = (listOf(Entry(cleanName, latitude, longitude)) + current).take(LIMIT)
         val array = JSONArray()
         updated.forEach {
             array.put(
@@ -55,9 +61,8 @@ object RecentPlaces {
                     .put("lng", it.longitude)
             )
         }
-        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY, array.toString())
-            .apply()
+        context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE).edit {
+            putString(KEY, array.toString())
+        }
     }
 }
