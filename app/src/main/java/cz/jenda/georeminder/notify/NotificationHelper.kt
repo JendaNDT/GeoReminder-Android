@@ -14,6 +14,8 @@ import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.FeatureSettings
 import cz.jenda.georeminder.data.LanguageController
+import cz.jenda.georeminder.data.ReliabilityEventType
+import cz.jenda.georeminder.data.ReliabilityHistory
 import cz.jenda.georeminder.model.AlertStyle
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder
@@ -186,23 +188,98 @@ object NotificationHelper {
             notification.flags = notification.flags or Notification.FLAG_INSISTENT
         }
 
+        val channelId = channelFor(reminder.alertStyle)
+        val channelBlocked = context.getSystemService(NotificationManager::class.java)
+            .getNotificationChannel(channelId)
+            ?.importance == NotificationManager.IMPORTANCE_NONE
+        if (channelBlocked ||
+            !NotificationManagerCompat.from(context).areNotificationsEnabled()
+        ) {
+            ReliabilityHistory.record(
+                context,
+                ReliabilityEventType.NOTIFICATION_BLOCKED,
+                reminder.id,
+                reminder.title,
+                channelId,
+            )
+            return
+        }
+
         try {
             NotificationManagerCompat.from(context).notify(notifId, notification)
             TtsSpeaker.speakIfEnabled(context, reminder)
+            ReliabilityHistory.record(
+                context,
+                ReliabilityEventType.NOTIFICATION_SHOWN,
+                reminder.id,
+                reminder.title,
+                channelId,
+            )
         } catch (_: SecurityException) {
             // Uživatel nepovolil notifikace – appka to ukazuje oranžovým bannerem.
+            ReliabilityHistory.record(
+                context,
+                ReliabilityEventType.NOTIFICATION_BLOCKED,
+                reminder.id,
+                reminder.title,
+                channelId,
+            )
         }
 
         // Dožadování: nepotvrzená připomínka se za 5 minut připomene znovu.
         // Neplánovat, když jsou notifikace vypnuté celé NEBO jen tento kanál –
         // jinak by neviditelná smyčka budíků běžela donekonečna.
-        val channelBlocked = context.getSystemService(NotificationManager::class.java)
-            .getNotificationChannel(channelFor(reminder.alertStyle))
-            ?.importance == NotificationManager.IMPORTANCE_NONE
         if (reminder.nagging && !reminder.isDone && !channelBlocked &&
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         ) {
-            ReminderScheduler(context).scheduleNag(reminder)
+            ReminderScheduler.get(context).scheduleNag(reminder)
+        }
+    }
+
+    /** Jednoduchá diagnostická notifikace bez akcí navázaných na připomínku. */
+    fun showReliabilityTest(context: Context) {
+        val manager = NotificationManagerCompat.from(context)
+        val channelBlocked = context.getSystemService(NotificationManager::class.java)
+            .getNotificationChannel(CHANNEL_ID)
+            ?.importance == NotificationManager.IMPORTANCE_NONE
+        if (!manager.areNotificationsEnabled() || channelBlocked) {
+            ReliabilityHistory.record(
+                context,
+                ReliabilityEventType.NOTIFICATION_BLOCKED,
+                detail = "reliability_test",
+            )
+            return
+        }
+
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            0x2801,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_pin)
+            .setContentTitle(context.getString(R.string.reliability_test_title))
+            .setContentText(context.getString(R.string.reliability_test_body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(contentIntent)
+            .build()
+        try {
+            manager.notify(0x2802, notification)
+            ReliabilityHistory.record(
+                context,
+                ReliabilityEventType.NOTIFICATION_SHOWN,
+                detail = "reliability_test",
+            )
+        } catch (_: SecurityException) {
+            ReliabilityHistory.record(
+                context,
+                ReliabilityEventType.NOTIFICATION_BLOCKED,
+                detail = "reliability_test",
+            )
         }
     }
 

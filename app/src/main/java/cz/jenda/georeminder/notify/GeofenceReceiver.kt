@@ -7,6 +7,9 @@ import android.util.Log
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 import com.google.android.gms.location.LocationServices
+import cz.jenda.georeminder.data.LocationHolder
+import cz.jenda.georeminder.data.ReliabilityEventType
+import cz.jenda.georeminder.data.ReliabilityHistory
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TriggerType
@@ -23,7 +26,16 @@ import kotlinx.coroutines.launch
 class GeofenceReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val event = GeofencingEvent.fromIntent(intent) ?: return
-        if (event.hasError()) return
+        if (event.hasError()) {
+            Log.w("GeofenceReceiver", "Geofence událost selhala, kód=${event.errorCode}")
+            LocationHolder.geofenceFailed.value = true
+            ReliabilityHistory.record(
+                context,
+                ReliabilityEventType.GEOFENCE_FAILED,
+                detail = event.errorCode.toString(),
+            )
+            return
+        }
 
         val transition = event.geofenceTransition
         val ids = event.triggeringGeofences?.map { it.requestId } ?: return
@@ -33,8 +45,7 @@ class GeofenceReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
-                val reminders = store.reminders.value
+                val reminders = store.reloadAndGet()
 
                 for (id in ids) {
                     val reminder = reminders.firstOrNull { it.id == id } ?: continue
@@ -47,12 +58,19 @@ class GeofenceReceiver : BroadcastReceiver() {
                                 && reminder.trigger == TriggerType.LEAVE)
                     if (!matches) continue
 
+                    ReliabilityHistory.record(
+                        context,
+                        ReliabilityEventType.TRIGGERED_LOCATION,
+                        reminder.id,
+                        reminder.title,
+                        transition.toString(),
+                    )
                     NotificationHelper.show(context, reminder)
 
                     if (!reminder.repeats) {
                         // Jednorázová: geofence už nehlídat (notifikace „vystřelila")
                         // a zapamatovat si to, aby ji resync znovu nezaregistroval
-                        ReminderScheduler(context).markGeofenceFired(id)
+                        ReminderScheduler.get(context).markGeofenceFired(id)
                         LocationServices.getGeofencingClient(context)
                             .removeGeofences(listOf(id))
                     }

@@ -23,6 +23,7 @@ class ReminderListViewModel(application: Application) : AndroidViewModel(applica
     val reminders: StateFlow<List<Reminder>> = store.reminders
     val userLocation: StateFlow<Location?> = LocationHolder.location
     val geofenceFailed: StateFlow<Boolean> = LocationHolder.geofenceFailed
+    val geofenceStates = LocationHolder.geofenceStates
 
     private val pendingDeleteIds = MutableStateFlow<Set<String>>(emptySet())
     val searchQuery = MutableStateFlow("")

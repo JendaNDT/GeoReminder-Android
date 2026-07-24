@@ -3,7 +3,7 @@
 Nativní Android verze GeoReminderu – **„Připomeň mi X, až budu u Y / v 18:30."**
 Vzhled 1:1 podle iOS verze (viz `design-podklady/DESIGN_SPEC.md` v iOS projektu), plus vlastní vylepšení navrch.
 
-**Aktuální verze: 2.7** (versionCode 19) · Stack: Kotlin + Jetpack Compose, Google Maps, GeofencingClient, AlarmManager, Glance widget · Minimum: Android 8 (API 26), target 35
+**Aktuální verze: 2.8** (versionCode 20) · Stack: Kotlin + Jetpack Compose, Google Maps, GeofencingClient, AlarmManager, Glance widget · Minimum: Android 8 (API 26), target 35
 
 > **Aktuální stav:** viz `PROJECT_STATUS.md` a `AUDIT3.md` (finální audit a kompletní realizace oprav pro logiku, stabilitu, přístupnost i WCAG AAA/AA kontrast). Appka je stabilní, bezpečně ukládá data, neblokuje UI a je připravena k terénnímu testování před vydáním.
 

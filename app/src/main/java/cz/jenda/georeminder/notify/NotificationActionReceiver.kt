@@ -25,13 +25,12 @@ class NotificationActionReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
-                val reminder = store.reminders.value.firstOrNull { it.id == id }
+                val reminder = store.reloadAndGet().firstOrNull { it.id == id }
                     ?: return@launch
 
                 when (action) {
                     NotificationHelper.ACTION_DONE -> {
-                        store.markDone(reminder)
+                        store.markDoneAndWait(reminder)
                     }
                     NotificationHelper.ACTION_SNOOZE -> {
                         store.snooze(reminder, minutes = ReminderScheduler.SNOOZE_MINUTES)

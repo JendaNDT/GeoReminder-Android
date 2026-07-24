@@ -79,18 +79,17 @@ fun Modifier.iosClickable(enabled: Boolean = true, onClick: () -> Unit): Modifie
         }
 }
 
-/** Kruhové „skleněné" tlačítko v toolbaru (hvězdička, plus). */
+/** Kruhové tlačítko v toolbaru (hvězdička, plus). */
 @Composable
-fun GlassCircleButton(
+fun ToolbarCircleButton(
     icon: ImageVector,
     contentDescription: String?,
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
-    tint: Color = if (GeoTheme.colors.isGlass) Color.White else GeoTheme.colors.label,
+    tint: Color = GeoTheme.colors.label,
     onClick: () -> Unit,
 ) {
     val colors = GeoTheme.colors
-    val bgColor = if (colors.isGlass) Color.White.copy(alpha = 0.22f) else colors.card
     Surface(
         modifier = modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
@@ -98,7 +97,7 @@ fun GlassCircleButton(
             .shadow(4.dp, CircleShape, spotColor = colors.shadow)
             .iosClickable(onClick = onClick),
         shape = CircleShape,
-        color = bgColor,
+        color = colors.card,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(

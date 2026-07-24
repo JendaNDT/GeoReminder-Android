@@ -1,12 +1,12 @@
 # GeoReminder Android – Project Status
-*Naposled aktualizováno: 23. 07. 2026 (v2.7 – po kompletní CZ/EN lokalizaci a přepínači jazyků)*
+*Naposled aktualizováno: 24. 07. 2026 (v2.8 – centrum spolehlivosti a diagnostika doručení)*
 
 > **Poznámka k stavu:** Tento soubor byl 23. 7. plně sesynchronizován s realitou kódové báze v `Android/GeoReminderAndroid/` po dokončení všech oprav z auditu `AUDIT3.md` a realizaci plné CZ/EN lokalizace.
 
 ## 🎯 Co to je
 Nativní Android verze GeoReminderu – připomínky vázané na místo i čas, vzhled 1:1 podle iOS předlohy (`design-podklady/DESIGN_SPEC.md`).
 Stack: Kotlin + Jetpack Compose, Google Maps (Compose), GeofencingClient, AlarmManager (přesné budíky), Glance widget, App Shortcuts, JSON úložiště formátově kompatibilní s iOS. Minimum: Android 8 (API 26), target 35. Jeden modul.
-**Verze: 2.7, versionCode 19.**
+**Verze: 2.8, versionCode 20.**
 
 ## ✅ Co je hotové a ověřené (v2.7 – AUDIT3 + Lokalizace stav)
 - **Odolné a asynchronní úložiště:** Atomický zápis (`AtomicFile`), čtení `reminders.json` i `favorites.json` po jednotlivých záznamech s obranou `loadFailed` (přechodná chyba neshodí ani nepřepíše platný soubor). Čtení disku v `reload()` spouštěno asynchronně na `Dispatchers.IO.limitedParallelism(1)` mimo Main thread (UI se nezasekává).

@@ -43,7 +43,6 @@ import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
-import cz.jenda.georeminder.ui.components.GlassCircleButton
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.SectionHeader
 import cz.jenda.georeminder.ui.components.SheetHeader
@@ -103,6 +102,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
+            .statusBarsPadding()
     ) {
         SheetHeader(
             title = stringResource(cz.jenda.georeminder.R.string.calendar_import_title),
@@ -127,7 +127,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                     EmptyState(
                         icon = Icons.Filled.CalendarMonth,
                         title = stringResource(cz.jenda.georeminder.R.string.calendar_import_title),
-                        text = stringResource(cz.jenda.georeminder.R.string.permission_banner_notifications),
+                        text = stringResource(cz.jenda.georeminder.R.string.calendar_permission_text),
                     )
                     Spacer(Modifier.height(16.dp))
                     androidx.compose.material3.Button(

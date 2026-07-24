@@ -7,7 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import cz.jenda.georeminder.data.GeofenceRegistrationState
 import cz.jenda.georeminder.data.LocationHolder
+import cz.jenda.georeminder.data.ReliabilityEventType
+import cz.jenda.georeminder.data.ReliabilityHistory
 import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
@@ -105,6 +108,20 @@ class ReminderScheduler(context: Context) {
             if (next.timeInMillis <= now) next.add(Calendar.DAY_OF_YEAR, 7)
             return next.timeInMillis
         }
+
+        /** Nejbližší termín, který má být pro časovou připomínku naplánovaný. */
+        fun nextOccurrenceAt(
+            reminder: Reminder,
+            now: Long = System.currentTimeMillis(),
+        ): Long? {
+            if (reminder.kind != ReminderKind.TIME) return null
+            val due = reminder.dueDate ?: return null
+            return when (reminder.timeRepeat) {
+                TimeRepeat.NEVER -> due
+                TimeRepeat.DAILY -> nextDaily(due, now)
+                TimeRepeat.WEEKLY -> nextWeekly(due, reminder.weekdays, now)
+            }
+        }
     }
 
     // MARK: - Veřejné API
@@ -119,6 +136,7 @@ class ReminderScheduler(context: Context) {
 
     fun cancel(reminderId: String) {
         geofencing.removeGeofences(listOf(reminderId))
+        LocationHolder.clearGeofenceState(reminderId)
         alarms.cancel(alarmPendingIntent(reminderId, snooze = false))
         alarms.cancel(alarmPendingIntent(reminderId, snooze = true))
         cancelNag(reminderId)
@@ -165,7 +183,7 @@ class ReminderScheduler(context: Context) {
     fun markGeofenceFired(reminderId: String) = synchronized(prefsLock) {
         prefs.edit()
             .putStringSet(KEY_FIRED_GEOFENCES, HashSet(firedGeofenceIds()).apply { add(reminderId) })
-            .apply()
+            .commit()
     }
 
     private fun clearGeofenceFired(reminderId: String) = synchronized(prefsLock) {
@@ -173,7 +191,7 @@ class ReminderScheduler(context: Context) {
         if (reminderId in current) {
             prefs.edit()
                 .putStringSet(KEY_FIRED_GEOFENCES, HashSet(current).apply { remove(reminderId) })
-                .apply()
+                .commit()
         }
     }
 
@@ -191,7 +209,7 @@ class ReminderScheduler(context: Context) {
     fun markAlarmFired(reminderId: String) = synchronized(prefsLock) {
         prefs.edit()
             .putStringSet(KEY_FIRED_ALARMS, HashSet(firedAlarmIds()).apply { add(reminderId) })
-            .apply()
+            .commit()
     }
 
     private fun clearAlarmFired(reminderId: String) = synchronized(prefsLock) {
@@ -199,16 +217,16 @@ class ReminderScheduler(context: Context) {
         if (reminderId in current) {
             prefs.edit()
                 .putStringSet(KEY_FIRED_ALARMS, HashSet(current).apply { remove(reminderId) })
-                .apply()
+                .commit()
         }
     }
 
     private fun rememberSnooze(reminderId: String, atMillis: Long) = synchronized(prefsLock) {
-        prefs.edit().putLong(KEY_SNOOZE_PREFIX + reminderId, atMillis).apply()
+        prefs.edit().putLong(KEY_SNOOZE_PREFIX + reminderId, atMillis).commit()
     }
 
     fun clearSnooze(reminderId: String) = synchronized(prefsLock) {
-        prefs.edit().remove(KEY_SNOOZE_PREFIX + reminderId).apply()
+        prefs.edit().remove(KEY_SNOOZE_PREFIX + reminderId).commit()
     }
 
     /** Odložení: jednorázový budík za daný počet minut (i pro geo-připomínky). */
@@ -232,7 +250,27 @@ class ReminderScheduler(context: Context) {
             TimeRepeat.WEEKLY -> nextWeekly(due, reminder.weekdays)
             TimeRepeat.NEVER -> return
         }
-        setExact(next, alarmPendingIntent(reminder.id, snooze = false))
+        val exact = setExact(next, alarmPendingIntent(reminder.id, snooze = false))
+        recordAlarmScheduled(reminder, next, exact)
+    }
+
+    /** Naplánuje diagnostickou notifikaci, která projde přes AlarmManager. */
+    fun scheduleReliabilityTest(delayMillis: Long = 30_000L): Boolean {
+        val triggerAt = System.currentTimeMillis() + delayMillis
+        val pendingIntent = PendingIntent.getBroadcast(
+            appContext,
+            0x2800,
+            Intent(appContext, ReliabilityTestReceiver::class.java)
+                .setAction(ReliabilityTestReceiver.ACTION_FIRE),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val exact = setExact(triggerAt, pendingIntent)
+        ReliabilityHistory.record(
+            appContext,
+            ReliabilityEventType.TEST_SCHEDULED,
+            detail = "${if (exact) "exact" else "approximate"}:$triggerAt",
+        )
+        return exact
     }
 
     /**
@@ -246,6 +284,9 @@ class ReminderScheduler(context: Context) {
         // „zamrzl" i po smazání problémové připomínky).
         LocationHolder.geofenceFailed.value = false
         val active = all.filter { !it.isDone }
+        LocationHolder.retainGeofenceStates(
+            active.filter { it.kind == ReminderKind.LOCATION }.map { it.id }.toSet()
+        )
         active.forEach { schedule(it) }
         restoreSnoozes(active)
     }
@@ -269,6 +310,13 @@ class ReminderScheduler(context: Context) {
             if (at > now) {
                 setExact(at, alarmPendingIntent(id, snooze = true))
             } else {
+                ReliabilityHistory.record(
+                    appContext,
+                    ReliabilityEventType.TRIGGERED_TIME,
+                    reminder.id,
+                    reminder.title,
+                    "restored_snooze",
+                )
                 NotificationHelper.show(appContext, reminder)
                 clearSnooze(id)
             }
@@ -279,9 +327,16 @@ class ReminderScheduler(context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun addGeofence(reminder: Reminder) {
-        if (!LocationHolder.hasFineLocation(appContext)) return
+        if (!LocationHolder.hasFineLocation(appContext)) {
+            LocationHolder.setGeofenceState(
+                reminder.id,
+                GeofenceRegistrationState.FAILED,
+            )
+            return
+        }
         // Jednorázová připomínka, která už vystřelila, se znovu neregistruje
         if (!reminder.repeats && reminder.id in firedGeofenceIds()) return
+        LocationHolder.setGeofenceState(reminder.id, GeofenceRegistrationState.PENDING)
 
         val transition = if (reminder.trigger == TriggerType.ARRIVE) {
             Geofence.GEOFENCE_TRANSITION_ENTER
@@ -309,16 +364,50 @@ class ReminderScheduler(context: Context) {
 
         try {
             geofencing.addGeofences(request, geofencePendingIntent())
-                .addOnSuccessListener { LocationHolder.geofenceFailed.value = false }
+                .addOnSuccessListener {
+                    LocationHolder.setGeofenceState(
+                        reminder.id,
+                        GeofenceRegistrationState.ACTIVE,
+                    )
+                    ReliabilityHistory.record(
+                        appContext,
+                        ReliabilityEventType.GEOFENCE_REGISTERED,
+                        reminder.id,
+                        reminder.title,
+                        reminder.radius.toInt().toString(),
+                    )
+                }
                 .addOnFailureListener { e ->
                     // Např. systémový limit 100 geofence nebo vypnuté služby polohy –
                     // dřív to selhalo úplně potichu, teď to appka ukáže bannerem.
                     Log.w("ReminderScheduler", "Registrace geofence selhala", e)
                     LocationHolder.geofenceFailed.value = true
+                    LocationHolder.setGeofenceState(
+                        reminder.id,
+                        GeofenceRegistrationState.FAILED,
+                    )
+                    ReliabilityHistory.record(
+                        appContext,
+                        ReliabilityEventType.GEOFENCE_FAILED,
+                        reminder.id,
+                        reminder.title,
+                        e.javaClass.simpleName,
+                    )
                 }
         } catch (_: SecurityException) {
             // Bez oprávnění „Povolit vždy" – registrace selhala, zobrazíme banner.
             LocationHolder.geofenceFailed.value = true
+            LocationHolder.setGeofenceState(
+                reminder.id,
+                GeofenceRegistrationState.FAILED,
+            )
+            ReliabilityHistory.record(
+                appContext,
+                ReliabilityEventType.GEOFENCE_FAILED,
+                reminder.id,
+                reminder.title,
+                "SecurityException",
+            )
         }
     }
 
@@ -348,6 +437,13 @@ class ReminderScheduler(context: Context) {
                     // Termín už uplynul – typicky zmeškaný, když byl telefon
                     // vypnutý. Doručit jednou, pokud se budík ještě neodpálil.
                     if (reminder.id !in firedAlarmIds()) {
+                        ReliabilityHistory.record(
+                            appContext,
+                            ReliabilityEventType.TRIGGERED_TIME,
+                            reminder.id,
+                            reminder.title,
+                            "catch_up",
+                        )
                         NotificationHelper.show(appContext, reminder)
                         markAlarmFired(reminder.id)
                     }
@@ -361,19 +457,39 @@ class ReminderScheduler(context: Context) {
             TimeRepeat.DAILY -> nextDaily(due, now)
             TimeRepeat.WEEKLY -> nextWeekly(due, reminder.weekdays, now)
         }
-        setExact(triggerAt, alarmPendingIntent(reminder.id, snooze = false))
+        val exact = setExact(triggerAt, alarmPendingIntent(reminder.id, snooze = false))
+        recordAlarmScheduled(reminder, triggerAt, exact)
     }
 
-    private fun setExact(triggerAtMillis: Long, pi: PendingIntent) {
-        try {
+    private fun recordAlarmScheduled(reminder: Reminder, triggerAt: Long, exact: Boolean) {
+        ReliabilityHistory.record(
+            appContext,
+            if (exact) {
+                ReliabilityEventType.SCHEDULED_EXACT
+            } else {
+                ReliabilityEventType.SCHEDULED_APPROXIMATE
+            },
+            reminder.id,
+            reminder.title,
+            triggerAt.toString(),
+        )
+    }
+
+    private fun setExact(triggerAtMillis: Long, pi: PendingIntent): Boolean {
+        return try {
             if (Build.VERSION.SDK_INT >= 31 && !alarms.canScheduleExactAlarms()) {
                 // Bez povolení přesných budíků: nepřesný budík (může přijít o pár minut později)
+                Log.w("ReminderScheduler", "Přesný budík není povolen, používám nepřesnou zálohu")
                 alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
+                false
             } else {
                 alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
+                true
             }
-        } catch (_: SecurityException) {
+        } catch (e: SecurityException) {
+            Log.w("ReminderScheduler", "Přesný budík systém odmítl, používám nepřesnou zálohu", e)
             alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
+            false
         }
     }
 

@@ -99,6 +99,10 @@
             android:name=".notify.AlarmReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".notify.ReliabilityTestReceiver"
+            android:exported="false" />
+
         <!-- Tlačítka Hotovo / Odložit o hodinu na notifikaci -->
         <receiver
             android:name=".notify.NotificationActionReceiver"

@@ -110,6 +110,7 @@
     <string name="calendar_import_button">Importovat vybrané (%1$d)</string>
     <string name="calendar_no_events">Žádné nadchádzající události nebyly nalezeny.</string>
     <string name="calendar_grant_button">Povolit přístup ke kalendáři</string>
+    <string name="calendar_permission_text">GeoReminder potřebuje oprávnění ke čtení kalendáře pro jednorázový import událostí.</string>
 
     <!-- Discard & Search Empty -->
     <string name="discard_dialog_title">Zahodit neuložené změny?</string>
@@ -126,6 +127,67 @@
     <string name="permission_banner_location">GeoReminder potřebuje přístup k poloze na pozadí pro fungování geofence.</string>
     <string name="permission_banner_notifications">GeoReminder potřebuje oprávnění k zasílání notifikací.</string>
     <string name="permission_banner_grant">Povolit přístup</string>
+    <string name="permission_notifications_disabled">Notifikace jsou vypnuté – appka ti nemůže nic připomenout.</string>
+    <string name="permission_location_disabled">Přístup k poloze je zakázaný – připomínky na místa nebudou fungovat.</string>
+    <string name="permission_background_missing">Poloha není povolená „Vždy“ – připomínky na místa nepřijdou se zavřenou appkou.</string>
+    <string name="permission_battery_restricted">Telefon může kvůli šetření baterie blokovat připomínky na pozadí.</string>
+    <string name="permission_exact_alarm_missing">Přesné časové připomínky nejsou povolené – mohou přijít se zpožděním.</string>
+    <string name="permission_geofence_failed">Hlídání místa se nepodařilo nastavit – zkontroluj polohu a zkus připomínku uložit znovu.</string>
+    <string name="action_allow">Povolit</string>
+
+    <!-- Reliability Center -->
+    <string name="reliability_center_title">Centrum spolehlivosti</string>
+    <string name="reliability_notifications">Notifikace</string>
+    <string name="reliability_location">Poloha na pozadí</string>
+    <string name="reliability_exact_alarms">Přesné časové připomínky</string>
+    <string name="reliability_battery">Optimalizace baterie</string>
+    <string name="reliability_geofences">Hlídání míst</string>
+    <string name="reliability_status_ready">Připraveno</string>
+    <string name="reliability_status_blocked">Vypnuto v systému</string>
+    <string name="reliability_status_location_missing">Chybí přístup k přesné poloze</string>
+    <string name="reliability_status_background_missing">Chybí volba „Povolit vždy“</string>
+    <string name="reliability_status_exact">Budíky mohou být spuštěny přesně</string>
+    <string name="reliability_status_approximate">Systém dovoluje jen přibližné spuštění</string>
+    <string name="reliability_status_battery_restricted">Telefon může omezovat běh na pozadí</string>
+    <string name="reliability_status_no_geofences">Žádná aktivní připomínka na místo</string>
+    <string name="reliability_status_geofence_failed">Selhalo hlídání: %1$d</string>
+    <string name="reliability_status_geofence_active">Aktivně hlídáno: %1$d z %2$d</string>
+    <string name="reliability_test_action">Otestovat upozornění za 30 sekund</string>
+    <string name="reliability_test_explanation">Ověří plánování, probuzení aplikace i zobrazení notifikace.</string>
+    <string name="reliability_test_scheduled">Test je naplánovaný přesně za 30 sekund.</string>
+    <string name="reliability_test_scheduled_approximate">Test je naplánovaný, systém ho ale může mírně zpozdit.</string>
+    <string name="reliability_test_title">Test GeoReminderu</string>
+    <string name="reliability_test_body">Plánování i zobrazení notifikací funguje.</string>
+    <string name="reliability_privacy_note">Diagnostická historie zůstává pouze v telefonu a neukládá souřadnice ani přílohy.</string>
+    <string name="reliability_history_title">Poslední události doručení</string>
+    <string name="reliability_history_empty">Zatím tu nejsou žádné diagnostické události.</string>
+    <string name="reliability_history_clear">Vymazat historii</string>
+
+    <string name="reliability_row_notifications_blocked">Nelze doručit – notifikace jsou vypnuté</string>
+    <string name="reliability_row_battery_warning">Telefon může omezovat doručení na pozadí</string>
+    <string name="reliability_row_location_required">Čeká na povolení přesné polohy</string>
+    <string name="reliability_row_background_required">Čeká na polohu „Povolit vždy“</string>
+    <string name="reliability_row_geofence_pending">Registruji hlídání místa…</string>
+    <string name="reliability_row_geofence_active">Místo je aktivně hlídané</string>
+    <string name="reliability_row_geofence_failed">Hlídání místa se nepodařilo zaregistrovat</string>
+    <string name="reliability_row_time_exact">Přesně naplánováno: %1$s</string>
+    <string name="reliability_row_time_approximate">Přibližně naplánováno: %1$s</string>
+    <string name="reliability_row_time_past">Termín uplynul – čeká na potvrzení</string>
+
+    <string name="reliability_event_scheduled_exact">Přesně naplánováno</string>
+    <string name="reliability_event_scheduled_approximate">Naplánováno přibližně</string>
+    <string name="reliability_event_geofence_registered">Hlídání místa zaregistrováno</string>
+    <string name="reliability_event_geofence_failed">Registrace místa selhala</string>
+    <string name="reliability_event_triggered_time">Časový spouštěč aktivován</string>
+    <string name="reliability_event_triggered_location">Poloha aktivovala připomínku</string>
+    <string name="reliability_event_notification_shown">Notifikace zobrazena</string>
+    <string name="reliability_event_notification_blocked">Notifikace zablokována</string>
+    <string name="reliability_event_snoozed">Připomínka odložena</string>
+    <string name="reliability_event_completed">Připomínka potvrzena</string>
+    <string name="reliability_event_reactivated">Připomínka znovu aktivována</string>
+    <string name="reliability_event_deleted">Připomínka odstraněna</string>
+    <string name="reliability_event_test_scheduled">Testovací upozornění naplánováno</string>
+    <string name="reliability_event_test_triggered">Testovací spouštěč aktivován</string>
 
     <!-- Toasts & Messages -->
     <string name="toast_backup_export_success">Záloha byla úspěšně exportována</string>

@@ -228,6 +228,8 @@ fun rememberCategoryStyle(reminder: Reminder): Triple<ImageVector, Color, String
 fun SwipeReminderRow(
     reminder: Reminder,
     distance: String?,
+    reliabilityStatus: String? = null,
+    reliabilityWarning: Boolean = false,
     onTap: () -> Unit,
     onLongTap: () -> Unit,
     onToggleDone: () -> Unit,
@@ -297,6 +299,8 @@ fun SwipeReminderRow(
         ReminderRow(
             reminder = reminder,
             distance = distance,
+            reliabilityStatus = reliabilityStatus,
+            reliabilityWarning = reliabilityWarning,
             onTap = onTap,
             onLongTap = onLongTap,
             modifier = Modifier.semantics {
@@ -317,6 +321,8 @@ fun SwipeReminderRow(
 fun ReminderRow(
     reminder: Reminder,
     distance: String?,
+    reliabilityStatus: String? = null,
+    reliabilityWarning: Boolean = false,
     onTap: () -> Unit,
     onLongTap: () -> Unit,
     modifier: Modifier = Modifier,
@@ -391,6 +397,15 @@ fun ReminderRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (!reliabilityStatus.isNullOrBlank()) {
+                Text(
+                    text = reliabilityStatus,
+                    style = GeoType.caption2,
+                    color = if (reliabilityWarning) colors.orange else colors.green,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         // Vpravo čip laděný k typu (320 m, odjezd, hotovo apod.)
         if (!chipText.isNullOrEmpty()) {

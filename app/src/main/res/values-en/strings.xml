@@ -110,6 +110,7 @@
     <string name="calendar_import_button">Import selected (%1$d)</string>
     <string name="calendar_no_events">No upcoming calendar events found.</string>
     <string name="calendar_grant_button">Grant calendar access</string>
+    <string name="calendar_permission_text">GeoReminder needs calendar read access for a one-time import of events.</string>
 
     <!-- Discard & Search Empty -->
     <string name="discard_dialog_title">Discard unsaved changes?</string>
@@ -126,6 +127,67 @@
     <string name="permission_banner_location">GeoReminder needs background location access to trigger geofence reminders.</string>
     <string name="permission_banner_notifications">GeoReminder needs permission to send notifications.</string>
     <string name="permission_banner_grant">Grant access</string>
+    <string name="permission_notifications_disabled">Notifications are disabled — the app cannot remind you.</string>
+    <string name="permission_location_disabled">Location access is disabled — location reminders will not work.</string>
+    <string name="permission_background_missing">Location is not set to “Allow all the time” — location reminders will not trigger while the app is closed.</string>
+    <string name="permission_battery_restricted">Battery saving may block background reminders.</string>
+    <string name="permission_exact_alarm_missing">Exact time reminders are not allowed — they may be delayed.</string>
+    <string name="permission_geofence_failed">Location monitoring could not be set up — check location settings and save the reminder again.</string>
+    <string name="action_allow">Allow</string>
+
+    <!-- Reliability Center -->
+    <string name="reliability_center_title">Reliability Center</string>
+    <string name="reliability_notifications">Notifications</string>
+    <string name="reliability_location">Background location</string>
+    <string name="reliability_exact_alarms">Exact time reminders</string>
+    <string name="reliability_battery">Battery optimization</string>
+    <string name="reliability_geofences">Location monitoring</string>
+    <string name="reliability_status_ready">Ready</string>
+    <string name="reliability_status_blocked">Disabled by the system</string>
+    <string name="reliability_status_location_missing">Precise location access is missing</string>
+    <string name="reliability_status_background_missing">“Allow all the time” is missing</string>
+    <string name="reliability_status_exact">Alarms can trigger exactly</string>
+    <string name="reliability_status_approximate">Only approximate triggering is allowed</string>
+    <string name="reliability_status_battery_restricted">The phone may restrict background work</string>
+    <string name="reliability_status_no_geofences">No active location reminder</string>
+    <string name="reliability_status_geofence_failed">Monitoring failed: %1$d</string>
+    <string name="reliability_status_geofence_active">Actively monitored: %1$d of %2$d</string>
+    <string name="reliability_test_action">Test an alert in 30 seconds</string>
+    <string name="reliability_test_explanation">Checks scheduling, app wake-up, and notification display.</string>
+    <string name="reliability_test_scheduled">The test is scheduled exactly 30 seconds from now.</string>
+    <string name="reliability_test_scheduled_approximate">The test is scheduled, but the system may delay it slightly.</string>
+    <string name="reliability_test_title">GeoReminder Test</string>
+    <string name="reliability_test_body">Scheduling and notification display are working.</string>
+    <string name="reliability_privacy_note">Diagnostic history stays on this phone and never stores coordinates or attachments.</string>
+    <string name="reliability_history_title">Recent delivery events</string>
+    <string name="reliability_history_empty">No diagnostic events yet.</string>
+    <string name="reliability_history_clear">Clear history</string>
+
+    <string name="reliability_row_notifications_blocked">Cannot deliver — notifications are disabled</string>
+    <string name="reliability_row_battery_warning">The phone may restrict background delivery</string>
+    <string name="reliability_row_location_required">Waiting for precise location permission</string>
+    <string name="reliability_row_background_required">Waiting for “Allow all the time”</string>
+    <string name="reliability_row_geofence_pending">Registering location monitoring…</string>
+    <string name="reliability_row_geofence_active">Location is actively monitored</string>
+    <string name="reliability_row_geofence_failed">Location monitoring could not be registered</string>
+    <string name="reliability_row_time_exact">Scheduled exactly: %1$s</string>
+    <string name="reliability_row_time_approximate">Scheduled approximately: %1$s</string>
+    <string name="reliability_row_time_past">Time has passed — awaiting confirmation</string>
+
+    <string name="reliability_event_scheduled_exact">Scheduled exactly</string>
+    <string name="reliability_event_scheduled_approximate">Scheduled approximately</string>
+    <string name="reliability_event_geofence_registered">Location monitoring registered</string>
+    <string name="reliability_event_geofence_failed">Location registration failed</string>
+    <string name="reliability_event_triggered_time">Time trigger activated</string>
+    <string name="reliability_event_triggered_location">Location triggered the reminder</string>
+    <string name="reliability_event_notification_shown">Notification displayed</string>
+    <string name="reliability_event_notification_blocked">Notification blocked</string>
+    <string name="reliability_event_snoozed">Reminder snoozed</string>
+    <string name="reliability_event_completed">Reminder completed</string>
+    <string name="reliability_event_reactivated">Reminder reactivated</string>
+    <string name="reliability_event_deleted">Reminder deleted</string>
+    <string name="reliability_event_test_scheduled">Test alert scheduled</string>
+    <string name="reliability_event_test_triggered">Test trigger activated</string>
 
     <!-- Toasts & Messages -->
     <string name="toast_backup_export_success">Backup successfully exported</string>

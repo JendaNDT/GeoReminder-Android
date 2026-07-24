@@ -25,8 +25,8 @@ android {
         applicationId = "cz.jenda.georeminder"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "2.7"
+        versionCode = 20
+        versionName = "2.8"
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 
@@ -98,5 +98,5 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
-

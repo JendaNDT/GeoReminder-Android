@@ -34,6 +34,22 @@ object LocationHolder {
      */
     val geofenceFailed = MutableStateFlow(false)
 
+    /** Stav registrace jednotlivých aktivních připomínek na místo. */
+    val geofenceStates =
+        MutableStateFlow<Map<String, GeofenceRegistrationState>>(emptyMap())
+
+    fun setGeofenceState(reminderId: String, state: GeofenceRegistrationState) {
+        geofenceStates.value = geofenceStates.value + (reminderId to state)
+    }
+
+    fun clearGeofenceState(reminderId: String) {
+        geofenceStates.value = geofenceStates.value - reminderId
+    }
+
+    fun retainGeofenceStates(activeIds: Set<String>) {
+        geofenceStates.value = geofenceStates.value.filterKeys { it in activeIds }
+    }
+
     fun hasFineLocation(context: Context): Boolean =
         ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION

@@ -1,8 +1,10 @@
 package cz.jenda.georeminder.ui
 
+import android.app.AlarmManager
 import android.content.Intent
 import android.location.Location
 import android.net.Uri
+import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -97,17 +99,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.data.FavoritesStore
+import cz.jenda.georeminder.data.GeofenceRegistrationState
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.PlaceLinkResolver
+import cz.jenda.georeminder.data.ReminderReadinessCode
+import cz.jenda.georeminder.data.ReminderReliabilityEvaluator
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
+import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
-import cz.jenda.georeminder.ui.components.GlassCircleButton
+import cz.jenda.georeminder.ui.components.ToolbarCircleButton
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.PermissionBanner
 import cz.jenda.georeminder.ui.components.SectionHeader
@@ -116,6 +122,8 @@ import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cz.jenda.georeminder.ui.viewmodel.ReminderListViewModel
@@ -138,6 +146,7 @@ fun ReminderListScreen(
     val active by viewModel.activeReminders.collectAsStateWithLifecycle()
     val done by viewModel.doneReminders.collectAsStateWithLifecycle()
     val geofenceFailed by viewModel.geofenceFailed.collectAsStateWithLifecycle()
+    val geofenceStates by viewModel.geofenceStates.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     var showNewSheet by rememberSaveable { mutableStateOf(false) }
@@ -152,6 +161,7 @@ fun ReminderListScreen(
     var locationDenied by remember { mutableStateOf(false) }
     var backgroundMissing by remember { mutableStateOf(false) }
     var batteryRestricted by remember { mutableStateOf(false) }
+    var exactAlarmsDenied by remember { mutableStateOf(false) }
     var sharedPrefill by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -166,6 +176,9 @@ fun ReminderListScreen(
         val powerManager = context.getSystemService(PowerManager::class.java)
         batteryRestricted =
             powerManager?.isIgnoringBatteryOptimizations(context.packageName) == false
+        exactAlarmsDenied = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                context.getSystemService(AlarmManager::class.java)
+                    ?.canScheduleExactAlarms() == false
     }
 
     // Stav oprávnění se přehodnocuje při každém návratu do appky
@@ -238,19 +251,19 @@ fun ReminderListScreen(
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                GlassCircleButton(Icons.Filled.StarBorder, "Oblíbená místa") {
+                ToolbarCircleButton(Icons.Filled.StarBorder, "Oblíbená místa") {
                     showFavorites = true
                 }
                 Spacer(Modifier.width(10.dp))
-                GlassCircleButton(Icons.Filled.CalendarMonth, "Import z kalendáře") {
+                ToolbarCircleButton(Icons.Filled.CalendarMonth, "Import z kalendáře") {
                     showCalendarImport = true
                 }
                 Spacer(Modifier.weight(1f))
-                GlassCircleButton(Icons.Filled.SettingsGear, "Nastavení") {
+                ToolbarCircleButton(Icons.Filled.SettingsGear, "Nastavení") {
                     showSettings = true
                 }
                 Spacer(Modifier.width(10.dp))
-                GlassCircleButton(Icons.Filled.Add, "Nová připomínka") {
+                ToolbarCircleButton(Icons.Filled.Add, "Nová připomínka") {
                     newSheetKind = null
                     editingReminder = null
                     showNewSheet = true
@@ -313,7 +326,9 @@ fun ReminderListScreen(
             }
         }
         // Bannery oprávnění a spolehlivosti
-        if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted || geofenceFailed) {
+        if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted ||
+            (exactAlarmsDenied && active.any { it.kind == ReminderKind.TIME }) || geofenceFailed
+        ) {
             item {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -322,25 +337,25 @@ fun ReminderListScreen(
                     if (notificationsDenied) {
                         PermissionBanner(
                             icon = Icons.Filled.NotificationsOff,
-                            message = "Notifikace jsou vypnuté – appka ti nemůže nic připomenout.",
+                            message = stringResource(R.string.permission_notifications_disabled),
                         )
                     }
                     if (locationDenied) {
                         PermissionBanner(
                             icon = Icons.Filled.LocationOff,
-                            message = "Přístup k poloze je zakázaný – připomínky na místa nebudou fungovat.",
+                            message = stringResource(R.string.permission_location_disabled),
                         )
                     } else if (backgroundMissing) {
                         PermissionBanner(
                             icon = Icons.Filled.LocationOff,
-                            message = "Poloha není povolená „Vždy“ – připomínky na místa nepřijdou se zavřenou appkou.",
+                            message = stringResource(R.string.permission_background_missing),
                         )
                     }
                     if (batteryRestricted) {
                         PermissionBanner(
                             icon = Icons.Filled.BatteryAlert,
-                            message = "Telefon může kvůli šetření baterie blokovat připomínky na pozadí.",
-                            actionLabel = "Povolit",
+                            message = stringResource(R.string.permission_battery_restricted),
+                            actionLabel = stringResource(R.string.action_allow),
                             onAction = {
                                 val direct = Intent(
                                     Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
@@ -360,10 +375,35 @@ fun ReminderListScreen(
                             },
                         )
                     }
+                    if (exactAlarmsDenied && active.any { it.kind == ReminderKind.TIME }) {
+                        PermissionBanner(
+                            icon = Icons.Filled.Schedule,
+                            message = stringResource(R.string.permission_exact_alarm_missing),
+                            actionLabel = stringResource(R.string.action_allow),
+                            onAction = {
+                                val direct = Intent(
+                                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                    Uri.parse("package:${context.packageName}"),
+                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                try {
+                                    context.startActivity(direct)
+                                } catch (_: Exception) {
+                                    try {
+                                        context.startActivity(
+                                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                                .setData(Uri.parse("package:${context.packageName}"))
+                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        )
+                                    } catch (_: Exception) {
+                                    }
+                                }
+                            },
+                        )
+                    }
                     if (geofenceFailed) {
                         PermissionBanner(
                             icon = Icons.Filled.LocationOff,
-                            message = "Hlídání místa se nepodařilo nastavit – zkontroluj polohu a zkus připomínku uložit znovu.",
+                            message = stringResource(R.string.permission_geofence_failed),
                         )
                     }
                 }
@@ -402,14 +442,25 @@ fun ReminderListScreen(
             }
         } else {
             if (active.isNotEmpty()) {
-                item { SectionHeader("Aktivní") }
+                item { SectionHeader(stringResource(R.string.section_active)) }
                 item {
                     InsetCard {
                         active.forEachIndexed { index, reminder ->
                             key(reminder.id) {
+                                val reliability = reminderReliabilityUi(
+                                    reminder = reminder,
+                                    notificationsEnabled = !notificationsDenied,
+                                    batteryUnrestricted = !batteryRestricted,
+                                    fineLocationGranted = !locationDenied,
+                                    backgroundLocationGranted = !backgroundMissing && !locationDenied,
+                                    exactAlarmsGranted = !exactAlarmsDenied,
+                                    geofenceState = geofenceStates[reminder.id],
+                                )
                                 SwipeReminderRow(
                                     reminder = reminder,
                                     distance = viewModel.distanceText(reminder),
+                                    reliabilityStatus = reliability.text,
+                                    reliabilityWarning = reliability.warning,
                                     onTap = { editingReminder = reminder },
                                     onLongTap = { longPressedReminder = reminder },
                                     onToggleDone = { viewModel.toggleDone(reminder) },
@@ -423,7 +474,7 @@ fun ReminderListScreen(
                 item { Spacer(Modifier.height(28.dp)) }
             }
             if (done.isNotEmpty()) {
-                item { SectionHeader("Hotové") }
+                item { SectionHeader(stringResource(R.string.section_done)) }
                 item {
                     InsetCard {
                         done.forEachIndexed { index, reminder ->
@@ -576,6 +627,91 @@ fun ReminderListScreen(
     }
 }
 
+private data class ReminderReliabilityUi(
+    val text: String?,
+    val warning: Boolean,
+)
+
+@Composable
+private fun reminderReliabilityUi(
+    reminder: Reminder,
+    notificationsEnabled: Boolean,
+    batteryUnrestricted: Boolean,
+    fineLocationGranted: Boolean,
+    backgroundLocationGranted: Boolean,
+    exactAlarmsGranted: Boolean,
+    geofenceState: GeofenceRegistrationState?,
+): ReminderReliabilityUi {
+    val code = ReminderReliabilityEvaluator.evaluate(
+        reminder = reminder,
+        notificationsEnabled = notificationsEnabled,
+        batteryUnrestricted = batteryUnrestricted,
+        fineLocationGranted = fineLocationGranted,
+        backgroundLocationGranted = backgroundLocationGranted,
+        exactAlarmsGranted = exactAlarmsGranted,
+        geofenceState = geofenceState,
+    )
+    val nextAt = ReminderScheduler.nextOccurrenceAt(reminder)
+    val nextLabel = nextAt?.let {
+        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+            .format(Date(it))
+    }.orEmpty()
+    return when (code) {
+        ReminderReadinessCode.COMPLETED ->
+            ReminderReliabilityUi(null, false)
+        ReminderReadinessCode.NOTIFICATIONS_BLOCKED ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_notifications_blocked),
+                true,
+            )
+        ReminderReadinessCode.BATTERY_RESTRICTED ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_battery_warning),
+                true,
+            )
+        ReminderReadinessCode.LOCATION_PERMISSION_REQUIRED ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_location_required),
+                true,
+            )
+        ReminderReadinessCode.BACKGROUND_LOCATION_REQUIRED ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_background_required),
+                true,
+            )
+        ReminderReadinessCode.GEOFENCE_PENDING ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_geofence_pending),
+                false,
+            )
+        ReminderReadinessCode.GEOFENCE_ACTIVE ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_geofence_active),
+                false,
+            )
+        ReminderReadinessCode.GEOFENCE_FAILED ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_geofence_failed),
+                true,
+            )
+        ReminderReadinessCode.TIME_EXACT ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_time_exact, nextLabel),
+                false,
+            )
+        ReminderReadinessCode.TIME_APPROXIMATE ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_time_approximate, nextLabel),
+                true,
+            )
+        ReminderReadinessCode.TIME_PAST ->
+            ReminderReliabilityUi(
+                stringResource(R.string.reliability_row_time_past),
+                true,
+            )
+    }
+}
+
 /** Kontextová nabídka akcí pro vybranou připomínku po dlouhém stisknutí. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -691,4 +827,3 @@ private fun ReminderActionSheet(
         }
     }
 }
-

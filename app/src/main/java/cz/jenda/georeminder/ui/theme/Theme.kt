@@ -57,10 +57,9 @@ fun GeoReminderTheme(content: @Composable () -> Unit) {
         ThemeMode.LIGHT -> LightGeoColors
         ThemeMode.DARK -> DarkGeoColors
         ThemeMode.NEUTRAL -> NeutralGeoColors
-        ThemeMode.GLASS -> GlassGeoColors
         ThemeMode.SYSTEM -> if (isSystemDark) DarkGeoColors else LightGeoColors
     }
-    val dark = colors.isDark || mode == ThemeMode.GLASS
+    val dark = colors.isDark
 
     // Barva ikon ve stavovém řádku podle zvoleného vzhledu (ne jen podle systému)
     val view = LocalView.current

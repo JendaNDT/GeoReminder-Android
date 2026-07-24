@@ -59,7 +59,7 @@ import cz.jenda.georeminder.model.DEFAULT_RADIUS
 import cz.jenda.georeminder.model.FavoritePlace
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
-import cz.jenda.georeminder.ui.components.GlassCircleButton
+import cz.jenda.georeminder.ui.components.ToolbarCircleButton
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.RadiusSlider
 import cz.jenda.georeminder.ui.components.SectionHeader
@@ -86,13 +86,14 @@ fun FavoritesSheet(onClose: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
+            .statusBarsPadding()
     ) {
         SheetHeader(
             title = "Oblíbená místa",
             leftText = "Hotovo",
             onLeft = onClose,
             rightContent = {
-                GlassCircleButton(
+                ToolbarCircleButton(
                     icon = Icons.Filled.Add,
                     contentDescription = "Nové oblíbené místo",
                 ) { addingNew = true }

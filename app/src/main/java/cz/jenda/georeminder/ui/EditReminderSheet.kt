@@ -318,6 +318,7 @@ fun EditReminderSheet(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
+            .statusBarsPadding()
     ) {
         SheetHeader(
             title = if (existing == null) "Nová připomínka" else "Upravit připomínku",

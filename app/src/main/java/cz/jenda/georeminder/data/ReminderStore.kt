@@ -1,17 +1,18 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
-import android.os.Looper
 import android.util.Log
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.widget.WidgetRefresher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 
 /**
@@ -21,16 +22,20 @@ import kotlinx.serialization.builtins.ListSerializer
  */
 class ReminderStore private constructor(context: Context) {
     private val appContext = context.applicationContext
-    private val scheduler = ReminderScheduler(appContext)
+    private val scheduler = ReminderScheduler.get(appContext)
 
     // Zápisy na disk jdou na jedno IO vlákno (serializovaně), aby neblokovaly UI
     // a zároveň se nepřekrývaly.
-    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+    private val ioDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val ioScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     // true = poslední čtení dat selhalo → dočasně nepovolit zápis (ochrana proti
     // přepsání platného souboru prázdným seznamem).
     @Volatile
     private var loadFailed = false
+
+    @Volatile
+    private var lastPersistJob: Job? = null
 
     private val _reminders = MutableStateFlow<List<Reminder>>(emptyList())
     val reminders: StateFlow<List<Reminder>> = _reminders
@@ -51,31 +56,55 @@ class ReminderStore private constructor(context: Context) {
             }
     }
 
-    /** Znovu načte data z disku (po akci na notifikaci, návratu do popředí…). */
+    /**
+     * Znovu načte data z disku bez blokování volajícího. Vhodné pro UI, které
+     * jen potřebuje aktualizovat StateFlow.
+     *
+     * Receiver nesmí po tomto volání hned číst [reminders]: načtení ještě
+     * nemusí být hotové. Pro doručování používej [reloadAndGet].
+     */
     fun reload() {
         ioScope.launch {
-            synchronized(this@ReminderStore) {
-                when (val res = SharedStorage.read(appContext, FILE)) {
-                    is SharedStorage.ReadResult.Ok -> {
-                        val loaded = SharedStorage.decodeReminders(res.text)
-                        _reminders.value = loaded
-                        loadFailed = false
-                        AttachmentHelper.cleanupOrphanedAttachments(appContext, loaded)
-                    }
-                    SharedStorage.ReadResult.Empty -> {
-                        // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
-                        _reminders.value = emptyList()
-                        loadFailed = false
-                    }
-                    SharedStorage.ReadResult.Error -> {
-                        // Čtení selhalo – NEPŘEPISOVAT paměť a zablokovat zápis, aby se
-                        // platný soubor nepřepsal prázdným seznamem.
-                        loadFailed = true
-                        Log.w("ReminderStore", "Čtení dat selhalo – uložení dočasně zablokováno")
-                    }
-                }
+            loadFromDisk()
+        }
+    }
+
+    /**
+     * Načte data a vrátí je až po dokončení IO. Toto je kritická varianta pro
+     * BroadcastReceivery: po studeném startu procesu by obyčejné [reload]
+     * vrátilo řízení s prázdným seznamem a událost by se nenávratně zahodila.
+     */
+    suspend fun reloadAndGet(): List<Reminder> = withContext(ioDispatcher) {
+        loadFromDisk()
+    }
+
+    /** Načte aktuální data a teprve potom obnoví všechny systémové spouštěče. */
+    suspend fun reloadAndResync() {
+        scheduler.resync(reloadAndGet())
+    }
+
+    @Synchronized
+    private fun loadFromDisk(): List<Reminder> {
+        when (val res = SharedStorage.read(appContext, FILE)) {
+            is SharedStorage.ReadResult.Ok -> {
+                val loaded = SharedStorage.decodeReminders(res.text)
+                _reminders.value = loaded
+                loadFailed = false
+                AttachmentHelper.cleanupOrphanedAttachments(appContext, loaded)
+            }
+            SharedStorage.ReadResult.Empty -> {
+                // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
+                _reminders.value = emptyList()
+                loadFailed = false
+            }
+            SharedStorage.ReadResult.Error -> {
+                // Čtení selhalo – NEPŘEPISOVAT paměť a zablokovat zápis, aby se
+                // platný soubor nepřepsal prázdným seznamem.
+                loadFailed = true
+                Log.w("ReminderStore", "Čtení dat selhalo – uložení dočasně zablokováno")
             }
         }
+        return _reminders.value
     }
 
     @Synchronized
@@ -97,6 +126,21 @@ class ReminderStore private constructor(context: Context) {
         list[index] = reminder
         _reminders.value = list
         persist()
+        if (!oldReminder.isDone && reminder.isDone) {
+            ReliabilityHistory.record(
+                appContext,
+                ReliabilityEventType.COMPLETED,
+                reminder.id,
+                reminder.title,
+            )
+        } else if (oldReminder.isDone && !reminder.isDone) {
+            ReliabilityHistory.record(
+                appContext,
+                ReliabilityEventType.REACTIVATED,
+                reminder.id,
+                reminder.title,
+            )
+        }
         scheduler.cancel(reminder.id)
         if (!reminder.isDone) {
             scheduler.schedule(reminder)
@@ -111,6 +155,15 @@ class ReminderStore private constructor(context: Context) {
         if (!reminder.isDone) toggleDone(reminder)
     }
 
+    /**
+     * Varianta pro BroadcastReceiver: stav se musí dostat na disk ještě před
+     * pending.finish(), jinak smí Android čerstvě probuzený proces ukončit.
+     */
+    suspend fun markDoneAndWait(reminder: Reminder) {
+        markDone(reminder)
+        lastPersistJob?.join()
+    }
+
     @Synchronized
     fun delete(reminder: Reminder) {
         _reminders.value = _reminders.value.filterNot { it.id == reminder.id }
@@ -118,17 +171,37 @@ class ReminderStore private constructor(context: Context) {
             AttachmentHelper.deleteAttachment(appContext, reminder.attachmentPath)
         }
         scheduler.cancel(reminder.id)
+        ReliabilityHistory.record(
+            appContext,
+            ReliabilityEventType.DELETED,
+            reminder.id,
+            reminder.title,
+        )
         persist()
     }
 
     /** Odloží připomínku – nová jednorázová notifikace za daný počet minut. */
     fun snooze(reminder: Reminder, minutes: Int) {
         scheduler.snooze(reminder, minutes)
+        ReliabilityHistory.record(
+            appContext,
+            ReliabilityEventType.SNOOZED,
+            reminder.id,
+            reminder.title,
+            (System.currentTimeMillis() + minutes * 60_000L).toString(),
+        )
     }
 
     /** Odloží připomínku na konkrétní čas (např. zítra ráno). */
     fun snoozeAt(reminder: Reminder, atMillis: Long) {
         scheduler.snoozeAt(reminder, atMillis)
+        ReliabilityHistory.record(
+            appContext,
+            ReliabilityEventType.SNOOZED,
+            reminder.id,
+            reminder.title,
+            atMillis.toString(),
+        )
     }
 
     /** Znovu zaregistruje geofence a budíky (start appky, po restartu telefonu). */
@@ -142,7 +215,7 @@ class ReminderStore private constructor(context: Context) {
             return
         }
         val snapshot = _reminders.value
-        ioScope.launch {
+        lastPersistJob = ioScope.launch {
             try {
                 val text = SharedStorage.json.encodeToString(
                     ListSerializer(Reminder.serializer()), snapshot

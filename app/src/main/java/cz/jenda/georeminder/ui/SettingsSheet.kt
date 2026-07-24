@@ -2,8 +2,6 @@ package cz.jenda.georeminder.ui
 
 import android.content.Intent
 import android.net.Uri
-import android.os.PowerManager
-import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -105,6 +103,7 @@ fun SettingsSheet(onClose: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxHeight()
+            .statusBarsPadding()
     ) {
         SheetHeader(
             title = "Nastavení",
@@ -372,97 +371,7 @@ fun SettingsSheet(onClose: () -> Unit) {
             }
 
             // --- SEKCIE 4: SPOLEHLIVOST & SYSTÉM ---
-            Column {
-                SectionHeader("Spolehlivost & Oprávnění")
-                InsetCard {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .iosClickable {
-                                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                try { context.startActivity(intent) } catch (_: Exception) {}
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Nastavení notifikací telefonu",
-                            style = GeoType.body,
-                            color = colors.label,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = colors.tertiaryLabel,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    CardDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .iosClickable {
-                                val powerManager = context.getSystemService(PowerManager::class.java)
-                                val intent = if (powerManager?.isIgnoringBatteryOptimizations(context.packageName) == false) {
-                                    Intent(
-                                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                        Uri.parse("package:${context.packageName}")
-                                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                } else {
-                                    Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                try { context.startActivity(intent) } catch (_: Exception) {}
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Optimalizace baterie",
-                            style = GeoType.body,
-                            color = colors.label,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = colors.tertiaryLabel,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                    CardDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .iosClickable {
-                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = Uri.fromParts("package", context.packageName, null)
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                try { context.startActivity(intent) } catch (_: Exception) {}
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Všechna oprávnění v Nastavení",
-                            style = GeoType.body,
-                            color = colors.label,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = colors.tertiaryLabel,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-            }
+            ReliabilityCenter()
 
             // --- SEKCIE 5: O APLIKACI ---
             Column {
@@ -481,7 +390,11 @@ fun SettingsSheet(onClose: () -> Unit) {
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            text = "v2.5 (Redesign Vytříbený)",
+                            text = context.packageManager
+                                .getPackageInfo(context.packageName, 0)
+                                .versionName
+                                ?.let { "v$it" }
+                                ?: "—",
                             style = GeoType.subheadline,
                             color = colors.secondaryLabel,
                         )

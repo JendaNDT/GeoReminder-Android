@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import cz.jenda.georeminder.data.ReliabilityEventType
+import cz.jenda.georeminder.data.ReliabilityHistory
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.TimeRepeat
 import kotlinx.coroutines.CoroutineScope
@@ -24,17 +26,27 @@ class AlarmReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
-                val reminder = store.reminders.value.firstOrNull { it.id == id }
+                val reminder = store.reloadAndGet().firstOrNull { it.id == id }
                     ?: return@launch
                 if (reminder.isDone) return@launch
 
-                val scheduler = ReminderScheduler(context)
+                val scheduler = ReminderScheduler.get(context)
                 val isOneTime = !isSnooze && !isNag && reminder.timeRepeat == TimeRepeat.NEVER
                 // Jednorázovou připomínku už mohl doručit catch-up (po rebootu /
                 // otevření appky) – pak ji přes budík nedoručovat podruhé.
                 if (isOneTime && scheduler.isAlarmFired(id)) return@launch
 
+                ReliabilityHistory.record(
+                    context,
+                    ReliabilityEventType.TRIGGERED_TIME,
+                    reminder.id,
+                    reminder.title,
+                    when {
+                        isSnooze -> "snooze"
+                        isNag -> "nag"
+                        else -> "alarm"
+                    },
+                )
                 // show() u dožadující se připomínky sám naplánuje další připomenutí
                 NotificationHelper.show(context, reminder)
 
