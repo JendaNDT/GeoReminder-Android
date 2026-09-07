@@ -6,9 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +23,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,21 +42,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
-
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.ui.graphics.graphicsLayer
 
 /** Klik bez agresivního Material ripple efektu (iOS vzhled), s jemnou vizuální a hmatovou odezvou. */
 @Composable
@@ -187,7 +187,6 @@ fun SheetHeader(
     }
 }
 
-/** Hlavička sekce nad kartou („Aktivní", „Kde"…). */
 @Composable
 fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(
@@ -198,7 +197,6 @@ fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** Karta seznamu / formulářové sekce – zaoblení 26, okraje 16 (DESIGN_SPEC §3). */
 @Composable
 fun InsetCard(
     modifier: Modifier = Modifier,
@@ -214,7 +212,6 @@ fun InsetCard(
     )
 }
 
-/** Oddělovač řádků uvnitř karty – odsazený zleva. */
 @Composable
 fun CardDivider(startIndent: Dp = 16.dp) {
     HorizontalDivider(
@@ -224,7 +221,6 @@ fun CardDivider(startIndent: Dp = 16.dp) {
     )
 }
 
-/** iOS přepínač (zelený toggle) s haptickou odezvou a min. 48dp dotykovou plochou. */
 @Composable
 fun IOSSwitch(
     checked: Boolean,
@@ -274,7 +270,6 @@ fun IOSSwitch(
     }
 }
 
-/** iOS slider – tenká dráha, velký bílý kulatý palec. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IOSSlider(
@@ -321,7 +316,6 @@ fun IOSSlider(
     )
 }
 
-/** Slider poloměru geo-oblasti (50–1000 m, krok 25 m) – sjednocuje formulář, oblíbená i výběr místa. */
 @Composable
 fun RadiusSlider(
     radius: Double,
@@ -337,7 +331,6 @@ fun RadiusSlider(
     )
 }
 
-/** iOS segmentovaný přepínač s klouzajícím jezdcem a haptikou. */
 @Composable
 fun SegmentedControl(
     options: List<String>,
@@ -398,7 +391,6 @@ fun SegmentedControl(
     }
 }
 
-/** Prázdný stav (88×88 dlaždice v accent barvě dle Vytříbený). */
 @Composable
 fun EmptyState(
     icon: ImageVector,
@@ -445,7 +437,6 @@ fun EmptyState(
     }
 }
 
-/** Primární kapslové tlačítko („Použít toto místo", „Pokračovat"). */
 @Composable
 fun PrimaryButton(
     text: String,
@@ -467,7 +458,6 @@ fun PrimaryButton(
     }
 }
 
-/** Standardní iOS potvrdzovací dialog pro stornování neuložených změn. */
 @Composable
 fun IOSDiscardDialog(
     onConfirm: () -> Unit,
@@ -476,44 +466,44 @@ fun IOSDiscardDialog(
     val colors = GeoTheme.colors
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.discard_dialog_title), style = GeoType.headline) },
-        text = { Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.discard_dialog_text), style = GeoType.body) },
+        title = { Text(stringResource(R.string.discard_dialog_title), style = GeoType.headline) },
+        text = { Text(stringResource(R.string.discard_dialog_text), style = GeoType.body) },
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = onConfirm) {
-                Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.discard_dialog_confirm), color = colors.red)
+                Text(stringResource(R.string.discard_dialog_confirm), color = colors.red)
             }
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text(androidx.compose.ui.res.stringResource(cz.jenda.georeminder.R.string.discard_dialog_dismiss))
+                Text(stringResource(R.string.discard_dialog_dismiss))
             }
         }
     )
 }
 
-/** Obecný potvrdzovací dialog (např. mazání položky). */
 @Composable
 fun IOSConfirmDialog(
     title: String,
     message: String,
-    confirmText: String = "Potvrdit",
+    confirmText: String? = null,
     isDestructive: Boolean = false,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val colors = GeoTheme.colors
+    val resolvedConfirmText = confirmText ?: stringResource(R.string.action_done)
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, style = GeoType.headline) },
         text = { Text(message, style = GeoType.body) },
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = onConfirm) {
-                Text(confirmText, color = if (isDestructive) colors.red else colors.accent)
+                Text(resolvedConfirmText, color = if (isDestructive) colors.red else colors.accent)
             }
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Zrušit")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
