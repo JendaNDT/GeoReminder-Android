@@ -98,9 +98,7 @@ import com.google.android.gms.maps.model.LatLng
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.data.FavoritesStore
 import cz.jenda.georeminder.data.LocationHolder
-import cz.jenda.georeminder.data.PlaceLinkResolver
 import cz.jenda.georeminder.data.ReminderStore
-import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
@@ -148,6 +146,7 @@ fun ReminderListScreen(
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showCalendarImport by rememberSaveable { mutableStateOf(false) }
     var longPressedReminder by remember { mutableStateOf<Reminder?>(null) }
+    var pendingNotificationReminderId by rememberSaveable { mutableStateOf<String?>(null) }
 
     var notificationsDenied by remember { mutableStateOf(false) }
     var locationDenied by remember { mutableStateOf(false) }
@@ -206,6 +205,53 @@ fun ReminderListScreen(
                 showNewSheet = true
             }
         }
+    }
+
+    // Kliknutí na notifikaci může přijít při cold-startu i během jiného sheetu.
+    // ID si proto nejdřív uložíme a globální request uvolníme pro další intent.
+    LaunchedEffect(Unit) {
+        MainActivity.notificationReminderRequest.collect { reminderId ->
+            if (!reminderId.isNullOrBlank()) {
+                pendingNotificationReminderId = reminderId
+                if (MainActivity.notificationReminderRequest.value == reminderId) {
+                    MainActivity.notificationReminderRequest.value = null
+                }
+            }
+        }
+    }
+
+    // Nezahazovat rozpracovaný editor ani jiný otevřený sheet. Deep-link se
+    // zpracuje až ve chvíli, kdy je bezpečné otevřít konkrétní reminder.
+    LaunchedEffect(
+        pendingNotificationReminderId,
+        showNewSheet,
+        editingReminder,
+        showFavorites,
+        showSettings,
+        showCalendarImport,
+        longPressedReminder,
+    ) {
+        val reminderId = pendingNotificationReminderId ?: return@LaunchedEffect
+        val hasBlockingSheet = showNewSheet || editingReminder != null || showFavorites ||
+            showSettings || showCalendarImport || longPressedReminder != null
+        if (hasBlockingSheet) return@LaunchedEffect
+
+        val loadResult = store.reloadAndWait()
+        if (loadResult == ReminderStore.ReloadResult.ERROR) {
+            snackbarHostState.showSnackbar("Připomínku se nepodařilo načíst")
+            pendingNotificationReminderId = null
+            return@LaunchedEffect
+        }
+
+        val target = store.reminders.value.firstOrNull { it.id == reminderId }
+        if (target == null) {
+            snackbarHostState.showSnackbar("Připomínka už neexistuje")
+        } else {
+            newSheetKind = null
+            sharedPrefill = null
+            editingReminder = target
+        }
+        pendingNotificationReminderId = null
     }
 
     // Mazání s možností „Vrátit zpět" přes ViewModel
