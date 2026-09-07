@@ -13,9 +13,24 @@ object AttachmentHelper {
     private const val DIR_ATTACHMENTS = "attachments"
 
     const val MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024L // 10 MB
+    val SUPPORTED_MIME_TYPES = arrayOf(
+        "image/jpeg",
+        "image/png",
+        "application/pdf",
+    )
 
     internal fun isAllowedAttachmentSize(size: Long): Boolean =
         size in 1..MAX_ATTACHMENT_SIZE_BYTES
+
+    internal fun isAllowedAttachmentMimeType(mimeType: String?): Boolean =
+        mimeType?.lowercase() in SUPPORTED_MIME_TYPES
+
+    private fun extensionForMimeType(mimeType: String): String? = when (mimeType.lowercase()) {
+        "application/pdf" -> "pdf"
+        "image/png" -> "png"
+        "image/jpeg" -> "jpg"
+        else -> null
+    }
 
     private fun attachmentsDir(context: Context): File =
         File(context.applicationContext.filesDir, DIR_ATTACHMENTS)
@@ -80,13 +95,12 @@ object AttachmentHelper {
                 }
             }
 
-            val mimeType = contentResolver.getType(uri) ?: ""
-            val ext = when {
-                mimeType.contains("pdf") -> "pdf"
-                mimeType.contains("png") -> "png"
-                mimeType.contains("jpeg") || mimeType.contains("jpg") -> "jpg"
-                else -> "bin"
+            val mimeType = contentResolver.getType(uri)?.lowercase()
+            if (!isAllowedAttachmentMimeType(mimeType)) {
+                android.util.Log.w("AttachmentHelper", "Odmítnut nepodporovaný MIME typ přílohy")
+                return null
             }
+            val ext = extensionForMimeType(mimeType!!) ?: return null
             val dir = ensureAttachmentsDir(context) ?: run {
                 android.util.Log.w("AttachmentHelper", "Nepodařilo se vytvořit adresář příloh")
                 return null
@@ -103,6 +117,10 @@ object AttachmentHelper {
         }
     }
 
+    /**
+     * Obnova ze zálohy zachovává i historické přípony kvůli kompatibilitě se
+     * staršími backupy. Nové přílohy ale přes picker vznikají jen jako jpg/png/pdf.
+     */
     fun copyBackupEntryToInternal(
         context: Context,
         entryName: String,
