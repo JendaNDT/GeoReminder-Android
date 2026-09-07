@@ -60,6 +60,11 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "emulator" "system-images;android-36;google_apis;x86_64"
 
+      - name: Emulator host libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpulse0
+
       - name: Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
