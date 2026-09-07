@@ -20,14 +20,8 @@ object SharedStorage {
         encodeDefaults = true
     }
 
-    /** Jeden název SharedPreferences pro celou appku (nastavení, značky…). */
     const val PREFS = "georeminder"
 
-    /**
-     * Výsledek dekódování reminders.json. Dřívější API vracelo při poškození
-     * prostě prázdný/částečný seznam, takže volající nemohl rozlišit legitimní
-     * prázdno od ztráty dat.
-     */
     sealed class DecodeRemindersResult {
         data class Success(val reminders: List<Reminder>) : DecodeRemindersResult()
         data class Partial(
@@ -38,9 +32,8 @@ object SharedStorage {
     }
 
     /**
-     * Odolné dekódování seznamu připomínek. Nejdřív zkusí celý list, a pokud
-     * jeden záznam selže, zkusí jednotlivé položky. Výsledek ale vždy výslovně
-     * řekne, zda šlo o plně validní, částečně obnovitelná nebo nečitelná data.
+     * Čistá parsovací část bez Android runtime závislostí, aby šla spolehlivě
+     * testovat jako obyčejný JVM unit test.
      */
     fun decodeReminders(text: String): DecodeRemindersResult {
         if (text.isBlank()) {
@@ -58,8 +51,7 @@ object SharedStorage {
         val array = try {
             json.parseToJsonElement(text) as? JsonArray
                 ?: return DecodeRemindersResult.Corrupted("root_is_not_array")
-        } catch (e: Exception) {
-            Log.w("SharedStorage", "Data připomínek nejsou platný JSON", e)
+        } catch (_: Exception) {
             return DecodeRemindersResult.Corrupted("invalid_json")
         }
 
@@ -68,9 +60,8 @@ object SharedStorage {
         for (element in array) {
             try {
                 recovered += json.decodeFromJsonElement(Reminder.serializer(), element)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 skipped++
-                Log.w("SharedStorage", "Přeskakuji vadný záznam připomínky", e)
             }
         }
 
@@ -81,10 +72,6 @@ object SharedStorage {
         }
     }
 
-    /**
-     * Výsledek čtení. Záměrně rozlišuje „prázdno" (soubor ještě neexistuje –
-     * legitimní stav při prvním spuštění) od skutečné chyby čtení.
-     */
     sealed class ReadResult {
         data class Ok(val text: String) : ReadResult()
         object Empty : ReadResult()
@@ -107,14 +94,9 @@ object SharedStorage {
         }
     }
 
-    /** Kompatibilní čtení pro widget (jen zobrazuje): null = prázdno i chyba. */
     fun readText(context: Context, filename: String): String? =
         (read(context, filename) as? ReadResult.Ok)?.text
 
-    /**
-     * Atomický zápis přes android.util.AtomicFile. Vrací false při skutečném
-     * selhání, aby recovery/import nemohl pokračovat s falešným pocitem úspěchu.
-     */
     @Synchronized
     fun writeText(context: Context, filename: String, content: String): Boolean {
         val atomicFile = android.util.AtomicFile(file(context, filename))
@@ -133,11 +115,6 @@ object SharedStorage {
         }
     }
 
-    /**
-     * Před automatickou částečnou obnovou uloží nedotčený zdroj do samostatné
-     * interní kopie. Název používá hash obsahu, takže opakovaný reload téhož
-     * poškozeného souboru nevyrábí nekonečné množství kopií.
-     */
     fun preserveCorruptCopy(context: Context, filename: String, content: String): File? {
         return try {
             val digest = MessageDigest.getInstance("SHA-256")
