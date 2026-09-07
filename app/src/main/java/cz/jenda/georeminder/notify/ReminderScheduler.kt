@@ -7,23 +7,26 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.location.Geofence
+import com.google.android.gms.location.GeofenceStatusCodes
+import com.google.android.gms.location.GeofencingRequest
+import com.google.android.gms.location.LocationServices
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.SystemAccess
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
-import com.google.android.gms.location.Geofence
-import com.google.android.gms.location.GeofencingRequest
-import com.google.android.gms.location.LocationServices
 import java.util.Calendar
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Plánování systémových spouštěčů připomínek.
  *
  * - LOCATION → GeofencingClient
  * - TIME → AlarmManager
- * - technický stav (fired/snooze/requestCode) → SchedulerStateStore
+ * - technický stav (fired/snooze/requestCode/geofence status) → SchedulerStateStore
  *
  * Scheduler je navržený tak, aby opakovaný resync byl bezpečný a aby stejné
  * reminder ID vždy používalo stejné PendingIntent requestCode i po restartu.
@@ -33,6 +36,9 @@ class ReminderScheduler(context: Context) {
     private val geofencing = LocationServices.getGeofencingClient(appContext)
     private val alarms = appContext.getSystemService(AlarmManager::class.java)
     private val stateStore = SchedulerStateStore(appContext)
+
+    val geofenceStates: StateFlow<Map<String, GeofenceRegistrationState>> =
+        stateStore.geofenceStates
 
     private val geofenceResyncLock = Any()
     private var geofenceResyncRunning = false
@@ -45,6 +51,8 @@ class ReminderScheduler(context: Context) {
         const val EXTRA_REMINDER_ID = "reminder_id"
         const val NAG_INTERVAL_MINUTES = 5
         const val SNOOZE_MINUTES = 60
+
+        private const val TAG = "ReminderScheduler"
 
         @Volatile
         private var instance: ReminderScheduler? = null
@@ -104,6 +112,9 @@ class ReminderScheduler(context: Context) {
 
         val snoozeUntil = stateStore.snoozeUntil(reminder.id)
         if (snoozeUntil != null && snoozeUntil > System.currentTimeMillis()) {
+            if (reminder.kind == ReminderKind.LOCATION) {
+                setGeofenceState(reminder.id, GeofenceRegistrationStatus.SNOOZED)
+            }
             cancelOriginalTrigger(reminder)
             setExact(snoozeUntil, alarmPendingIntent(reminder.id, snooze = true))
             return
@@ -124,6 +135,7 @@ class ReminderScheduler(context: Context) {
         NotificationHelper.cancel(appContext, reminderId)
         stateStore.clearFired(reminderId)
         stateStore.clearSnooze(reminderId)
+        clearGeofenceState(reminderId)
     }
 
     fun scheduleNag(reminder: Reminder) {
@@ -149,6 +161,7 @@ class ReminderScheduler(context: Context) {
 
     fun markGeofenceFired(reminderId: String) {
         stateStore.markFired(reminderId)
+        setGeofenceState(reminderId, GeofenceRegistrationStatus.FIRED)
     }
 
     fun isAlarmFired(reminderId: String): Boolean = stateStore.isFired(reminderId)
@@ -170,22 +183,34 @@ class ReminderScheduler(context: Context) {
         cancelNag(reminder.id)
         alarms.cancel(alarmPendingIntent(reminder.id, snooze = true))
         stateStore.setSnooze(reminder.id, target)
+        if (reminder.kind == ReminderKind.LOCATION) {
+            setGeofenceState(reminder.id, GeofenceRegistrationStatus.SNOOZED)
+        }
         cancelOriginalTrigger(reminder)
         setExact(target, alarmPendingIntent(reminder.id, snooze = true))
     }
 
-    fun resumeAfterSnooze(reminder: Reminder) {
+    fun resumeAfterSnooze(reminder: Reminder, allReminders: List<Reminder>? = null) {
         stateStore.clearSnooze(reminder.id)
         if (reminder.isDone) return
 
         if (isOneTime(reminder)) {
             stateStore.markFired(reminder.id)
+            if (reminder.kind == ReminderKind.LOCATION) {
+                setGeofenceState(reminder.id, GeofenceRegistrationStatus.FIRED)
+            }
             cancelOriginalTrigger(reminder)
             return
         }
 
         when {
-            reminder.kind == ReminderKind.LOCATION && reminder.repeats -> addGeofence(reminder)
+            reminder.kind == ReminderKind.LOCATION && reminder.repeats -> {
+                if (allReminders != null) {
+                    resyncGeofences(allReminders)
+                } else {
+                    addGeofence(reminder)
+                }
+            }
             reminder.kind == ReminderKind.TIME && reminder.timeRepeat != TimeRepeat.NEVER ->
                 scheduleNextOccurrence(reminder)
         }
@@ -212,7 +237,6 @@ class ReminderScheduler(context: Context) {
             cancelLegacyPendingIntents(it.id)
         }
 
-        LocationHolder.geofenceFailed.value = false
         val active = all.filter { !it.isDone }
         val snoozedIds = restoreSnoozes(active)
 
@@ -220,9 +244,36 @@ class ReminderScheduler(context: Context) {
             .filter { it.kind == ReminderKind.TIME && it.id !in snoozedIds }
             .forEach { scheduleAlarm(it) }
 
-        queueGeofenceResync(
-            active.filter { it.kind == ReminderKind.LOCATION && it.id !in snoozedIds },
-        )
+        resyncGeofences(all)
+    }
+
+    /**
+     * Lehký reconcile jen pro location remindery. Používá se při přidání,
+     * smazání, změně a snooze, aby se správně přepočítal limit 100 bez zásahu
+     * do časových alarmů a dožadování.
+     */
+    fun resyncGeofences(all: List<Reminder>) {
+        val activeLocations = all.filter {
+            !it.isDone && it.kind == ReminderKind.LOCATION
+        }
+        stateStore.retainGeofenceStates(activeLocations.map { it.id }.toSet())
+        refreshLegacyFailureFlag()
+        queueGeofenceResync(activeLocations)
+    }
+
+    /** GeofencingEvent může oznámit chybu bez konkrétního request ID. */
+    fun handleGeofenceServiceError(errorCode: Int, all: List<Reminder>) {
+        val status = statusForErrorCode(errorCode)
+        val now = System.currentTimeMillis()
+        all.asSequence()
+            .filter { !it.isDone && it.kind == ReminderKind.LOCATION }
+            .filter { reminder ->
+                val snoozeUntil = stateStore.snoozeUntil(reminder.id)
+                (snoozeUntil == null || snoozeUntil <= now) &&
+                    (reminder.repeats || !stateStore.isFired(reminder.id))
+            }
+            .forEach { setGeofenceState(it.id, status, errorCode) }
+        Log.w(TAG, "Geofence service error: code=$errorCode status=${status.name}")
     }
 
     private fun restoreSnoozes(active: List<Reminder>): Set<String> {
@@ -239,11 +290,17 @@ class ReminderScheduler(context: Context) {
             if (at > now) {
                 setExact(at, alarmPendingIntent(id, snooze = true))
                 stillSnoozed += id
+                if (reminder.kind == ReminderKind.LOCATION) {
+                    setGeofenceState(id, GeofenceRegistrationStatus.SNOOZED)
+                }
             } else {
                 NotificationHelper.show(appContext, reminder)
                 stateStore.clearSnooze(id)
                 if (isOneTime(reminder)) {
                     stateStore.markFired(id)
+                    if (reminder.kind == ReminderKind.LOCATION) {
+                        setGeofenceState(id, GeofenceRegistrationStatus.FIRED)
+                    }
                     cancelOriginalTrigger(reminder)
                 }
             }
@@ -285,7 +342,7 @@ class ReminderScheduler(context: Context) {
                     }
                 }
         } catch (e: Exception) {
-            Log.w("ReminderScheduler", "Hromadný reset geofence selhal", e)
+            Log.w(TAG, "Hromadný reset geofence selhal", e)
             addGeofencesBatch(snapshot) {
                 finishGeofenceResyncPass()
             }
@@ -307,35 +364,56 @@ class ReminderScheduler(context: Context) {
     @SuppressLint("MissingPermission")
     private fun addGeofencesBatch(reminders: List<Reminder>, onComplete: () -> Unit) {
         val now = System.currentTimeMillis()
-        val eligible = reminders.filter { reminder ->
+        val candidates = mutableListOf<Reminder>()
+
+        reminders.forEach { reminder ->
             val snoozeUntil = stateStore.snoozeUntil(reminder.id)
-            (snoozeUntil == null || snoozeUntil <= now) &&
-                (reminder.repeats || !stateStore.isFired(reminder.id))
-        }
+            when {
+                snoozeUntil != null && snoozeUntil > now ->
+                    setGeofenceState(reminder.id, GeofenceRegistrationStatus.SNOOZED)
 
-        if (eligible.isEmpty()) {
-            onComplete()
-            return
-        }
-        if (!LocationHolder.hasBackgroundLocation(appContext)) {
-            LocationHolder.geofenceFailed.value = true
-            onComplete()
-            return
-        }
+                !reminder.repeats && stateStore.isFired(reminder.id) ->
+                    setGeofenceState(reminder.id, GeofenceRegistrationStatus.FIRED)
 
-        val geofences = eligible.mapNotNull { reminder ->
-            try {
-                buildGeofence(reminder)
-            } catch (e: IllegalArgumentException) {
-                Log.w("ReminderScheduler", "Neplatná geofence data pro ${reminder.id}", e)
-                LocationHolder.geofenceFailed.value = true
-                null
+                !GeofencePolicy.isValidRegion(reminder) ->
+                    setGeofenceState(reminder.id, GeofenceRegistrationStatus.FAILED_INVALID_REGION)
+
+                else -> candidates += reminder
             }
         }
-        if (geofences.isEmpty()) {
+
+        if (candidates.isEmpty()) {
             onComplete()
             return
         }
+
+        if (!LocationHolder.hasBackgroundLocation(appContext)) {
+            candidates.forEach {
+                setGeofenceState(it.id, GeofenceRegistrationStatus.FAILED_PERMISSION)
+            }
+            onComplete()
+            return
+        }
+
+        if (!LocationHolder.isSystemLocationEnabled(appContext)) {
+            candidates.forEach {
+                setGeofenceState(it.id, GeofenceRegistrationStatus.FAILED_LOCATION_DISABLED)
+            }
+            onComplete()
+            return
+        }
+
+        val capacity = GeofencePolicy.selectWithinCapacity(candidates)
+        capacity.overflow.forEach {
+            setGeofenceState(it.id, GeofenceRegistrationStatus.FAILED_TOO_MANY)
+        }
+
+        if (capacity.selected.isEmpty()) {
+            onComplete()
+            return
+        }
+
+        val geofences = capacity.selected.map { buildGeofence(it) }
 
         try {
             val request = GeofencingRequest.Builder()
@@ -344,31 +422,64 @@ class ReminderScheduler(context: Context) {
                 .build()
 
             geofencing.addGeofences(request, geofencePendingIntent())
-                .addOnFailureListener { e ->
-                    Log.w("ReminderScheduler", "Hromadná registrace geofence selhala", e)
-                    LocationHolder.geofenceFailed.value = true
+                .addOnSuccessListener {
+                    capacity.selected.forEach {
+                        setGeofenceState(it.id, GeofenceRegistrationStatus.ACTIVE)
+                    }
+                }
+                .addOnFailureListener { error ->
+                    val (status, errorCode) = statusForException(error)
+                    capacity.selected.forEach {
+                        setGeofenceState(it.id, status, errorCode)
+                    }
+                    Log.w(TAG, "Hromadná registrace geofence selhala: status=${status.name} code=$errorCode")
                 }
                 .addOnCompleteListener { onComplete() }
         } catch (e: SecurityException) {
-            Log.w("ReminderScheduler", "Hromadná registrace geofence bez oprávnění", e)
-            LocationHolder.geofenceFailed.value = true
+            capacity.selected.forEach {
+                setGeofenceState(it.id, GeofenceRegistrationStatus.FAILED_PERMISSION)
+            }
+            Log.w(TAG, "Hromadná registrace geofence bez oprávnění")
             onComplete()
         } catch (e: Exception) {
-            Log.w("ReminderScheduler", "Hromadná registrace geofence selhala", e)
-            LocationHolder.geofenceFailed.value = true
+            val (status, errorCode) = statusForException(e)
+            capacity.selected.forEach {
+                setGeofenceState(it.id, status, errorCode)
+            }
+            Log.w(TAG, "Hromadná registrace geofence selhala: status=${status.name} code=$errorCode")
             onComplete()
         }
     }
 
     @SuppressLint("MissingPermission")
     private fun addGeofence(reminder: Reminder) {
-        if (!LocationHolder.hasBackgroundLocation(appContext)) {
-            LocationHolder.geofenceFailed.value = true
+        if (!GeofencePolicy.isValidRegion(reminder)) {
+            setGeofenceState(reminder.id, GeofenceRegistrationStatus.FAILED_INVALID_REGION)
             return
         }
-        if (!reminder.repeats && stateStore.isFired(reminder.id)) return
+        if (!LocationHolder.hasBackgroundLocation(appContext)) {
+            setGeofenceState(reminder.id, GeofenceRegistrationStatus.FAILED_PERMISSION)
+            return
+        }
+        if (!LocationHolder.isSystemLocationEnabled(appContext)) {
+            setGeofenceState(reminder.id, GeofenceRegistrationStatus.FAILED_LOCATION_DISABLED)
+            return
+        }
+        if (!reminder.repeats && stateStore.isFired(reminder.id)) {
+            setGeofenceState(reminder.id, GeofenceRegistrationStatus.FIRED)
+            return
+        }
         val snoozeUntil = stateStore.snoozeUntil(reminder.id)
-        if (snoozeUntil != null && snoozeUntil > System.currentTimeMillis()) return
+        if (snoozeUntil != null && snoozeUntil > System.currentTimeMillis()) {
+            setGeofenceState(reminder.id, GeofenceRegistrationStatus.SNOOZED)
+            return
+        }
+        if (stateStore.activeGeofenceCount(excludingReminderId = reminder.id) >=
+            GeofencePolicy.MAX_ACTIVE_GEOFENCES
+        ) {
+            setGeofenceState(reminder.id, GeofenceRegistrationStatus.FAILED_TOO_MANY)
+            return
+        }
 
         try {
             val request = GeofencingRequest.Builder()
@@ -377,20 +488,25 @@ class ReminderScheduler(context: Context) {
                 .build()
 
             geofencing.addGeofences(request, geofencePendingIntent())
-                .addOnSuccessListener { LocationHolder.geofenceFailed.value = false }
-                .addOnFailureListener { e ->
-                    Log.w("ReminderScheduler", "Registrace geofence selhala", e)
-                    LocationHolder.geofenceFailed.value = true
+                .addOnSuccessListener {
+                    setGeofenceState(reminder.id, GeofenceRegistrationStatus.ACTIVE)
                 }
-        } catch (e: IllegalArgumentException) {
-            Log.w("ReminderScheduler", "Neplatná geofence data pro ${reminder.id}", e)
-            LocationHolder.geofenceFailed.value = true
-        } catch (_: SecurityException) {
-            LocationHolder.geofenceFailed.value = true
+                .addOnFailureListener { error ->
+                    val (status, errorCode) = statusForException(error)
+                    setGeofenceState(reminder.id, status, errorCode)
+                    Log.w(TAG, "Registrace geofence ${reminder.id} selhala: status=${status.name} code=$errorCode")
+                }
+        } catch (e: SecurityException) {
+            setGeofenceState(reminder.id, GeofenceRegistrationStatus.FAILED_PERMISSION)
+        } catch (e: Exception) {
+            val (status, errorCode) = statusForException(e)
+            setGeofenceState(reminder.id, status, errorCode)
+            Log.w(TAG, "Registrace geofence ${reminder.id} selhala: status=${status.name} code=$errorCode")
         }
     }
 
     private fun buildGeofence(reminder: Reminder): Geofence {
+        require(GeofencePolicy.isValidRegion(reminder)) { "Invalid geofence region" }
         val transition = if (reminder.trigger == TriggerType.ARRIVE) {
             Geofence.GEOFENCE_TRANSITION_ENTER
         } else {
@@ -503,4 +619,41 @@ class ReminderScheduler(context: Context) {
                 .putExtra(EXTRA_REMINDER_ID, reminderId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+
+    private fun statusForException(error: Exception): Pair<GeofenceRegistrationStatus, Int?> {
+        val code = (error as? ApiException)?.statusCode
+        return statusForErrorCode(code) to code
+    }
+
+    private fun statusForErrorCode(errorCode: Int?): GeofenceRegistrationStatus = when (errorCode) {
+        GeofenceStatusCodes.GEOFENCE_INSUFFICIENT_LOCATION_PERMISSION ->
+            GeofenceRegistrationStatus.FAILED_PERMISSION
+        GeofenceStatusCodes.GEOFENCE_NOT_AVAILABLE ->
+            GeofenceRegistrationStatus.FAILED_LOCATION_DISABLED
+        GeofenceStatusCodes.GEOFENCE_TOO_MANY_GEOFENCES ->
+            GeofenceRegistrationStatus.FAILED_TOO_MANY
+        else -> GeofenceRegistrationStatus.FAILED_SERVICE
+    }
+
+    private fun setGeofenceState(
+        reminderId: String,
+        status: GeofenceRegistrationStatus,
+        errorCode: Int? = null,
+    ) {
+        stateStore.setGeofenceState(reminderId, status, errorCode)
+        if (status.isFailure) {
+            Log.w(TAG, "Geofence state ${reminderId}: ${status.name} code=$errorCode")
+        }
+        refreshLegacyFailureFlag()
+    }
+
+    private fun clearGeofenceState(reminderId: String) {
+        stateStore.clearGeofenceState(reminderId)
+        refreshLegacyFailureFlag()
+    }
+
+    private fun refreshLegacyFailureFlag() {
+        LocationHolder.geofenceFailed.value =
+            stateStore.geofenceStates.value.values.any { it.status.isFailure }
+    }
 }
