@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import cz.jenda.georeminder.data.DiagnosticEventType
+import cz.jenda.georeminder.data.DiagnosticStore
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.TimeRepeat
 import kotlinx.coroutines.CoroutineScope
@@ -37,30 +39,24 @@ class AlarmReceiver : BroadcastReceiver() {
 
                 val scheduler = ReminderScheduler.get(context)
                 val isOneTime = !isSnooze && !isNag && reminder.timeRepeat == TimeRepeat.NEVER
-                // Jednorázovou připomínku už mohl doručit catch-up (po rebootu /
-                // otevření appky) – pak ji přes budík nedoručovat podruhé.
                 if (isOneTime && scheduler.isAlarmFired(id)) return@launch
 
-                // show() u dožadující se připomínky sám naplánuje další připomenutí
+                DiagnosticStore.get(context).record(
+                    DiagnosticEventType.ALARM_FIRED,
+                    detail = when {
+                        isSnooze -> "snooze"
+                        isNag -> "nag"
+                        else -> reminder.timeRepeat.name
+                    },
+                )
                 NotificationHelper.show(context, reminder)
 
                 when {
-                    isSnooze -> {
-                        // Snooze skončil. U location reminderu se zároveň přepočítá
-                        // limit 100, aby se deterministicky obnovily správné geofence.
-                        scheduler.resumeAfterSnooze(reminder, reminders)
-                    }
-                    isNag -> {
-                        // Dožadování: show() si další připomenutí naplánovalo samo.
-                    }
-                    reminder.timeRepeat != TimeRepeat.NEVER -> {
+                    isSnooze -> scheduler.resumeAfterSnooze(reminder, reminders)
+                    isNag -> Unit
+                    reminder.timeRepeat != TimeRepeat.NEVER ->
                         scheduler.scheduleNextOccurrence(reminder)
-                    }
-                    else -> {
-                        // Jednorázový budík se odpálil – ať ho catch-up po restartu
-                        // telefonu neposlal znovu.
-                        scheduler.markAlarmFired(id)
-                    }
+                    else -> scheduler.markAlarmFired(id)
                 }
             } catch (e: Exception) {
                 Log.w("AlarmReceiver", "Chyba při doručení připomínky", e)
