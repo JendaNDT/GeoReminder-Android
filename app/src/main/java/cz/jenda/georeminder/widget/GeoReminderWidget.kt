@@ -13,14 +13,14 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalSize
+import androidx.glance.action.actionStartActivity
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionStartActivity as actionStartActivityIntent
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.action.actionStartActivity
-import androidx.glance.action.clickable
-import androidx.glance.appwidget.action.actionStartActivity as actionStartActivityIntent
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
@@ -38,18 +38,14 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
+import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TriggerType
 
-/**
- * Widget „Nejbližší připomínky" (Jetpack Glance) – ekvivalent WidgetKit widgetu.
- * 2 řádky na malé ploše, 3 na širší; obnovuje se při každém uložení dat
- * a sám každých ~30 minut.
- */
+/** Widget „Nejbližší připomínky". */
 class GeoReminderWidget : GlanceAppWidget() {
-
     companion object {
         private val SMALL = DpSize(110.dp, 110.dp)
         private val WIDE = DpSize(220.dp, 110.dp)
@@ -63,12 +59,9 @@ class GeoReminderWidget : GlanceAppWidget() {
             .setAction(Intent.ACTION_VIEW)
             .putExtra("shortcut_kind", "location")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        provideContent {
-            WidgetContent(reminders, addIntent)
-        }
+        provideContent { WidgetContent(reminders, addIntent) }
     }
 
-    /** Načte nejnovější aktivní připomínky ze sdíleného JSON souboru. */
     private fun loadActive(context: Context): List<Reminder> {
         val text = SharedStorage.readText(context, ReminderStoreFile.NAME) ?: return emptyList()
         val decoded = when (val result = SharedStorage.decodeReminders(text)) {
@@ -76,47 +69,34 @@ class GeoReminderWidget : GlanceAppWidget() {
             is SharedStorage.DecodeRemindersResult.Partial -> result.reminders
             is SharedStorage.DecodeRemindersResult.Corrupted -> emptyList()
         }
-        return decoded
-            .filter { !it.isDone }
-            .sortedByDescending { it.createdAt }
-            .take(3)
+        val location = LocationHolder.location.value?.let {
+            WidgetOrdering.UserLocation(it.latitude, it.longitude, it.time)
+        }
+        return WidgetOrdering.sort(
+            decoded.filter { !it.isDone },
+            userLocation = location,
+        ).take(3)
     }
 
-    /** Oddělená konstanta bez inicializace ReminderStore z procesu widgetu. */
-    private object ReminderStoreFile {
-        const val NAME = "reminders.json"
-    }
+    private object ReminderStoreFile { const val NAME = "reminders.json" }
 }
 
 class GeoReminderWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = GeoReminderWidget()
 }
 
-private val widgetBackground = ColorProvider(
-    day = Color(0xFFEFEFF4), night = Color(0xFF2C2C2E)
-)
-private val accentColor = ColorProvider(
-    day = Color(0xFF007AFF), night = Color(0xFF0A84FF)
-)
-private val labelColor = ColorProvider(
-    day = Color(0xFF000000), night = Color(0xFFFFFFFF)
-)
-private val secondaryColor = ColorProvider(
-    day = Color(0x993C3C43), night = Color(0x99EBEBF5)
-)
+private val widgetBackground = ColorProvider(day = Color(0xFFEFEFF4), night = Color(0xFF2C2C2E))
+private val accentColor = ColorProvider(day = Color(0xFF007AFF), night = Color(0xFF0A84FF))
+private val labelColor = ColorProvider(day = Color(0xFF000000), night = Color(0xFFFFFFFF))
+private val secondaryColor = ColorProvider(day = Color(0x993C3C43), night = Color(0x99EBEBF5))
 
 @Composable
 private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
     val size = LocalSize.current
     val limit = if (size.width >= 200.dp) 3 else 2
-
     Box(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .background(widgetBackground)
-            .cornerRadius(24.dp)
-            .clickable(actionStartActivity<MainActivity>())
-            .padding(14.dp),
+        modifier = GlanceModifier.fillMaxSize().background(widgetBackground).cornerRadius(24.dp)
+            .clickable(actionStartActivity<MainActivity>()).padding(14.dp),
     ) {
         if (reminders.isEmpty()) {
             Column(
@@ -130,22 +110,13 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
                     modifier = GlanceModifier.size(22.dp),
                     colorFilter = ColorFilter.tint(secondaryColor),
                 )
-                Text(
-                    text = "Vše vyřízeno",
-                    style = TextStyle(color = secondaryColor, fontSize = 12.sp),
-                )
+                Text("Vše vyřízeno", style = TextStyle(color = secondaryColor, fontSize = 12.sp))
             }
         } else {
-            Column(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .padding(end = 20.dp)
-            ) {
+            Column(modifier = GlanceModifier.fillMaxSize().padding(end = 20.dp)) {
                 reminders.take(limit).forEach { reminder ->
                     Row(
-                        modifier = GlanceModifier
-                            .fillMaxWidth()
-                            .padding(bottom = 7.dp),
+                        modifier = GlanceModifier.fillMaxWidth().padding(bottom = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Image(
@@ -157,38 +128,22 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
                         Spacer(GlanceModifier.width(7.dp))
                         Column {
                             Text(
-                                text = reminder.title,
-                                style = TextStyle(
-                                    color = labelColor,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                ),
+                                reminder.title,
+                                style = TextStyle(color = labelColor, fontSize = 12.sp, fontWeight = FontWeight.Bold),
                                 maxLines = 1,
                             )
-                            Text(
-                                text = reminder.subtitle,
-                                style = TextStyle(
-                                    color = secondaryColor,
-                                    fontSize = 11.sp,
-                                ),
-                                maxLines = 1,
-                            )
+                            Text(reminder.subtitle, style = TextStyle(color = secondaryColor, fontSize = 11.sp), maxLines = 1)
                         }
                     }
                 }
             }
         }
 
-        Box(
-            modifier = GlanceModifier.fillMaxSize(),
-            contentAlignment = Alignment.TopEnd,
-        ) {
+        Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
             Image(
                 provider = ImageProvider(R.drawable.ic_widget_add),
                 contentDescription = "Nová připomínka",
-                modifier = GlanceModifier
-                    .size(18.dp)
-                    .clickable(actionStartActivityIntent(addIntent)),
+                modifier = GlanceModifier.size(18.dp).clickable(actionStartActivityIntent(addIntent)),
                 colorFilter = ColorFilter.tint(accentColor),
             )
         }
