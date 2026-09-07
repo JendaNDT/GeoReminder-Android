@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -132,14 +133,18 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                     Toast.makeText(
                         context,
                         if (additions.isEmpty()) {
-                            "Vybrané události už byly importované"
+                            context.getString(R.string.calendar_already_imported_toast)
                         } else {
-                            "Naimportováno ${additions.size} událostí z kalendáře"
+                            context.getString(R.string.calendar_imported_count, additions.size)
                         },
                         Toast.LENGTH_SHORT,
                     ).show()
                 } else {
-                    Toast.makeText(context, "Import z kalendáře selhal", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.calendar_import_failed),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             } finally {
                 importing = false
@@ -153,11 +158,11 @@ fun CalendarImportSheet(onClose: () -> Unit) {
             .fillMaxHeight()
     ) {
         SheetHeader(
-            title = androidx.compose.ui.res.stringResource(R.string.calendar_import_title),
-            leftText = androidx.compose.ui.res.stringResource(R.string.action_cancel),
+            title = stringResource(R.string.calendar_import_title),
+            leftText = stringResource(R.string.action_cancel),
             onLeft = onClose,
             rightText = if (selectedKeys.isNotEmpty()) {
-                androidx.compose.ui.res.stringResource(R.string.calendar_import_button, selectedKeys.size)
+                stringResource(R.string.calendar_import_button, selectedKeys.size)
             } else {
                 ""
             },
@@ -185,8 +190,8 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         EmptyState(
                             icon = Icons.Filled.CalendarMonth,
-                            title = "Přístup ke kalendáři",
-                            text = "GeoReminder potřebuje oprávnění číst kalendář, aby mohl nabídnout nadcházející události k importu.",
+                            title = stringResource(R.string.calendar_permission_title),
+                            text = stringResource(R.string.calendar_permission_text),
                         )
                         Spacer(Modifier.height(16.dp))
                         Button(
@@ -200,7 +205,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                             Icon(Icons.Filled.CalendarMonth, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                androidx.compose.ui.res.stringResource(R.string.calendar_grant_button),
+                                stringResource(R.string.calendar_grant_button),
                                 style = GeoType.footnoteBold,
                             )
                         }
@@ -215,8 +220,8 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                 ) {
                     EmptyState(
                         icon = Icons.Filled.CalendarMonth,
-                        title = "Žádné události",
-                        text = "V systémovém kalendáři na příštích 30 dní nejsou žádné budoucí výskyty událostí.",
+                        title = stringResource(R.string.calendar_empty_title),
+                        text = stringResource(R.string.calendar_empty_text),
                     )
                 }
             }
@@ -229,8 +234,8 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         EmptyState(
                             icon = Icons.Filled.CalendarMonth,
-                            title = "Kalendář se nepodařilo načíst",
-                            text = "Systémový kalendář vrátil chybu. Události nebyly změněny.",
+                            title = stringResource(R.string.calendar_error_title),
+                            text = stringResource(R.string.calendar_error_text),
                         )
                         Spacer(Modifier.height(14.dp))
                         Button(
@@ -238,7 +243,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                             colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
                             shape = RoundedCornerShape(20.dp),
                         ) {
-                            Text("Zkusit znovu", color = Color.White)
+                            Text(stringResource(R.string.action_retry), color = Color.White)
                         }
                     }
                 }
@@ -251,7 +256,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                         .verticalScroll(rememberScrollState())
                         .padding(top = 8.dp, bottom = 40.dp),
                 ) {
-                    SectionHeader("Nadcházející události (30 dní)")
+                    SectionHeader(stringResource(R.string.calendar_upcoming_section))
                     InsetCard {
                         state.events.forEachIndexed { index, event ->
                             val alreadyImported = event.instanceKey in importedKeys
@@ -283,7 +288,7 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                                     )
                                     if (alreadyImported) {
                                         Text(
-                                            text = "Již importováno",
+                                            text = stringResource(R.string.calendar_already_imported),
                                             style = GeoType.caption,
                                             color = colors.green,
                                         )
@@ -292,7 +297,11 @@ fun CalendarImportSheet(onClose: () -> Unit) {
                                 if (selected || alreadyImported) {
                                     Icon(
                                         imageVector = Icons.Filled.Check,
-                                        contentDescription = if (alreadyImported) "Již importováno" else "Vybráno",
+                                        contentDescription = if (alreadyImported) {
+                                            stringResource(R.string.calendar_already_imported)
+                                        } else {
+                                            stringResource(R.string.calendar_selected)
+                                        },
                                         tint = if (alreadyImported) colors.green else colors.accent,
                                         modifier = Modifier.size(22.dp),
                                     )
