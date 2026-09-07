@@ -45,8 +45,9 @@ class AlarmReceiver : BroadcastReceiver() {
 
                 when {
                     isSnooze -> {
-                        // Odložení doručeno – zapomenout uloženou značku odložení.
-                        scheduler.clearSnooze(id)
+                        // Snooze skončil. Scheduler smaže odložení a obnoví pouze
+                        // původní opakovaný trigger; jednorázový reminder neoživí.
+                        scheduler.resumeAfterSnooze(reminder)
                     }
                     isNag -> {
                         // Dožadování: show() si další připomenutí naplánovalo samo.
