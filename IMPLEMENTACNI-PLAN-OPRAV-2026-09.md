@@ -672,7 +672,7 @@ Minimální varianta: přejmenovat widget, pokud má zůstat řazení podle vytv
 - souřadnice z Photon, Geocoderu i sdílených mapových odkazů procházejí validačním rozsahem,
 - widget řadí časové remindery podle příštího výskytu a geo podle čerstvé polohy; starou polohu ignoruje,
 - přidány/rozšířeny `CalendarImporterTest`, `PlaceLinkResolverTest` a `WidgetOrderingTest`,
-- finální head Etapy 8 `8f8916785065eace7f0fbca351917d9cf66d567a` prošel GitHub Actions run #66 (`34127677696`): unit testy zelené + debug APK sestavené na API 36.
+- aplikační head Etapy 8 `267d581eb3c064c25cb63f012405da2727db6dc0` prošel GitHub Actions run #68 (`34128384063`): unit testy zelené + debug APK sestavené na API 36.
 
 ---
 
