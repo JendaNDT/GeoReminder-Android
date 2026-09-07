@@ -105,6 +105,7 @@ import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
+import cz.jenda.georeminder.notify.NotificationHelper
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
 import cz.jenda.georeminder.ui.components.GlassCircleButton
@@ -132,7 +133,7 @@ fun ReminderListScreen(
     val context = LocalContext.current
     val colors = GeoTheme.colors
     val store = remember { ReminderStore.get(context) }
-    remember { FavoritesStore.get(context) } // zahřátí (čipy ve formuláři)
+    remember { FavoritesStore.get(context) }
 
     val reminders by viewModel.reminders.collectAsStateWithLifecycle()
     val active by viewModel.activeReminders.collectAsStateWithLifecycle()
@@ -168,7 +169,6 @@ fun ReminderListScreen(
             powerManager?.isIgnoringBatteryOptimizations(context.packageName) == false
     }
 
-    // Stav oprávnění se přehodnocuje při každém návratu do appky
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -182,7 +182,6 @@ fun ReminderListScreen(
     }
     LaunchedEffect(Unit) { refreshPermissionState() }
 
-    // Zástupce z plochy (podržení ikony appky) → rovnou otevřít formulář
     LaunchedEffect(Unit) {
         MainActivity.shortcutRequest.collect { kind ->
             if (kind != null) {
@@ -194,7 +193,6 @@ fun ReminderListScreen(
         }
     }
 
-    // Sdílené místo z Map Google → rozluštit polohu a otevřít předvyplněný formulář
     LaunchedEffect(Unit) {
         MainActivity.sharedPlaceText.collect { text ->
             if (text != null) {
@@ -207,7 +205,6 @@ fun ReminderListScreen(
         }
     }
 
-    // Mazání s možností „Vrátit zpět" přes ViewModel
     fun requestDelete(reminder: Reminder) {
         viewModel.markPendingDelete(reminder)
         scope.launch {
@@ -224,226 +221,221 @@ fun ReminderListScreen(
         }
     }
 
-
     Box(modifier = Modifier.fillMaxSize()) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 130.dp),
-    ) {
-        // Kruhová „skleněná" tlačítka nahoře
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                GlassCircleButton(Icons.Filled.StarBorder, "Oblíbená místa") {
-                    showFavorites = true
-                }
-                Spacer(Modifier.width(10.dp))
-                GlassCircleButton(Icons.Filled.CalendarMonth, "Import z kalendáře") {
-                    showCalendarImport = true
-                }
-                Spacer(Modifier.weight(1f))
-                GlassCircleButton(Icons.Filled.SettingsGear, "Nastavení") {
-                    showSettings = true
-                }
-                Spacer(Modifier.width(10.dp))
-                GlassCircleButton(Icons.Filled.Add, "Nová připomínka") {
-                    newSheetKind = null
-                    editingReminder = null
-                    showNewSheet = true
-                }
-            }
-        }
-        // Velký titulek
-        item {
-            Text(
-                text = "GeoReminder",
-                style = GeoType.largeTitle,
-                color = colors.label,
-                modifier = Modifier.padding(start = 20.dp, top = 6.dp, bottom = 12.dp),
-            )
-        }
-        // Vyhledávací pole (Search bar)
-        item {
-            val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-            InsetCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 130.dp),
+        ) {
+            item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = colors.tertiaryLabel,
-                        modifier = Modifier.size(20.dp),
-                    )
+                    GlassCircleButton(Icons.Filled.StarBorder, "Oblíbená místa") {
+                        showFavorites = true
+                    }
                     Spacer(Modifier.width(10.dp))
-                    Box(modifier = Modifier.weight(1f)) {
-                        if (searchQuery.isEmpty()) {
-                            Text(
-                                text = "Hledat v připomínkách...",
-                                style = GeoType.body,
-                                color = colors.tertiaryLabel,
+                    GlassCircleButton(Icons.Filled.CalendarMonth, "Import z kalendáře") {
+                        showCalendarImport = true
+                    }
+                    Spacer(Modifier.weight(1f))
+                    GlassCircleButton(Icons.Filled.SettingsGear, "Nastavení") {
+                        showSettings = true
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    GlassCircleButton(Icons.Filled.Add, "Nová připomínka") {
+                        newSheetKind = null
+                        editingReminder = null
+                        showNewSheet = true
+                    }
+                }
+            }
+            item {
+                Text(
+                    text = "GeoReminder",
+                    style = GeoType.largeTitle,
+                    color = colors.label,
+                    modifier = Modifier.padding(start = 20.dp, top = 6.dp, bottom = 12.dp),
+                )
+            }
+            item {
+                val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+                InsetCard(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = colors.tertiaryLabel,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    text = "Hledat v připomínkách...",
+                                    style = GeoType.body,
+                                    color = colors.tertiaryLabel,
+                                )
+                            }
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { viewModel.updateSearchQuery(it) },
+                                textStyle = GeoType.body.copy(color = colors.label),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { viewModel.updateSearchQuery(it) },
-                            textStyle = GeoType.body.copy(color = colors.label),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    if (searchQuery.isNotEmpty()) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Vymazat",
-                            tint = colors.tertiaryLabel,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .iosClickable { viewModel.updateSearchQuery("") },
-                        )
+                        if (searchQuery.isNotEmpty()) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Vymazat",
+                                tint = colors.tertiaryLabel,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .iosClickable { viewModel.updateSearchQuery("") },
+                            )
+                        }
                     }
                 }
             }
-        }
-        // Bannery oprávnění a spolehlivosti
-        if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted || geofenceFailed) {
-            item {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(bottom = 12.dp),
-                ) {
-                    if (notificationsDenied) {
-                        PermissionBanner(
-                            icon = Icons.Filled.NotificationsOff,
-                            message = "Notifikace jsou vypnuté – appka ti nemůže nic připomenout.",
-                        )
-                    }
-                    if (locationDenied) {
-                        PermissionBanner(
-                            icon = Icons.Filled.LocationOff,
-                            message = "Přístup k poloze je zakázaný – připomínky na místa nebudou fungovat.",
-                        )
-                    } else if (backgroundMissing) {
-                        PermissionBanner(
-                            icon = Icons.Filled.LocationOff,
-                            message = "Poloha není povolená „Vždy“ – připomínky na místa nepřijdou se zavřenou appkou.",
-                        )
-                    }
-                    if (batteryRestricted) {
-                        PermissionBanner(
-                            icon = Icons.Filled.BatteryAlert,
-                            message = "Telefon může kvůli šetření baterie blokovat připomínky na pozadí.",
-                            actionLabel = "Povolit",
-                            onAction = {
-                                val direct = Intent(
-                                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                    Uri.parse("package:${context.packageName}"),
-                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                try {
-                                    context.startActivity(direct)
-                                } catch (_: Exception) {
+            if (notificationsDenied || locationDenied || backgroundMissing || batteryRestricted || geofenceFailed) {
+                item {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    ) {
+                        if (notificationsDenied) {
+                            PermissionBanner(
+                                icon = Icons.Filled.NotificationsOff,
+                                message = "Notifikace jsou vypnuté – appka ti nemůže nic připomenout.",
+                            )
+                        }
+                        if (locationDenied) {
+                            PermissionBanner(
+                                icon = Icons.Filled.LocationOff,
+                                message = "Přístup k poloze je zakázaný – připomínky na místa nebudou fungovat.",
+                            )
+                        } else if (backgroundMissing) {
+                            PermissionBanner(
+                                icon = Icons.Filled.LocationOff,
+                                message = "Poloha není povolená „Vždy“ – připomínky na místa nepřijdou se zavřenou appkou.",
+                            )
+                        }
+                        if (batteryRestricted) {
+                            PermissionBanner(
+                                icon = Icons.Filled.BatteryAlert,
+                                message = "Telefon může kvůli šetření baterie blokovat připomínky na pozadí.",
+                                actionLabel = "Povolit",
+                                onAction = {
+                                    val direct = Intent(
+                                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                        Uri.parse("package:${context.packageName}"),
+                                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                     try {
-                                        context.startActivity(
-                                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        )
+                                        context.startActivity(direct)
                                     } catch (_: Exception) {
+                                        try {
+                                            context.startActivity(
+                                                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            )
+                                        } catch (_: Exception) {
+                                        }
                                     }
-                                }
-                            },
-                        )
-                    }
-                    if (geofenceFailed) {
-                        PermissionBanner(
-                            icon = Icons.Filled.LocationOff,
-                            message = "Hlídání místa se nepodařilo nastavit – zkontroluj polohu a zkus připomínku uložit znovu.",
-                        )
+                                },
+                            )
+                        }
+                        if (geofenceFailed) {
+                            PermissionBanner(
+                                icon = Icons.Filled.LocationOff,
+                                message = "Hlídání místa se nepodařilo nastavit – zkontroluj polohu a zkus připomínku uložit znovu.",
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        if (reminders.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillParentMaxHeight(0.6f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    EmptyState(
-                        icon = Icons.Filled.PinDrop,
-                        title = "Zatím žádné připomínky",
-                        text = "Ťukni na + a vytvoř první připomínku na místo nebo na čas.",
-                    )
-                }
-            }
-        } else if (active.isEmpty() && done.isEmpty() && searchQuery.isNotBlank()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillParentMaxHeight(0.5f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    EmptyState(
-                        icon = Icons.Filled.Search,
-                        title = stringResource(R.string.search_empty_title),
-                        text = stringResource(R.string.search_empty_text, searchQuery),
-                    )
-                }
-            }
-        } else {
-            if (active.isNotEmpty()) {
-                item { SectionHeader("Aktivní") }
+            if (reminders.isEmpty()) {
                 item {
-                    InsetCard {
-                        active.forEachIndexed { index, reminder ->
-                            key(reminder.id) {
-                                SwipeReminderRow(
-                                    reminder = reminder,
-                                    distance = viewModel.distanceText(reminder),
-                                    onTap = { editingReminder = reminder },
-                                    onLongTap = { longPressedReminder = reminder },
-                                    onToggleDone = { viewModel.toggleDone(reminder) },
-                                    onDelete = { requestDelete(reminder) },
-                                )
-                            }
-                            if (index != active.lastIndex) CardDivider(startIndent = 60.dp)
-                        }
+                    Box(
+                        modifier = Modifier
+                            .fillParentMaxHeight(0.6f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        EmptyState(
+                            icon = Icons.Filled.PinDrop,
+                            title = "Zatím žádné připomínky",
+                            text = "Ťukni na + a vytvoř první připomínku na místo nebo na čas.",
+                        )
                     }
                 }
-                item { Spacer(Modifier.height(28.dp)) }
-            }
-            if (done.isNotEmpty()) {
-                item { SectionHeader("Hotové") }
+            } else if (active.isEmpty() && done.isEmpty() && searchQuery.isNotBlank()) {
                 item {
-                    InsetCard {
-                        done.forEachIndexed { index, reminder ->
-                            key(reminder.id) {
-                                SwipeReminderRow(
-                                    reminder = reminder,
-                                    distance = viewModel.distanceText(reminder),
-                                    onTap = { editingReminder = reminder },
-                                    onLongTap = { longPressedReminder = reminder },
-                                    onToggleDone = { viewModel.toggleDone(reminder) },
-                                    onDelete = { requestDelete(reminder) },
-                                )
+                    Box(
+                        modifier = Modifier
+                            .fillParentMaxHeight(0.5f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        EmptyState(
+                            icon = Icons.Filled.Search,
+                            title = stringResource(R.string.search_empty_title),
+                            text = stringResource(R.string.search_empty_text, searchQuery),
+                        )
+                    }
+                }
+            } else {
+                if (active.isNotEmpty()) {
+                    item { SectionHeader("Aktivní") }
+                    item {
+                        InsetCard {
+                            active.forEachIndexed { index, reminder ->
+                                key(reminder.id) {
+                                    SwipeReminderRow(
+                                        reminder = reminder,
+                                        distance = viewModel.distanceText(reminder),
+                                        onTap = { editingReminder = reminder },
+                                        onLongTap = { longPressedReminder = reminder },
+                                        onToggleDone = { viewModel.toggleDone(reminder) },
+                                        onDelete = { requestDelete(reminder) },
+                                    )
+                                }
+                                if (index != active.lastIndex) CardDivider(startIndent = 60.dp)
                             }
-                            if (index != done.lastIndex) CardDivider(startIndent = 60.dp)
+                        }
+                    }
+                    item { Spacer(Modifier.height(28.dp)) }
+                }
+                if (done.isNotEmpty()) {
+                    item { SectionHeader("Hotové") }
+                    item {
+                        InsetCard {
+                            done.forEachIndexed { index, reminder ->
+                                key(reminder.id) {
+                                    SwipeReminderRow(
+                                        reminder = reminder,
+                                        distance = viewModel.distanceText(reminder),
+                                        onTap = { editingReminder = reminder },
+                                        onLongTap = { longPressedReminder = reminder },
+                                        onToggleDone = { viewModel.toggleDone(reminder) },
+                                        onDelete = { requestDelete(reminder) },
+                                    )
+                                }
+                                if (index != done.lastIndex) CardDivider(startIndent = 60.dp)
+                            }
                         }
                     }
                 }
             }
         }
-    }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -453,7 +445,6 @@ fun ReminderListScreen(
         )
     }
 
-    // Formulář (nová / úprava)
     if (showNewSheet || editingReminder != null) {
         ModalBottomSheet(
             onDismissRequest = {
@@ -467,8 +458,6 @@ fun ReminderListScreen(
             shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
             dragHandle = null,
         ) {
-            // key() zajistí čerstvý formulář, když se změní cíl (úprava vs. nová,
-            // nebo přijde sdílené místo, zatímco je formulář otevřený)
             key(editingReminder?.id ?: "new", sharedPrefill) {
                 EditReminderSheet(
                     existing = editingReminder,
@@ -486,7 +475,6 @@ fun ReminderListScreen(
         }
     }
 
-    // Oblíbená místa
     if (showFavorites) {
         ModalBottomSheet(
             onDismissRequest = { showFavorites = false },
@@ -499,7 +487,6 @@ fun ReminderListScreen(
         }
     }
 
-    // Nastavení (vzhled & zálohy)
     if (showSettings) {
         ModalBottomSheet(
             onDismissRequest = { showSettings = false },
@@ -512,7 +499,6 @@ fun ReminderListScreen(
         }
     }
 
-    // Import z Google Kalendáře
     if (showCalendarImport) {
         ModalBottomSheet(
             onDismissRequest = { showCalendarImport = false },
@@ -525,7 +511,6 @@ fun ReminderListScreen(
         }
     }
 
-    // Kontextová nabídka rychlých akcí po dlouhém stisku
     if (longPressedReminder != null) {
         val target = longPressedReminder!!
         ModalBottomSheet(
@@ -539,11 +524,8 @@ fun ReminderListScreen(
                 onClose = { longPressedReminder = null },
                 onEdit = { editingReminder = target },
                 onSnoozeTomorrow = {
-                    val updated = target.copy(
-                        dueDate = nextMorningMillis(),
-                        isDone = false,
-                    )
-                    store.update(updated)
+                    store.snoozeAt(target, nextMorningMillis())
+                    NotificationHelper.cancel(context, target.id)
                 },
                 onNavigate = if (target.kind == ReminderKind.LOCATION) {
                     {
@@ -576,7 +558,6 @@ fun ReminderListScreen(
     }
 }
 
-/** Kontextová nabídka akcí pro vybranou připomínku po dlouhém stisknutí. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReminderActionSheet(
@@ -603,7 +584,6 @@ private fun ReminderActionSheet(
 
         SectionHeader("Rychlé akce", Modifier.padding(top = 8.dp))
         InsetCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-            // 1. Odložit na zítra ráno
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -619,7 +599,6 @@ private fun ReminderActionSheet(
                 Text("Odložit na zítra ráno (8:00)", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
-            // 2. Navigovat (pokud je připomínka na místo)
             if (reminder.kind == ReminderKind.LOCATION && onNavigate != null) {
                 CardDivider()
                 Row(
@@ -638,7 +617,6 @@ private fun ReminderActionSheet(
                 }
             }
 
-            // 3. Sdílet
             CardDivider()
             Row(
                 modifier = Modifier
@@ -655,7 +633,6 @@ private fun ReminderActionSheet(
                 Text("Sdílet připomínku", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
-            // 4. Upravit
             CardDivider()
             Row(
                 modifier = Modifier
@@ -672,7 +649,6 @@ private fun ReminderActionSheet(
                 Text("Upravit připomínku", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
-            // 5. Smazat
             CardDivider()
             Row(
                 modifier = Modifier
@@ -691,4 +667,3 @@ private fun ReminderActionSheet(
         }
     }
 }
-
