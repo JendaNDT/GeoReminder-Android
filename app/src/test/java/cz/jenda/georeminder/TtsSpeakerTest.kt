@@ -28,12 +28,21 @@ class TtsSpeakerTest {
     }
 
     @Test
-    fun `system zachova skutecny systemovy locale`() {
-        val system = Locale.GERMANY
+    fun `system s anglickym telefonem pouzije anglictinu`() {
         val locale = TtsSpeaker.resolvePreferredLocale(
             LanguageController.LANG_SYSTEM,
-            system,
+            Locale.UK,
         )
-        assertEquals(system, locale)
+        assertEquals(Locale.US, locale)
+    }
+
+    @Test
+    fun `system s nepodporovanym jazykem pouzije cesky fallback`() {
+        val locale = TtsSpeaker.resolvePreferredLocale(
+            LanguageController.LANG_SYSTEM,
+            Locale.GERMANY,
+        )
+        assertEquals("cs", locale.language)
+        assertEquals("CZ", locale.country)
     }
 }
