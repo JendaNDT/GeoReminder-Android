@@ -35,7 +35,6 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import cz.jenda.georeminder.R
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
+import cz.jenda.georeminder.model.ReminderText
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
 import cz.jenda.georeminder.notify.GeofenceRegistrationState
@@ -99,7 +99,12 @@ fun QuickActionSheet(
             ) {
                 Icon(Icons.Filled.Schedule, null, tint = colors.orange, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.action_snooze_tomorrow), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.action_snooze_tomorrow),
+                    style = GeoType.body,
+                    color = colors.label,
+                    modifier = Modifier.weight(1f),
+                )
             }
 
             if (reminder.kind == ReminderKind.LOCATION && onNavigate != null) {
@@ -114,9 +119,19 @@ fun QuickActionSheet(
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.DirectionsWalk, null, tint = colors.accent, modifier = Modifier.size(20.dp))
+                    Icon(
+                        Icons.AutoMirrored.Filled.DirectionsWalk,
+                        null,
+                        tint = colors.accent,
+                        modifier = Modifier.size(20.dp),
+                    )
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.action_navigate), style = GeoType.body, color = colors.accent, modifier = Modifier.weight(1f))
+                    Text(
+                        stringResource(R.string.action_navigate),
+                        style = GeoType.body,
+                        color = colors.accent,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
 
@@ -133,7 +148,12 @@ fun QuickActionSheet(
             ) {
                 Icon(Icons.Filled.Share, null, tint = colors.purple, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.action_share), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.action_share),
+                    style = GeoType.body,
+                    color = colors.label,
+                    modifier = Modifier.weight(1f),
+                )
             }
 
             CardDivider()
@@ -149,7 +169,12 @@ fun QuickActionSheet(
             ) {
                 Icon(Icons.Filled.Edit, null, tint = colors.label, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.action_edit), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.action_edit),
+                    style = GeoType.body,
+                    color = colors.label,
+                    modifier = Modifier.weight(1f),
+                )
             }
 
             CardDivider()
@@ -165,7 +190,12 @@ fun QuickActionSheet(
             ) {
                 Icon(Icons.Filled.Delete, null, tint = colors.red, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.action_delete), style = GeoType.body, color = colors.red, modifier = Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.action_delete),
+                    style = GeoType.body,
+                    color = colors.red,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -183,42 +213,41 @@ fun nextMorningMillis(): Long {
 }
 
 @Composable
-fun rememberCategoryStyle(reminder: Reminder): Triple<ImageVector, Color, String?> {
+fun categoryStyle(reminder: Reminder): Triple<ImageVector, Color, String?> {
     val colors = GeoTheme.colors
-    return remember(reminder, colors) {
-        val isRepeating = reminder.repeats || reminder.timeRepeat != TimeRepeat.NEVER || !reminder.weekdays.isNullOrEmpty()
-        when {
-            reminder.isDone -> Triple(
-                when {
-                    isRepeating -> Icons.Filled.Autorenew
-                    reminder.kind == ReminderKind.TIME -> Icons.Filled.Schedule
-                    reminder.trigger == TriggerType.LEAVE -> Icons.AutoMirrored.Filled.DirectionsWalk
-                    else -> Icons.Filled.LocationOn
-                },
-                colors.secondaryLabel,
-                "hotovo"
-            )
-            isRepeating -> Triple(
-                Icons.Filled.Autorenew,
-                colors.purple,
-                if (!reminder.weekdays.isNullOrEmpty()) "Po–Pá" else "opakuje"
-            )
-            reminder.kind == ReminderKind.TIME -> Triple(
-                Icons.Filled.Schedule,
-                colors.orange,
-                null
-            )
-            reminder.trigger == TriggerType.LEAVE -> Triple(
-                Icons.AutoMirrored.Filled.DirectionsWalk,
-                colors.teal,
-                "odjezd"
-            )
-            else -> Triple(
-                Icons.Filled.LocationOn,
-                colors.accent,
-                null
-            )
-        }
+    val isRepeating = reminder.repeats || reminder.timeRepeat != TimeRepeat.NEVER ||
+        !reminder.weekdays.isNullOrEmpty()
+    return when {
+        reminder.isDone -> Triple(
+            when {
+                isRepeating -> Icons.Filled.Autorenew
+                reminder.kind == ReminderKind.TIME -> Icons.Filled.Schedule
+                reminder.trigger == TriggerType.LEAVE -> Icons.AutoMirrored.Filled.DirectionsWalk
+                else -> Icons.Filled.LocationOn
+            },
+            colors.secondaryLabel,
+            stringResource(R.string.badge_done),
+        )
+        isRepeating -> Triple(
+            Icons.Filled.Autorenew,
+            colors.purple,
+            stringResource(R.string.badge_repeats),
+        )
+        reminder.kind == ReminderKind.TIME -> Triple(
+            Icons.Filled.Schedule,
+            colors.orange,
+            null,
+        )
+        reminder.trigger == TriggerType.LEAVE -> Triple(
+            Icons.AutoMirrored.Filled.DirectionsWalk,
+            colors.teal,
+            stringResource(R.string.badge_leave),
+        )
+        else -> Triple(
+            Icons.Filled.LocationOn,
+            colors.accent,
+            null,
+        )
     }
 }
 
@@ -234,6 +263,13 @@ fun SwipeReminderRow(
     onDelete: () -> Unit,
 ) {
     val colors = GeoTheme.colors
+    val doneAction = if (reminder.isDone) {
+        stringResource(R.string.action_undo)
+    } else {
+        stringResource(R.string.action_done)
+    }
+    val deleteAction = stringResource(R.string.action_delete)
+
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
@@ -269,11 +305,7 @@ fun SwipeReminderRow(
                             tint = Color.White,
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = if (reminder.isDone) "Vrátit" else "Hotovo",
-                            style = GeoType.footnoteBold,
-                            color = Color.White,
-                        )
+                        Text(doneAction, style = GeoType.footnoteBold, color = Color.White)
                     }
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
@@ -287,10 +319,10 @@ fun SwipeReminderRow(
                     ) {
                         Icon(Icons.Filled.Delete, null, tint = Color.White)
                         Spacer(Modifier.width(6.dp))
-                        Text("Smazat", style = GeoType.footnoteBold, color = Color.White)
+                        Text(deleteAction, style = GeoType.footnoteBold, color = Color.White)
                     }
                 }
-                else -> {}
+                else -> Unit
             }
         },
     ) {
@@ -302,10 +334,8 @@ fun SwipeReminderRow(
             onLongTap = onLongTap,
             modifier = Modifier.semantics {
                 customActions = listOf(
-                    CustomAccessibilityAction(
-                        if (reminder.isDone) "Vrátit" else "Hotovo"
-                    ) { onToggleDone(); true },
-                    CustomAccessibilityAction("Smazat") { onDelete(); true },
+                    CustomAccessibilityAction(doneAction) { onToggleDone(); true },
+                    CustomAccessibilityAction(deleteAction) { onDelete(); true },
                 )
             },
         )
@@ -327,20 +357,25 @@ fun ReminderRow(
     val context = LocalContext.current
     val liveGeofenceStates by ReminderScheduler.get(context).geofenceStates.collectAsState()
     val effectiveGeofenceState = geofenceState ?: liveGeofenceStates[reminder.id]
-    val (icon, categoryColor, defaultBadge) = rememberCategoryStyle(reminder)
+    val (icon, categoryColor, defaultBadge) = categoryStyle(reminder)
     val chipText = distance ?: defaultBadge
     val geofenceStatusText = if (reminder.kind == ReminderKind.LOCATION && !reminder.isDone) {
         when (effectiveGeofenceState?.status) {
-            GeofenceRegistrationStatus.FAILED_PERMISSION -> "Hlídání neaktivní: chybí poloha „Vždy“"
-            GeofenceRegistrationStatus.FAILED_LOCATION_DISABLED -> "Hlídání neaktivní: poloha v telefonu je vypnutá"
-            GeofenceRegistrationStatus.FAILED_TOO_MANY -> "Hlídání neaktivní: limit 100 míst"
-            GeofenceRegistrationStatus.FAILED_SERVICE -> "Hlídání místa se nepodařilo aktivovat"
-            GeofenceRegistrationStatus.FAILED_INVALID_REGION -> "Hlídání neaktivní: neplatná oblast"
-            GeofenceRegistrationStatus.SNOOZED -> "Odloženo"
-            GeofenceRegistrationStatus.FIRED -> "Již spuštěno – jednorázové hlídání je vypnuté"
+            GeofenceRegistrationStatus.FAILED_PERMISSION -> stringResource(R.string.geofence_missing_background)
+            GeofenceRegistrationStatus.FAILED_LOCATION_DISABLED -> stringResource(R.string.geofence_location_disabled)
+            GeofenceRegistrationStatus.FAILED_TOO_MANY -> stringResource(R.string.geofence_limit)
+            GeofenceRegistrationStatus.FAILED_SERVICE -> stringResource(R.string.geofence_service_failed)
+            GeofenceRegistrationStatus.FAILED_INVALID_REGION -> stringResource(R.string.geofence_invalid_region)
+            GeofenceRegistrationStatus.SNOOZED -> stringResource(R.string.geofence_snoozed)
+            GeofenceRegistrationStatus.FIRED -> stringResource(R.string.geofence_fired)
             GeofenceRegistrationStatus.ACTIVE, null -> null
         }
     } else null
+    val reminderDescription = when {
+        reminder.isDone -> stringResource(R.string.a11y_completed_reminder)
+        reminder.kind == ReminderKind.LOCATION -> stringResource(R.string.a11y_location_reminder)
+        else -> stringResource(R.string.a11y_time_reminder)
+    }
 
     Row(
         modifier = modifier
@@ -361,7 +396,11 @@ fun ReminderRow(
             modifier = Modifier
                 .size(36.dp)
                 .background(
-                    color = if (reminder.isDone) colors.secondaryLabel.copy(alpha = 0.12f) else categoryColor.copy(alpha = 0.15f),
+                    color = if (reminder.isDone) {
+                        colors.secondaryLabel.copy(alpha = 0.12f)
+                    } else {
+                        categoryColor.copy(alpha = 0.15f)
+                    },
                     shape = RoundedCornerShape(11.dp),
                 )
                 .border(
@@ -373,7 +412,7 @@ fun ReminderRow(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = if (reminder.isDone) "Dokončená připomínka" else "Připomínka ${if (reminder.kind == ReminderKind.LOCATION) "na místo" else "na čas"}",
+                contentDescription = reminderDescription,
                 tint = if (reminder.isDone) colors.secondaryLabel else categoryColor,
                 modifier = Modifier.size(20.dp),
             )
@@ -400,7 +439,7 @@ fun ReminderRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = reminder.subtitle,
+                text = ReminderText.subtitle(context, reminder),
                 style = GeoType.caption,
                 color = colors.secondaryLabel,
                 maxLines = 1,
@@ -410,7 +449,11 @@ fun ReminderRow(
                 Text(
                     text = geofenceStatusText,
                     style = GeoType.caption2,
-                    color = if (effectiveGeofenceState?.status?.isFailure == true) colors.orange else colors.secondaryLabel,
+                    color = if (effectiveGeofenceState?.status?.isFailure == true) {
+                        colors.orange
+                    } else {
+                        colors.secondaryLabel
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -421,7 +464,11 @@ fun ReminderRow(
             Box(
                 modifier = Modifier
                     .background(
-                        color = if (reminder.isDone) colors.secondaryLabel.copy(alpha = 0.10f) else categoryColor.copy(alpha = 0.12f),
+                        color = if (reminder.isDone) {
+                            colors.secondaryLabel.copy(alpha = 0.10f)
+                        } else {
+                            categoryColor.copy(alpha = 0.12f)
+                        },
                         shape = RoundedCornerShape(999.dp),
                     )
                     .padding(horizontal = 10.dp, vertical = 4.dp),
