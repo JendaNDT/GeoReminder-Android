@@ -33,8 +33,12 @@ class ReminderScheduler(context: Context) {
     private val alarms = appContext.getSystemService(AlarmManager::class.java)
     private val stateStore = SchedulerStateStore(appContext)
 
-    private val resyncLock = Any()
-    private var resyncGeneration = 0L
+    // Hromadný geofence resync musí být sekvenční. Dvě překrývající se operace
+    // remove→add by se jinak mohly dokončit v opačném pořadí a starší remove by
+    // smazal novější registraci.
+    private val geofenceResyncLock = Any()
+    private var geofenceResyncRunning = false
+    private var pendingGeofenceSnapshot: List<Reminder>? = null
 
     companion object {
         const val ACTION_ALARM_FIRE = "cz.jenda.georeminder.ALARM_FIRE"
@@ -192,11 +196,8 @@ class ReminderScheduler(context: Context) {
 
     /**
      * Znovu nastaví celý systémový stav podle seznamu reminderů.
-     *
-     * AlarmManager je idempotentní díky stabilním PendingIntentům. U geofence
-     * nejdřív odstraníme všechny geofence patřící našemu sdílenému PendingIntentu
-     * a až po dokončení odstranění přidáme aktuální snapshot. Generační číslo
-     * zabrání tomu, aby starší paralelní resync přepsal novější stav.
+     * AlarmManager je idempotentní díky stabilním PendingIntentům. Geofence
+     * snapshoty jdou přes sériovou remove→batch-add frontu.
      */
     fun resync(all: List<Reminder>) {
         all.forEach {
@@ -207,31 +208,10 @@ class ReminderScheduler(context: Context) {
         LocationHolder.geofenceFailed.value = false
         val active = all.filter { !it.isDone }
 
-        // Časové remindery lze bezpečně přeplánovat hned: stejný PendingIntent
-        // nahradí předchozí alarm místo vytvoření duplicity.
         active.filter { it.kind == ReminderKind.TIME }.forEach { scheduleAlarm(it) }
         restoreSnoozes(active)
 
-        val locationSnapshot = active.filter { it.kind == ReminderKind.LOCATION }
-        val generation = synchronized(resyncLock) {
-            resyncGeneration += 1
-            resyncGeneration
-        }
-
-        try {
-            geofencing.removeGeofences(geofencePendingIntent())
-                .addOnCompleteListener {
-                    val stillLatest = synchronized(resyncLock) { generation == resyncGeneration }
-                    if (!stillLatest) return@addOnCompleteListener
-                    locationSnapshot.forEach { addGeofence(it) }
-                }
-        } catch (e: Exception) {
-            Log.w("ReminderScheduler", "Hromadný reset geofence selhal", e)
-            val stillLatest = synchronized(resyncLock) { generation == resyncGeneration }
-            if (stillLatest) {
-                locationSnapshot.forEach { addGeofence(it) }
-            }
-        }
+        queueGeofenceResync(active.filter { it.kind == ReminderKind.LOCATION })
     }
 
     /** Obnoví snooze po restartu telefonu. */
@@ -254,6 +234,94 @@ class ReminderScheduler(context: Context) {
         }
     }
 
+    // MARK: - Sekvenční geofence resync
+
+    private fun queueGeofenceResync(snapshot: List<Reminder>) {
+        var startNow = false
+        synchronized(geofenceResyncLock) {
+            pendingGeofenceSnapshot = snapshot
+            if (!geofenceResyncRunning) {
+                geofenceResyncRunning = true
+                startNow = true
+            }
+        }
+        if (startNow) runNextGeofenceResync()
+    }
+
+    private fun runNextGeofenceResync() {
+        val snapshot = synchronized(geofenceResyncLock) {
+            val latest = pendingGeofenceSnapshot ?: emptyList()
+            pendingGeofenceSnapshot = null
+            latest
+        }
+
+        try {
+            geofencing.removeGeofences(geofencePendingIntent())
+                .addOnCompleteListener {
+                    addGeofencesBatch(snapshot) {
+                        finishGeofenceResyncPass()
+                    }
+                }
+        } catch (e: Exception) {
+            Log.w("ReminderScheduler", "Hromadný reset geofence selhal", e)
+            addGeofencesBatch(snapshot) {
+                finishGeofenceResyncPass()
+            }
+        }
+    }
+
+    private fun finishGeofenceResyncPass() {
+        val runAgain = synchronized(geofenceResyncLock) {
+            if (pendingGeofenceSnapshot != null) {
+                true
+            } else {
+                geofenceResyncRunning = false
+                false
+            }
+        }
+        if (runAgain) runNextGeofenceResync()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun addGeofencesBatch(reminders: List<Reminder>, onComplete: () -> Unit) {
+        val eligible = reminders.filter { reminder ->
+            reminder.repeats || !stateStore.isFired(reminder.id)
+        }
+
+        if (eligible.isEmpty()) {
+            onComplete()
+            return
+        }
+        if (!LocationHolder.hasFineLocation(appContext)) {
+            LocationHolder.geofenceFailed.value = true
+            onComplete()
+            return
+        }
+
+        val geofences = eligible.map { buildGeofence(it) }
+        val request = GeofencingRequest.Builder()
+            .setInitialTrigger(0)
+            .addGeofences(geofences)
+            .build()
+
+        try {
+            geofencing.addGeofences(request, geofencePendingIntent())
+                .addOnFailureListener { e ->
+                    Log.w("ReminderScheduler", "Hromadná registrace geofence selhala", e)
+                    LocationHolder.geofenceFailed.value = true
+                }
+                .addOnCompleteListener { onComplete() }
+        } catch (e: SecurityException) {
+            Log.w("ReminderScheduler", "Hromadná registrace geofence bez oprávnění", e)
+            LocationHolder.geofenceFailed.value = true
+            onComplete()
+        } catch (e: Exception) {
+            Log.w("ReminderScheduler", "Hromadná registrace geofence selhala", e)
+            LocationHolder.geofenceFailed.value = true
+            onComplete()
+        }
+    }
+
     // MARK: - Geofence
 
     @SuppressLint("MissingPermission")
@@ -261,26 +329,9 @@ class ReminderScheduler(context: Context) {
         if (!LocationHolder.hasFineLocation(appContext)) return
         if (!reminder.repeats && stateStore.isFired(reminder.id)) return
 
-        val transition = if (reminder.trigger == TriggerType.ARRIVE) {
-            Geofence.GEOFENCE_TRANSITION_ENTER
-        } else {
-            Geofence.GEOFENCE_TRANSITION_EXIT
-        }
-
-        val geofence = Geofence.Builder()
-            .setRequestId(reminder.id)
-            .setCircularRegion(
-                reminder.latitude,
-                reminder.longitude,
-                reminder.radius.toFloat(),
-            )
-            .setExpirationDuration(Geofence.NEVER_EXPIRE)
-            .setTransitionTypes(transition)
-            .build()
-
         val request = GeofencingRequest.Builder()
             .setInitialTrigger(0)
-            .addGeofence(geofence)
+            .addGeofence(buildGeofence(reminder))
             .build()
 
         try {
@@ -293,6 +344,24 @@ class ReminderScheduler(context: Context) {
         } catch (_: SecurityException) {
             LocationHolder.geofenceFailed.value = true
         }
+    }
+
+    private fun buildGeofence(reminder: Reminder): Geofence {
+        val transition = if (reminder.trigger == TriggerType.ARRIVE) {
+            Geofence.GEOFENCE_TRANSITION_ENTER
+        } else {
+            Geofence.GEOFENCE_TRANSITION_EXIT
+        }
+        return Geofence.Builder()
+            .setRequestId(reminder.id)
+            .setCircularRegion(
+                reminder.latitude,
+                reminder.longitude,
+                reminder.radius.toFloat(),
+            )
+            .setExpirationDuration(Geofence.NEVER_EXPIRE)
+            .setTransitionTypes(transition)
+            .build()
     }
 
     private fun geofencePendingIntent(): PendingIntent {
