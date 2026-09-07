@@ -6,7 +6,8 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.test.InstrumentationTestCase
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.data.SystemAccess
@@ -16,18 +17,28 @@ import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.notify.AlarmReceiver
 import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.notify.SchedulerStateStore
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
 
-@Suppress("DEPRECATION")
-class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
+@RunWith(AndroidJUnit4::class)
+class PermissionsAndSnoozeInstrumentationTest {
 
+    private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
 
-    override fun setUp() {
-        super.setUp()
+    @Before
+    fun setUp() {
         context.getSharedPreferences(SharedStorage.PREFS, 0).edit().clear().commit()
     }
 
-    fun testFineLocationGrantAndRevokeAreReflected() {
+    @Test
+    fun fineLocationGrantAndRevokeAreReflected() {
         setRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION, granted = true)
         assertTrue(LocationHolder.hasFineLocation(context))
 
@@ -35,7 +46,8 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
         assertFalse(LocationHolder.hasFineLocation(context))
     }
 
-    fun testBackgroundLocationGrantAndRevokeAreReflected() {
+    @Test
+    fun backgroundLocationGrantAndRevokeAreReflected() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
 
         setRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION, granted = true)
@@ -46,7 +58,8 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
         assertFalse(LocationHolder.hasBackgroundLocation(context))
     }
 
-    fun testNotificationPermissionGrantAndRevokeAreReflected() {
+    @Test
+    fun notificationPermissionGrantAndRevokeAreReflected() {
         if (Build.VERSION.SDK_INT < 33) return
 
         setRuntimePermission(Manifest.permission.POST_NOTIFICATIONS, granted = true)
@@ -62,7 +75,8 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
         )
     }
 
-    fun testExactAlarmCapabilityMatchesPlatformAlarmManager() {
+    @Test
+    fun exactAlarmCapabilityMatchesPlatformAlarmManager() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             assertTrue(SystemAccess.canScheduleExactAlarms(context))
             return
@@ -71,7 +85,8 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
         assertEquals(alarmManager.canScheduleExactAlarms(), SystemAccess.canScheduleExactAlarms(context))
     }
 
-    fun testTimeSnoozeCancelsOriginalAlarmAndPersistsSnooze() {
+    @Test
+    fun timeSnoozeCancelsOriginalAlarmAndPersistsSnooze() {
         val reminder = Reminder(
             id = "snooze-time",
             title = "Snooze test",
