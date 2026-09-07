@@ -132,8 +132,8 @@ class ReminderScheduler(context: Context) {
 
     fun cancel(reminderId: String) {
         geofencing.removeGeofences(listOf(reminderId))
-        alarms.cancel(alarmPendingIntent(reminderId, snooze = false))
-        alarms.cancel(alarmPendingIntent(reminderId, snooze = true))
+        cancelPendingIntent(alarmPendingIntent(reminderId, snooze = false))
+        cancelPendingIntent(alarmPendingIntent(reminderId, snooze = true))
         cancelNag(reminderId)
         cancelLegacyPendingIntents(reminderId)
         NotificationHelper.cancel(appContext, reminderId)
@@ -150,7 +150,7 @@ class ReminderScheduler(context: Context) {
     }
 
     fun cancelNag(reminderId: String) {
-        alarms.cancel(nagPendingIntent(reminderId))
+        cancelPendingIntent(nagPendingIntent(reminderId))
     }
 
     private fun nagPendingIntent(reminderId: String): PendingIntent =
@@ -185,7 +185,7 @@ class ReminderScheduler(context: Context) {
     fun snoozeAt(reminder: Reminder, atMillis: Long) {
         val target = atMillis.coerceAtLeast(System.currentTimeMillis() + 1_000L)
         cancelNag(reminder.id)
-        alarms.cancel(alarmPendingIntent(reminder.id, snooze = true))
+        cancelPendingIntent(alarmPendingIntent(reminder.id, snooze = true))
         stateStore.setSnooze(reminder.id, target)
         if (reminder.kind == ReminderKind.LOCATION) {
             setGeofenceState(reminder.id, GeofenceRegistrationStatus.SNOOZED)
@@ -315,8 +315,13 @@ class ReminderScheduler(context: Context) {
     private fun cancelOriginalTrigger(reminder: Reminder) {
         when (reminder.kind) {
             ReminderKind.LOCATION -> geofencing.removeGeofences(listOf(reminder.id))
-            ReminderKind.TIME -> alarms.cancel(alarmPendingIntent(reminder.id, snooze = false))
+            ReminderKind.TIME -> cancelPendingIntent(alarmPendingIntent(reminder.id, snooze = false))
         }
+    }
+
+    private fun cancelPendingIntent(pendingIntent: PendingIntent) {
+        alarms.cancel(pendingIntent)
+        pendingIntent.cancel()
     }
 
     private fun queueGeofenceResync(snapshot: List<Reminder>) {
@@ -549,7 +554,7 @@ class ReminderScheduler(context: Context) {
         if (snoozeUntil != null && snoozeUntil > now) return
 
         if (reminder.timeRepeat == TimeRepeat.NEVER && stateStore.isFired(reminder.id)) {
-            alarms.cancel(alarmPendingIntent(reminder.id, snooze = false))
+            cancelPendingIntent(alarmPendingIntent(reminder.id, snooze = false))
             return
         }
 
@@ -558,7 +563,7 @@ class ReminderScheduler(context: Context) {
                 if (due <= now) {
                     NotificationHelper.show(appContext, reminder)
                     stateStore.markFired(reminder.id)
-                    alarms.cancel(alarmPendingIntent(reminder.id, snooze = false))
+                    cancelPendingIntent(alarmPendingIntent(reminder.id, snooze = false))
                     return
                 }
                 due
@@ -596,9 +601,9 @@ class ReminderScheduler(context: Context) {
     }
 
     private fun cancelLegacyPendingIntents(reminderId: String) {
-        alarms.cancel(legacyAlarmPendingIntent(reminderId, snooze = false))
-        alarms.cancel(legacyAlarmPendingIntent(reminderId, snooze = true))
-        alarms.cancel(legacyNagPendingIntent(reminderId))
+        cancelPendingIntent(legacyAlarmPendingIntent(reminderId, snooze = false))
+        cancelPendingIntent(legacyAlarmPendingIntent(reminderId, snooze = true))
+        cancelPendingIntent(legacyNagPendingIntent(reminderId))
     }
 
     private fun legacyAlarmPendingIntent(reminderId: String, snooze: Boolean): PendingIntent {
