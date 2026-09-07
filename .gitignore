@@ -11,8 +11,9 @@ local.properties
 # Tajnosti – NEPATŘÍ do gitu (žijí v lokální kopii projektu / zipu):
 # Google Maps klíč
 mapskey.properties
-# podpisový keystore (jen s ním jdou aktualizace instalovat přes starou verzi)
+# podpisový keystore a jeho přihlašovací údaje
 app/georeminder.keystore
+app/keystore.properties
 
 # IDE a systémové soubory
 .idea/
