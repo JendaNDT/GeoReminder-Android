@@ -143,6 +143,7 @@ class DiagnosticStore private constructor(context: Context) {
         val schedulerState = SchedulerStateStore(appContext)
         val geofenceStates = schedulerState.geofenceStates.value
         val snoozes = schedulerState.allSnoozes().filterValues { it > now }
+        val recentEvents = events().sortedByDescending { it.timestamp }
 
         val activeGeo = active.count { it.kind == ReminderKind.LOCATION }
         val activeTime = active.filter { it.kind == ReminderKind.TIME }
@@ -160,13 +161,9 @@ class DiagnosticStore private constructor(context: Context) {
             .minOrNull()
 
         val failedStates = geofenceStates.values.filter { it.status.isFailure }
-        val latestFailure = failedStates.maxByOrNull { it.updatedAt }
-        val lastFailure = latestFailure?.let { state ->
-            buildString {
-                append(state.status.name)
-                state.errorCode?.let { append(" (").append(it).append(')') }
-            }
-        }
+        val lastFailure = recentEvents
+            .firstOrNull { it.type == DiagnosticEventType.GEOFENCE_REGISTER_FAIL }
+            ?.detail
 
         val powerManager = appContext.getSystemService(PowerManager::class.java)
         val batteryUnrestricted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -194,7 +191,7 @@ class DiagnosticStore private constructor(context: Context) {
             lastSuccessfulResync = prefs.getLong(KEY_LAST_RESYNC, 0L).takeIf { it > 0L },
             lastRegistrationError = lastFailure,
             dataIntegrityState = reminderStore.dataIntegrityState.value,
-            recentEvents = events().sortedByDescending { it.timestamp },
+            recentEvents = recentEvents,
         )
     }
 
