@@ -20,23 +20,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 
-/**
- * Oranžový banner zobrazený, když uživatel odmítl oprávnění.
- * Tlačítko vede přímo do systémového nastavení appky.
- */
+/** Oranžový banner pro chybějící oprávnění nebo systémový přístup. */
 @Composable
 fun PermissionBanner(
     icon: ImageVector,
     message: String,
     modifier: Modifier = Modifier,
-    actionLabel: String = "Nastavení",
+    actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val resolvedActionLabel = actionLabel ?: stringResource(R.string.action_open_settings)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -62,7 +62,7 @@ fun PermissionBanner(
                 .padding(horizontal = 10.dp),
         )
         Text(
-            text = actionLabel,
+            text = resolvedActionLabel,
             style = GeoType.footnoteBold,
             color = bannerTextColor,
             modifier = Modifier
