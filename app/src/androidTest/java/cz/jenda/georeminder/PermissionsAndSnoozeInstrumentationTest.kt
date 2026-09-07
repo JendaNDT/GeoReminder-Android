@@ -109,6 +109,28 @@ class PermissionsAndSnoozeInstrumentationTest {
         scheduler.cancel(reminder.id)
     }
 
+    @Test
+    fun test06PersistedSnoozeIsRestoredByResyncWithoutOriginalAlarm() {
+        val reminder = Reminder(
+            id = "snooze-restore",
+            title = "Restore snooze",
+            kind = ReminderKind.TIME,
+            dueDate = System.currentTimeMillis() + 3_600_000L,
+            timeRepeat = TimeRepeat.DAILY,
+        )
+        val state = SchedulerStateStore(context)
+        val target = System.currentTimeMillis() + 180_000L
+        state.setSnooze(reminder.id, target)
+
+        ReminderScheduler.get(context).resync(listOf(reminder))
+
+        assertEquals(target, SchedulerStateStore(context).snoozeUntil(reminder.id))
+        assertNull(normalAlarmPendingIntent(reminder.id, state))
+        assertNotNull(snoozePendingIntent(reminder.id, state))
+
+        ReminderScheduler.get(context).cancel(reminder.id)
+    }
+
     private fun grantRuntimePermission(permission: String) {
         instrumentation.uiAutomation
             .executeShellCommand("pm grant ${context.packageName} $permission")
