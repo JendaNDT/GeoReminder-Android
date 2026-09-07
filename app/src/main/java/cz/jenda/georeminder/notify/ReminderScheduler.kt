@@ -56,7 +56,6 @@ class ReminderScheduler(context: Context) {
                 instance ?: ReminderScheduler(context.applicationContext).also { instance = it }
             }
 
-        /** Nejbližší budoucí výskyt stejné hodiny a minuty (denní opakování). */
         fun nextDaily(dueMillis: Long, now: Long = System.currentTimeMillis()): Long {
             val due = Calendar.getInstance().apply { timeInMillis = dueMillis }
             val next = Calendar.getInstance().apply {
@@ -70,17 +69,12 @@ class ReminderScheduler(context: Context) {
             return next.timeInMillis
         }
 
-        /** Den v týdnu v ISO formátu: 1 = pondělí … 7 = neděle. */
         fun isoWeekday(millis: Long): Int {
             val dow = Calendar.getInstance().apply { timeInMillis = millis }
                 .get(Calendar.DAY_OF_WEEK)
             return ((dow + 5) % 7) + 1
         }
 
-        /**
-         * Nejbližší budoucí výskyt v některém z vybraných dnů týdne (hodina a
-         * minuta podle dueMillis). Bez vybraných dnů se použije den z dueMillis.
-         */
         fun nextWeekly(
             dueMillis: Long,
             weekdays: List<Int>?,
@@ -106,15 +100,9 @@ class ReminderScheduler(context: Context) {
         }
     }
 
-    // MARK: - Veřejné API
-
     fun schedule(reminder: Reminder) {
         if (reminder.isDone) return
-
-        // Po upgradu z původní verze mohou v AlarmManageru ještě žít PendingIntenty
-        // založené na String.hashCode(). Před prvním novým plánováním je zrušíme.
         cancelLegacyPendingIntents(reminder.id)
-
         when (reminder.kind) {
             ReminderKind.LOCATION -> addGeofence(reminder)
             ReminderKind.TIME -> scheduleAlarm(reminder)
@@ -131,8 +119,6 @@ class ReminderScheduler(context: Context) {
         stateStore.clearFired(reminderId)
         stateStore.clearSnooze(reminderId)
     }
-
-    // MARK: - Dožadování
 
     fun scheduleNag(reminder: Reminder) {
         setExact(
@@ -155,8 +141,6 @@ class ReminderScheduler(context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-    // MARK: - Jednorázové „už vystřeleno"
-
     fun markGeofenceFired(reminderId: String) {
         stateStore.markFired(reminderId)
     }
@@ -166,8 +150,6 @@ class ReminderScheduler(context: Context) {
     fun markAlarmFired(reminderId: String) {
         stateStore.markFired(reminderId)
     }
-
-    // MARK: - Snooze
 
     fun clearSnooze(reminderId: String) {
         stateStore.clearSnooze(reminderId)
@@ -183,7 +165,6 @@ class ReminderScheduler(context: Context) {
         stateStore.setSnooze(reminder.id, atMillis)
     }
 
-    /** Po spuštění opakovaného budíku naplánuje další výskyt. */
     fun scheduleNextOccurrence(reminder: Reminder) {
         val due = reminder.dueDate ?: return
         val next = when (reminder.timeRepeat) {
@@ -194,11 +175,6 @@ class ReminderScheduler(context: Context) {
         setExact(next, alarmPendingIntent(reminder.id, snooze = false))
     }
 
-    /**
-     * Znovu nastaví celý systémový stav podle seznamu reminderů.
-     * AlarmManager je idempotentní díky stabilním PendingIntentům. Geofence
-     * snapshoty jdou přes sériovou remove→batch-add frontu.
-     */
     fun resync(all: List<Reminder>) {
         all.forEach {
             cancelNag(it.id)
@@ -210,11 +186,9 @@ class ReminderScheduler(context: Context) {
 
         active.filter { it.kind == ReminderKind.TIME }.forEach { scheduleAlarm(it) }
         restoreSnoozes(active)
-
         queueGeofenceResync(active.filter { it.kind == ReminderKind.LOCATION })
     }
 
-    /** Obnoví snooze po restartu telefonu. */
     private fun restoreSnoozes(active: List<Reminder>) {
         val byId = active.associateBy { it.id }
         val now = System.currentTimeMillis()
@@ -233,8 +207,6 @@ class ReminderScheduler(context: Context) {
             }
         }
     }
-
-    // MARK: - Sekvenční geofence resync
 
     private fun queueGeofenceResync(snapshot: List<Reminder>) {
         var startNow = false
@@ -298,13 +270,26 @@ class ReminderScheduler(context: Context) {
             return
         }
 
-        val geofences = eligible.map { buildGeofence(it) }
-        val request = GeofencingRequest.Builder()
-            .setInitialTrigger(0)
-            .addGeofences(geofences)
-            .build()
+        val geofences = eligible.mapNotNull { reminder ->
+            try {
+                buildGeofence(reminder)
+            } catch (e: IllegalArgumentException) {
+                Log.w("ReminderScheduler", "Neplatná geofence data pro ${reminder.id}", e)
+                LocationHolder.geofenceFailed.value = true
+                null
+            }
+        }
+        if (geofences.isEmpty()) {
+            onComplete()
+            return
+        }
 
         try {
+            val request = GeofencingRequest.Builder()
+                .setInitialTrigger(0)
+                .addGeofences(geofences)
+                .build()
+
             geofencing.addGeofences(request, geofencePendingIntent())
                 .addOnFailureListener { e ->
                     Log.w("ReminderScheduler", "Hromadná registrace geofence selhala", e)
@@ -322,25 +307,26 @@ class ReminderScheduler(context: Context) {
         }
     }
 
-    // MARK: - Geofence
-
     @SuppressLint("MissingPermission")
     private fun addGeofence(reminder: Reminder) {
         if (!LocationHolder.hasFineLocation(appContext)) return
         if (!reminder.repeats && stateStore.isFired(reminder.id)) return
 
-        val request = GeofencingRequest.Builder()
-            .setInitialTrigger(0)
-            .addGeofence(buildGeofence(reminder))
-            .build()
-
         try {
+            val request = GeofencingRequest.Builder()
+                .setInitialTrigger(0)
+                .addGeofence(buildGeofence(reminder))
+                .build()
+
             geofencing.addGeofences(request, geofencePendingIntent())
                 .addOnSuccessListener { LocationHolder.geofenceFailed.value = false }
                 .addOnFailureListener { e ->
                     Log.w("ReminderScheduler", "Registrace geofence selhala", e)
                     LocationHolder.geofenceFailed.value = true
                 }
+        } catch (e: IllegalArgumentException) {
+            Log.w("ReminderScheduler", "Neplatná geofence data pro ${reminder.id}", e)
+            LocationHolder.geofenceFailed.value = true
         } catch (_: SecurityException) {
             LocationHolder.geofenceFailed.value = true
         }
@@ -377,8 +363,6 @@ class ReminderScheduler(context: Context) {
             flags,
         )
     }
-
-    // MARK: - AlarmManager
 
     private fun scheduleAlarm(reminder: Reminder) {
         val due = reminder.dueDate ?: return
@@ -426,8 +410,6 @@ class ReminderScheduler(context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
-
-    // MARK: - Migrace PendingIntentů z v2.7 a starších
 
     private fun cancelLegacyPendingIntents(reminderId: String) {
         alarms.cancel(legacyAlarmPendingIntent(reminderId, snooze = false))
