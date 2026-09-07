@@ -89,10 +89,10 @@ class FavoritesStore private constructor(context: Context) {
         persist()
     }
 
-    /**
-     * Jeden atomický zápis pro celý výsledný snapshot importu, zařazený do
-     * stejné jednovláknové IO fronty jako běžné zápisy.
-     */
+    suspend fun snapshotAfterPendingIo(): List<FavoritePlace> = withContext(ioDispatcher) {
+        _favorites.value
+    }
+
     suspend fun replaceAllFromImport(snapshot: List<FavoritePlace>): Boolean =
         withContext(ioDispatcher) {
             try {
