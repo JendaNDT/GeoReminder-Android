@@ -33,7 +33,11 @@ class GeofenceReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
+                val loadResult = store.reloadAndWait()
+                if (loadResult == ReminderStore.ReloadResult.ERROR) {
+                    Log.w("GeofenceReceiver", "Událost přeskočena – data připomínek se nepodařilo načíst")
+                    return@launch
+                }
                 val reminders = store.reminders.value
 
                 for (id in ids) {
