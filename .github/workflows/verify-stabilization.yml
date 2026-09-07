@@ -41,6 +41,8 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
 
     steps:
       - name: Checkout
@@ -81,7 +83,11 @@ jobs:
           test -x "$EMULATOR_BIN"
           "$EMULATOR_BIN" -version | head -n 3
 
+          mkdir -p "$ANDROID_AVD_HOME"
           echo "no" | avdmanager create avd --force --name georeminder-api36 --package "system-images;android-36;google_apis;x86_64" --device "pixel_6"
+          test -f "$ANDROID_AVD_HOME/georeminder-api36.ini"
+          "$EMULATOR_BIN" -list-avds
+
           sudo chmod 666 /dev/kvm 2>/dev/null || true
           adb kill-server || true
           adb start-server
