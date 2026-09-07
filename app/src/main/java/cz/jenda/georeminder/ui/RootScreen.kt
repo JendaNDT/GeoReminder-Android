@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -54,17 +53,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import cz.jenda.georeminder.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.jenda.georeminder.MainActivity
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.ActivityInsets
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.data.SystemAccess
+import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
@@ -73,7 +73,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Kořen aplikace: uvítací průvodce (jen poprvé), pak záložky Připomínky + Mapa
- * s plovoucím kapslovým tab barem. Oprávnění se žádají až PO zavření průvodce.
+ * s plovoucím kapslovým tab barem. Special access se žádá až ve chvíli, kdy ho
+ * konkrétní aktivní připomínka opravdu potřebuje.
  */
 @Composable
 fun RootScreen() {
@@ -89,15 +90,32 @@ fun RootScreen() {
     val reminders by store.reminders.collectAsStateWithLifecycle()
     val resumeScope = rememberCoroutineScope()
 
-    var showBackgroundEducation by rememberSaveable { mutableStateOf(false) }
+    var backgroundAccessMissing by remember { mutableStateOf(false) }
+    var exactAlarmAccessMissing by remember { mutableStateOf(false) }
+    var backgroundPromptDismissed by rememberSaveable { mutableStateOf(false) }
     var exactAlarmPromptDismissed by rememberSaveable { mutableStateOf(false) }
+    var android10BackgroundRequestStarted by rememberSaveable { mutableStateOf(false) }
 
-    val hasActiveTimeReminders = reminders.any {
-        !it.isDone && it.kind == ReminderKind.TIME
+    fun refreshSpecialAccessState(items: List<Reminder>) {
+        val hasActiveLocation = items.any {
+            !it.isDone && it.kind == ReminderKind.LOCATION
+        }
+        val hasActiveTime = items.any {
+            !it.isDone && it.kind == ReminderKind.TIME
+        }
+
+        backgroundAccessMissing = hasActiveLocation &&
+                LocationHolder.hasFineLocation(context) &&
+                !LocationHolder.hasBackgroundLocation(context)
+
+        exactAlarmAccessMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                hasActiveTime &&
+                !SystemAccess.canScheduleExactAlarms(context)
     }
-    val exactAlarmMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            hasActiveTimeReminders &&
-            !SystemAccess.canScheduleExactAlarms(context)
+
+    LaunchedEffect(reminders) {
+        refreshSpecialAccessState(reminders)
+    }
 
     // Změřit výšku spodní systémové lišty v okně aktivity (spolehlivé)
     // a zpřístupnit ji dialogovým oknům, která ji samy nedostávají.
@@ -113,6 +131,7 @@ fun RootScreen() {
     val backgroundLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
+        refreshSpecialAccessState(store.reminders.value)
         store.resyncAll()
         LocationHolder.refresh(context)
     }
@@ -128,18 +147,7 @@ fun RootScreen() {
             LocationHolder.refresh(context)
             store.resyncAll()
         }
-
-        if (fineGranted && !LocationHolder.hasBackgroundLocation(context)) {
-            when {
-                Build.VERSION.SDK_INT == Build.VERSION_CODES.Q -> {
-                    backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                }
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
-                    // Android 11+ už „Povolit vždy“ v běžném dialogu nenabízí.
-                    showBackgroundEducation = true
-                }
-            }
-        }
+        refreshSpecialAccessState(store.reminders.value)
     }
 
     val notificationLauncher = rememberLauncherForActivityResult(
@@ -166,8 +174,19 @@ fun RootScreen() {
         }
     }
 
-    // Návrat do popředí: nejdřív počkat na čerstvá data z disku a teprve
-    // potom zaregistrovat spouštěče. Zároveň se projeví změny oprávnění v Settings.
+    // Android 10: background permission vyžádat až při první skutečné geo připomínce.
+    LaunchedEffect(backgroundAccessMissing, reminders) {
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q &&
+            backgroundAccessMissing &&
+            !android10BackgroundRequestStarted
+        ) {
+            android10BackgroundRequestStarted = true
+            backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+    }
+
+    // Návrat do popředí: načíst čerstvá data, znovu naplánovat spouštěče a
+    // přepočítat special access. Tím se ihned projeví změny provedené v Settings.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -178,6 +197,7 @@ fun RootScreen() {
                         store.resyncAll()
                     }
                     LocationHolder.refresh(context)
+                    refreshSpecialAccessState(store.reminders.value)
                 }
             }
         }
@@ -259,10 +279,15 @@ fun RootScreen() {
         }
     }
 
-    if (showBackgroundEducation && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    val shouldShowBackgroundDialog = hasSeenOnboarding &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            backgroundAccessMissing &&
+            !backgroundPromptDismissed
+
+    if (shouldShowBackgroundDialog) {
         val optionLabel = SystemAccess.backgroundLocationOptionLabel(context)
         AlertDialog(
-            onDismissRequest = { showBackgroundEducation = false },
+            onDismissRequest = { backgroundPromptDismissed = true },
             title = { Text("Poloha i na pozadí") },
             text = {
                 Text(
@@ -273,22 +298,22 @@ fun RootScreen() {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    showBackgroundEducation = false
+                    backgroundPromptDismissed = true
                     SystemAccess.openAppDetails(context)
                 }) {
                     Text("Otevřít nastavení")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showBackgroundEducation = false }) {
+                TextButton(onClick = { backgroundPromptDismissed = true }) {
                     Text("Teď ne")
                 }
             },
         )
     }
 
-    if (hasSeenOnboarding && exactAlarmMissing && !exactAlarmPromptDismissed &&
-        !showBackgroundEducation
+    if (hasSeenOnboarding && exactAlarmAccessMissing && !exactAlarmPromptDismissed &&
+        !shouldShowBackgroundDialog
     ) {
         AlertDialog(
             onDismissRequest = { exactAlarmPromptDismissed = true },
