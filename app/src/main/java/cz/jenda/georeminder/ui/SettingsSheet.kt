@@ -238,14 +238,19 @@ fun SettingsSheet(onClose: () -> Unit) {
                                 color = colors.label,
                             )
                             Text(
-                                text = "Při spuštění přečte název česky",
+                                text = "Při spuštění přečte text v jazyce aplikace",
                                 style = GeoType.caption,
                                 color = colors.secondaryLabel,
                             )
                         }
                         IOSSwitch(
                             checked = ttsEnabled,
-                            onCheckedChange = { FeatureSettings.setTtsEnabled(context, it) },
+                            onCheckedChange = { enabled ->
+                                FeatureSettings.setTtsEnabled(context, enabled)
+                                if (!enabled) {
+                                    TtsSpeaker.shutdown()
+                                }
+                            },
                         )
                     }
 
@@ -279,7 +284,12 @@ fun SettingsSheet(onClose: () -> Unit) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .iosClickable {
-                                    TtsSpeaker.speakText(context, "GeoReminder: Toto je ukázka hlasitého čtení připomínek.")
+                                    val sample = if (currentLang == LanguageController.LANG_EN) {
+                                        "GeoReminder: This is a sample of spoken reminders."
+                                    } else {
+                                        "GeoReminder: Toto je ukázka hlasitého čtení připomínek."
+                                    }
+                                    TtsSpeaker.speakText(context, sample)
                                 }
                                 .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
