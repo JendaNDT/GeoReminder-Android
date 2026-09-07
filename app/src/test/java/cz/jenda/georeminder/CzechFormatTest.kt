@@ -1,10 +1,27 @@
 package cz.jenda.georeminder
 
+import cz.jenda.georeminder.data.FeatureSettings
+import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.model.CzechFormat
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class CzechFormatTest {
+
+    private lateinit var previousLanguage: String
+
+    @Before
+    fun setCzechLanguage() {
+        previousLanguage = FeatureSettings.appLanguage.value
+        FeatureSettings.appLanguage.value = LanguageController.LANG_CS
+    }
+
+    @After
+    fun restoreLanguage() {
+        FeatureSettings.appLanguage.value = previousLanguage
+    }
 
     @Test
     fun testDistanceFormatting() {
