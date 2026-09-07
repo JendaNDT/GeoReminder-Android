@@ -74,11 +74,6 @@ class ReminderStore private constructor(context: Context) {
         }
     }
 
-    /**
-     * Znovu načte data a vrátí se až po dokončení čtení. Částečně poškozený
-     * JSON se nejdřív zazálohuje v původním znění a teprve potom automaticky
-     * opraví na seznam záznamů, které šly bezpečně načíst.
-     */
     suspend fun reloadAndWait(): ReloadResult = withContext(ioDispatcher) {
         synchronized(this@ReminderStore) {
             when (val res = SharedStorage.read(appContext, FILE)) {
@@ -107,7 +102,6 @@ class ReminderStore private constructor(context: Context) {
                                 res.text,
                             )
                             if (recoveryCopy == null) {
-                                // Bez nedotčené recovery kopie se původního souboru nedotýkat.
                                 loadFailed = true
                                 Log.w(
                                     "ReminderStore",
@@ -253,30 +247,32 @@ class ReminderStore private constructor(context: Context) {
     }
 
     /**
-     * Dávkový import: data už musí být validovaná. Nejdřív se atomicky zapíše
-     * celý výsledný snapshot a až potom se přepne stav v paměti a jednou resyncne.
+     * Dávkový import běží na stejné jednovláknové IO frontě jako běžné zápisy,
+     * takže žádný starší pending persist nemůže později přepsat importovaná data.
      */
-    @Synchronized
-    fun replaceAllFromImport(snapshot: List<Reminder>): Boolean {
-        return try {
-            val text = SharedStorage.json.encodeToString(
-                ListSerializer(Reminder.serializer()),
-                snapshot,
-            )
-            if (!SharedStorage.writeText(appContext, FILE, text)) return false
+    suspend fun replaceAllFromImport(snapshot: List<Reminder>): Boolean =
+        withContext(ioDispatcher) {
+            try {
+                val text = SharedStorage.json.encodeToString(
+                    ListSerializer(Reminder.serializer()),
+                    snapshot,
+                )
+                if (!SharedStorage.writeText(appContext, FILE, text)) return@withContext false
 
-            _reminders.value = snapshot
-            loadFailed = false
-            hasLoadedSuccessfully = true
-            _dataIntegrityState.value = DataIntegrityState.OK
-            scheduler.resync(snapshot)
-            WidgetRefresher.refresh(appContext)
-            true
-        } catch (e: Exception) {
-            Log.w("ReminderStore", "Dávkové nahrazení dat po importu selhalo", e)
-            false
+                synchronized(this@ReminderStore) {
+                    _reminders.value = snapshot
+                    loadFailed = false
+                    hasLoadedSuccessfully = true
+                    _dataIntegrityState.value = DataIntegrityState.OK
+                }
+                scheduler.resync(snapshot)
+                WidgetRefresher.refresh(appContext)
+                true
+            } catch (e: Exception) {
+                Log.w("ReminderStore", "Dávkové nahrazení dat po importu selhalo", e)
+                false
+            }
         }
-    }
 
     private fun persist() {
         if (loadFailed) {
