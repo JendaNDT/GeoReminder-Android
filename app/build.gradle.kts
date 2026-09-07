@@ -45,10 +45,10 @@ android {
 
     buildTypes {
         release {
-            // První release-hardening průchod zůstává bez minifikace. Po zeleném
-            // lint + release buildu se R8 zapne samostatným krokem, aby šla
-            // případná regrese jednoznačně připsat minifikaci.
-            isMinifyEnabled = false
+            // R8 zapnutý až po úspěšném neminifikovaném release + lint průchodu.
+            // proguard-rules.pro chrání serializovatelné modely a knihovny si
+            // vlastní consumer rules dodávají samy.
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
