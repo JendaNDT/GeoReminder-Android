@@ -63,6 +63,21 @@ class SchedulerMathTest {
     }
 
     @Test
+    fun nextDailyHandlesAutumnDstOverlapAndStaysInFuture() {
+        val due = localMillis(2026, 10, 24, 2, 30)
+        val now = localMillis(2026, 10, 24, 23, 0)
+        val actual = ReminderScheduler.nextDaily(due, now)
+        val local = ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(actual), zone)
+
+        assertEquals(2026, local.year)
+        assertEquals(10, local.monthValue)
+        assertEquals(25, local.dayOfMonth)
+        assertEquals(2, local.hour)
+        assertEquals(30, local.minute)
+        assertTrue(actual > now)
+    }
+
+    @Test
     fun nextWeeklySupportsEveryIsoWeekday() {
         val due = localMillis(2026, 1, 5, 18, 30)
         val mondayMorning = localMillis(2026, 9, 7, 10, 0)
