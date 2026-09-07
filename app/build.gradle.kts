@@ -30,16 +30,35 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 
-    // Podpisový keystore není v git repozitáři (bezpečnost) – žije v Jendově
-    // lokální kopii projektu. Bez něj se použije běžný debug podpis.
+    // Release/upload keystore ani hesla nejsou v Git repozitáři.
+    // Lokálně lze vytvořit app/keystore.properties podle .example, případně
+    // dodat hesla přes environment proměnné v bezpečném CI.
     val keystoreFile = file("georeminder.keystore")
+    val keystorePropertiesFile = file("keystore.properties")
+    val keystoreProperties = Properties().apply {
+        if (keystorePropertiesFile.exists()) {
+            keystorePropertiesFile.inputStream().use { load(it) }
+        }
+    }
+    val signingStorePassword =
+        keystoreProperties.getProperty("storePassword") ?: System.getenv("GEOREMINDER_STORE_PASSWORD")
+    val signingKeyAlias =
+        keystoreProperties.getProperty("keyAlias") ?: System.getenv("GEOREMINDER_KEY_ALIAS")
+    val signingKeyPassword =
+        keystoreProperties.getProperty("keyPassword") ?: System.getenv("GEOREMINDER_KEY_PASSWORD")
+    val hasReleaseSigning = keystoreFile.exists() &&
+        !signingStorePassword.isNullOrBlank() &&
+        !signingKeyAlias.isNullOrBlank() &&
+        !signingKeyPassword.isNullOrBlank()
 
     signingConfigs {
-        create("georeminder") {
-            storeFile = keystoreFile
-            storePassword = "georeminder"
-            keyAlias = "georeminder"
-            keyPassword = "georeminder"
+        if (hasReleaseSigning) {
+            create("georeminder") {
+                storeFile = keystoreFile
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
         }
     }
 
@@ -53,12 +72,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            if (keystoreFile.exists()) {
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("georeminder")
             }
         }
         debug {
-            if (keystoreFile.exists()) {
+            // Lokální debug build lze podepsat stejným klíčem kvůli instalaci
+            // přes starší interní build, ale pouze když jsou tajnosti dostupné.
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("georeminder")
             }
         }
