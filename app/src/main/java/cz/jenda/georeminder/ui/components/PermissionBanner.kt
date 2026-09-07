@@ -25,15 +25,15 @@ import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 
 /**
- * Oranžový banner pro problém se systémovým přístupem nebo spolehlivostí.
- * Pokud je [actionLabel] null, banner je pouze informační.
+ * Oranžový banner zobrazený, když uživatel odmítl oprávnění.
+ * Tlačítko vede přímo do systémového nastavení appky.
  */
 @Composable
 fun PermissionBanner(
     icon: ImageVector,
     message: String,
     modifier: Modifier = Modifier,
-    actionLabel: String? = "Nastavení",
+    actionLabel: String = "Nastavení",
     onAction: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -61,30 +61,28 @@ fun PermissionBanner(
                 .weight(1f)
                 .padding(horizontal = 10.dp),
         )
-        if (actionLabel != null) {
-            Text(
-                text = actionLabel,
-                style = GeoType.footnoteBold,
-                color = bannerTextColor,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .border(1.dp, bannerTextColor, CircleShape)
-                    .iosClickable {
-                        if (onAction != null) {
-                            onAction()
-                        } else {
-                            val intent = Intent(
-                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                Uri.fromParts("package", context.packageName, null),
-                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            try {
-                                context.startActivity(intent)
-                            } catch (_: Exception) {
-                            }
+        Text(
+            text = actionLabel,
+            style = GeoType.footnoteBold,
+            color = bannerTextColor,
+            modifier = Modifier
+                .clip(CircleShape)
+                .border(1.dp, bannerTextColor, CircleShape)
+                .iosClickable {
+                    if (onAction != null) {
+                        onAction()
+                    } else {
+                        val intent = Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        try {
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
                         }
                     }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-            )
-        }
+                }
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+        )
     }
 }
