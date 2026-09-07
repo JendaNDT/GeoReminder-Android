@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import cz.jenda.georeminder.data.LocationHolder
+import cz.jenda.georeminder.data.SystemAccess
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
@@ -168,8 +169,6 @@ class ReminderScheduler(context: Context) {
         val target = atMillis.coerceAtLeast(System.currentTimeMillis() + 1_000L)
         cancelNag(reminder.id)
         alarms.cancel(alarmPendingIntent(reminder.id, snooze = true))
-        // Nejdřív zapsat stav snooze. Případný souběžný hromadný geofence resync
-        // pak reminder vyfiltruje ještě před tím, než odregistrujeme původní trigger.
         stateStore.setSnooze(reminder.id, target)
         cancelOriginalTrigger(reminder)
         setExact(target, alarmPendingIntent(reminder.id, snooze = true))
@@ -318,7 +317,7 @@ class ReminderScheduler(context: Context) {
             onComplete()
             return
         }
-        if (!LocationHolder.hasFineLocation(appContext)) {
+        if (!LocationHolder.hasBackgroundLocation(appContext)) {
             LocationHolder.geofenceFailed.value = true
             onComplete()
             return
@@ -363,7 +362,10 @@ class ReminderScheduler(context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun addGeofence(reminder: Reminder) {
-        if (!LocationHolder.hasFineLocation(appContext)) return
+        if (!LocationHolder.hasBackgroundLocation(appContext)) {
+            LocationHolder.geofenceFailed.value = true
+            return
+        }
         if (!reminder.repeats && stateStore.isFired(reminder.id)) return
         val snoozeUntil = stateStore.snoozeUntil(reminder.id)
         if (snoozeUntil != null && snoozeUntil > System.currentTimeMillis()) return
@@ -450,7 +452,7 @@ class ReminderScheduler(context: Context) {
 
     private fun setExact(triggerAtMillis: Long, pi: PendingIntent) {
         try {
-            if (Build.VERSION.SDK_INT >= 31 && !alarms.canScheduleExactAlarms()) {
+            if (!SystemAccess.canScheduleExactAlarms(appContext)) {
                 alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
             } else {
                 alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
