@@ -29,9 +29,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -56,11 +58,14 @@ import cz.jenda.georeminder.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.data.ActivityInsets
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
+import cz.jenda.georeminder.data.SystemAccess
+import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
@@ -68,8 +73,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Kořen aplikace: uvítací průvodce (jen poprvé), pak záložky Připomínky + Mapa
- * s plovoucím kapslovým tab barem. Oprávnění se žádají až PO zavření průvodce,
- * v pořadí: notifikace → poloha → poloha „Povolit vždy" (zvláštnost Androidu).
+ * s plovoucím kapslovým tab barem. Oprávnění se žádají až PO zavření průvodce.
  */
 @Composable
 fun RootScreen() {
@@ -82,7 +86,18 @@ fun RootScreen() {
         mutableStateOf(prefs.getBoolean("hasSeenOnboarding", false))
     }
     val store = remember { ReminderStore.get(context) }
+    val reminders by store.reminders.collectAsStateWithLifecycle()
     val resumeScope = rememberCoroutineScope()
+
+    var showBackgroundEducation by rememberSaveable { mutableStateOf(false) }
+    var exactAlarmPromptDismissed by rememberSaveable { mutableStateOf(false) }
+
+    val hasActiveTimeReminders = reminders.any {
+        !it.isDone && it.kind == ReminderKind.TIME
+    }
+    val exactAlarmMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            hasActiveTimeReminders &&
+            !SystemAccess.canScheduleExactAlarms(context)
 
     // Změřit výšku spodní systémové lišty v okně aktivity (spolehlivé)
     // a zpřístupnit ji dialogovým oknům, která ji samy nedostávají.
@@ -94,28 +109,39 @@ fun RootScreen() {
         }
     }
 
-    // Řetězec žádostí o oprávnění (spouští se po průvodci)
+    // Android 10 ještě umí background location udělit běžným runtime dialogem.
     val backgroundLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
         store.resyncAll()
         LocationHolder.refresh(context)
     }
+
     val locationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
-        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+        val fineGranted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val anyLocationGranted = fineGranted ||
                 result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) {
+
+        if (anyLocationGranted) {
             LocationHolder.refresh(context)
             store.resyncAll()
-            if (Build.VERSION.SDK_INT >= 29 &&
-                !LocationHolder.hasBackgroundLocation(context)
-            ) {
-                backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+
+        if (fineGranted && !LocationHolder.hasBackgroundLocation(context)) {
+            when {
+                Build.VERSION.SDK_INT == Build.VERSION_CODES.Q -> {
+                    backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                    // Android 11+ už „Povolit vždy“ v běžném dialogu nenabízí.
+                    showBackgroundEducation = true
+                }
             }
         }
     }
+
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
@@ -141,7 +167,7 @@ fun RootScreen() {
     }
 
     // Návrat do popředí: nejdřív počkat na čerstvá data z disku a teprve
-    // potom zaregistrovat spouštěče. Původní reload()+resyncAll() závodil.
+    // potom zaregistrovat spouštěče. Zároveň se projeví změny oprávnění v Settings.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -231,6 +257,63 @@ fun RootScreen() {
                     .padding(bottom = 10.dp),
             )
         }
+    }
+
+    if (showBackgroundEducation && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        val optionLabel = SystemAccess.backgroundLocationOptionLabel(context)
+        AlertDialog(
+            onDismissRequest = { showBackgroundEducation = false },
+            title = { Text("Poloha i na pozadí") },
+            text = {
+                Text(
+                    "Aby připomínky podle místa fungovaly i se zavřenou aplikací, " +
+                            "otevři v systémovém nastavení Oprávnění → Poloha a zvol „$optionLabel“. " +
+                            "Bez toho můžeš aplikaci dál používat, ale hlídání míst na pozadí nebude spolehlivé."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBackgroundEducation = false
+                    SystemAccess.openAppDetails(context)
+                }) {
+                    Text("Otevřít nastavení")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBackgroundEducation = false }) {
+                    Text("Teď ne")
+                }
+            },
+        )
+    }
+
+    if (hasSeenOnboarding && exactAlarmMissing && !exactAlarmPromptDismissed &&
+        !showBackgroundEducation
+    ) {
+        AlertDialog(
+            onDismissRequest = { exactAlarmPromptDismissed = true },
+            title = { Text("Přesné časové připomínky") },
+            text = {
+                Text(
+                    "Android teď nepovoluje GeoReminderu nastavovat přesné alarmy. " +
+                            "Časová připomínka může přijít se zpožděním. V systémovém nastavení " +
+                            "povol aplikaci přístup k Budíkům a připomínkám."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    exactAlarmPromptDismissed = true
+                    SystemAccess.openExactAlarmSettings(context)
+                }) {
+                    Text("Povolit přesné alarmy")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { exactAlarmPromptDismissed = true }) {
+                    Text("Později")
+                }
+            },
+        )
     }
 }
 
