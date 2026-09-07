@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.FeatureSettings
 import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.model.Reminder
@@ -48,11 +49,7 @@ object TtsSpeaker {
 
     /** Ukázka z Nastavení funguje i když je automatické TTS vypnuté. */
     fun speakText(context: Context, text: String) {
-        val fallback = if (LanguageController.effectiveLanguageCode() == LanguageController.LANG_EN) {
-            "GeoReminder reminder"
-        } else {
-            "GeoReminder připomínka"
-        }
+        val fallback = context.getString(R.string.tts_test_message)
         enqueueOrSpeak(
             context = context,
             request = SpeechRequest(text.ifBlank { fallback }, "sample_tts"),
