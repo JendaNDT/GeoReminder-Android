@@ -3,6 +3,8 @@ package cz.jenda.georeminder.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -96,7 +98,7 @@ fun DiagnosticsScreen(onClose: () -> Unit) {
                 SectionHeader(stringResource(R.string.settings_reliability))
                 InsetCard {
                     DiagnosticActionRow(stringResource(R.string.diagnostics_fix_permissions)) {
-                        SystemAccess.openAppDetails(context)
+                        openRepairSettings(context, snapshot)
                     }
                     CardDivider()
                     DiagnosticActionRow(stringResource(R.string.diagnostics_resync)) {
@@ -146,6 +148,33 @@ fun DiagnosticsScreen(onClose: () -> Unit) {
 
             DiagnosticHistorySection(snapshot.recentEvents)
         }
+    }
+}
+
+private fun openRepairSettings(context: Context, snapshot: DiagnosticSnapshot) {
+    when {
+        !snapshot.notificationsEnabled -> {
+            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            runCatching { context.startActivity(intent) }
+                .onFailure { SystemAccess.openAppDetails(context) }
+        }
+
+        !snapshot.systemLocationEnabled -> {
+            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { context.startActivity(intent) }
+                .onFailure { SystemAccess.openAppDetails(context) }
+        }
+
+        !snapshot.fineLocationGranted || !snapshot.backgroundLocationGranted ->
+            SystemAccess.openAppDetails(context)
+
+        !snapshot.exactAlarmsAllowed -> SystemAccess.openExactAlarmSettings(context)
+
+        else -> SystemAccess.openAppDetails(context)
     }
 }
 
