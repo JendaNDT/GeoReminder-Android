@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.FeatureSettings
+import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.model.AlertStyle
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder
@@ -39,25 +40,26 @@ object NotificationHelper {
     const val EXTRA_NOTIFICATION_TOKEN = "notification_action_token"
 
     fun createChannel(context: Context) {
+        val strings = LanguageController.localizedContext(context)
         val manager = context.getSystemService(NotificationManager::class.java)
 
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                context.getString(R.string.notification_channel_default),
+                strings.getString(R.string.notification_channel_default),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = context.getString(R.string.notification_channel_default_desc)
+                description = strings.getString(R.string.notification_channel_default_desc)
             }
         )
 
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_QUIET_ID,
-                context.getString(R.string.notification_channel_quiet),
+                strings.getString(R.string.notification_channel_quiet),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = context.getString(R.string.notification_channel_quiet_desc)
+                description = strings.getString(R.string.notification_channel_quiet_desc)
                 setSound(null, null)
                 enableVibration(false)
             }
@@ -66,10 +68,10 @@ object NotificationHelper {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_URGENT_ID,
-                context.getString(R.string.notification_channel_urgent),
+                strings.getString(R.string.notification_channel_urgent),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = context.getString(R.string.notification_channel_urgent_desc)
+                description = strings.getString(R.string.notification_channel_urgent_desc)
                 setSound(
                     RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
                     AudioAttributes.Builder()
@@ -89,33 +91,37 @@ object NotificationHelper {
         AlertStyle.URGENT -> CHANNEL_URGENT_ID
     }
 
-    fun body(context: Context, reminder: Reminder): String = when (reminder.kind) {
-        ReminderKind.LOCATION -> if (reminder.trigger == TriggerType.ARRIVE) {
-            context.getString(R.string.notification_arrive_body, reminder.placeName)
-        } else {
-            context.getString(R.string.notification_leave_body, reminder.placeName)
-        }
+    fun body(context: Context, reminder: Reminder): String {
+        val strings = LanguageController.localizedContext(context)
+        return when (reminder.kind) {
+            ReminderKind.LOCATION -> if (reminder.trigger == TriggerType.ARRIVE) {
+                strings.getString(R.string.notification_arrive_body, reminder.placeName)
+            } else {
+                strings.getString(R.string.notification_leave_body, reminder.placeName)
+            }
 
-        ReminderKind.TIME -> {
-            val due = reminder.dueDate
-            if (due == null) "" else when (reminder.timeRepeat) {
-                TimeRepeat.NEVER -> context.getString(
-                    R.string.notification_time_once_body,
-                    CzechFormat.dateTime(due),
-                )
-                TimeRepeat.DAILY -> context.getString(
-                    R.string.notification_time_daily_body,
-                    CzechFormat.time(due),
-                )
-                TimeRepeat.WEEKLY -> context.getString(
-                    R.string.notification_time_weekly_body,
-                    CzechFormat.weeklyLabel(due, reminder.weekdays),
-                )
+            ReminderKind.TIME -> {
+                val due = reminder.dueDate
+                if (due == null) "" else when (reminder.timeRepeat) {
+                    TimeRepeat.NEVER -> strings.getString(
+                        R.string.notification_time_once_body,
+                        CzechFormat.dateTime(due),
+                    )
+                    TimeRepeat.DAILY -> strings.getString(
+                        R.string.notification_time_daily_body,
+                        CzechFormat.time(due),
+                    )
+                    TimeRepeat.WEEKLY -> strings.getString(
+                        R.string.notification_time_weekly_body,
+                        CzechFormat.weeklyLabel(due, reminder.weekdays),
+                    )
+                }
             }
         }
     }
 
     fun show(context: Context, reminder: Reminder) {
+        val strings = LanguageController.localizedContext(context)
         val stateStore = SchedulerStateStore(context)
         val notifId = stateStore.requestCode(
             reminder.id,
@@ -167,7 +173,7 @@ object NotificationHelper {
 
         val wearableExtender = NotificationCompat.WearableExtender()
             .setHintHideIcon(false)
-        val body = body(context, reminder)
+        val body = body(strings, reminder)
 
         val builder = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
             .setSmallIcon(R.drawable.ic_stat_pin)
@@ -184,9 +190,9 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
-            .addAction(0, context.getString(R.string.action_done), doneIntent)
-            .addAction(0, context.getString(R.string.action_snooze_hour), snoozeIntent)
-            .addAction(0, context.getString(R.string.action_snooze_morning), morningIntent)
+            .addAction(0, strings.getString(R.string.action_done), doneIntent)
+            .addAction(0, strings.getString(R.string.action_snooze_hour), snoozeIntent)
+            .addAction(0, strings.getString(R.string.action_snooze_morning), morningIntent)
             .extend(wearableExtender)
             .setVibrate(longArrayOf(0, 150, 100, 150))
 
