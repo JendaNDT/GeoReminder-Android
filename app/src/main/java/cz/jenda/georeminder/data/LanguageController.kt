@@ -1,9 +1,9 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
-import android.content.res.Configuration
 import android.content.res.Resources
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import java.util.Locale
 
@@ -63,18 +63,18 @@ object LanguageController {
         }
 
     /**
-     * Context pro komponenty, které mohou běžet bez AppCompatActivity
-     * (receiver, widget, TTS). Neprovádí globální updateConfiguration; vytvoří
-     * pouze lokální konfiguraci pro čtení správných string resources.
+     * Context pro receiver/widget/TTS, tedy situace bez AppCompatActivity.
+     * AndroidX zde zohlední uloženou per-app locale i na starších Androidech.
      */
-    fun localizedContext(context: Context): Context {
-        if (currentLanguageCode() == LANG_SYSTEM) return context
-        val locale = effectiveLocale()
-        val configuration = Configuration(context.resources.configuration).apply {
-            setLocale(locale)
-            setLayoutDirection(locale)
-        }
-        return context.createConfigurationContext(configuration)
+    fun localizedContext(context: Context): Context =
+        ContextCompat.getContextForLanguage(context)
+
+    fun localeForContext(context: Context): Locale {
+        val localized = localizedContext(context)
+        val locales = localized.resources.configuration.locales
+        val locale = if (!locales.isEmpty) locales[0] else systemLocale()
+        return if (locale.language.equals("en", ignoreCase = true)) Locale.US
+        else Locale.forLanguageTag("cs-CZ")
     }
 
     fun localeListFor(langCode: String): LocaleListCompat = when (langCode) {
