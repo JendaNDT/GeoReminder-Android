@@ -12,6 +12,7 @@ import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.notify.GeofenceRegistrationState
+import cz.jenda.georeminder.notify.GeofenceRegistrationStatus
 import cz.jenda.georeminder.notify.ReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,8 +28,18 @@ class ReminderListViewModel(application: Application) : AndroidViewModel(applica
     val reminders: StateFlow<List<Reminder>> = store.reminders
     val userLocation: StateFlow<Location?> = LocationHolder.location
     val geofenceStates: StateFlow<Map<String, GeofenceRegistrationState>> = scheduler.geofenceStates
+
+    /**
+     * Starý souhrnný banner ponecháváme jen pro provozní výpadek služby/polohy.
+     * Permission, limit 100 a neplatná oblast mají přesnější vysvětlení jinde.
+     */
     val geofenceFailed: StateFlow<Boolean> = geofenceStates
-        .map { states -> states.values.any { it.status.isFailure } }
+        .map { states ->
+            states.values.any {
+                it.status == GeofenceRegistrationStatus.FAILED_SERVICE ||
+                    it.status == GeofenceRegistrationStatus.FAILED_LOCATION_DISABLED
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val pendingDeleteIds = MutableStateFlow<Set<String>>(emptySet())
