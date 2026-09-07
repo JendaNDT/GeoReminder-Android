@@ -22,6 +22,7 @@ import kotlinx.serialization.builtins.ListSerializer
 class ReminderStore private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val scheduler = ReminderScheduler.get(appContext)
+    private val diagnostics = DiagnosticStore.get(appContext)
 
     private val ioDispatcher = Dispatchers.IO.limitedParallelism(1)
     private val ioScope = CoroutineScope(SupervisorJob() + ioDispatcher)
@@ -95,6 +96,10 @@ class ReminderStore private constructor(context: Context) {
                             _reminders.value = recovered
                             hasLoadedSuccessfully = true
                             _dataIntegrityState.value = DataIntegrityState.PARTIAL_RECOVERED
+                            diagnostics.record(
+                                DiagnosticEventType.DATA_PARTIAL_RECOVERY,
+                                "recovered=${recovered.size} skipped=${decoded.skippedCount}",
+                            )
 
                             val recoveryCopy = SharedStorage.preserveCorruptCopy(
                                 appContext,
@@ -179,6 +184,7 @@ class ReminderStore private constructor(context: Context) {
             scheduler.resyncGeofences(_reminders.value)
         } else {
             scheduler.schedule(reminder)
+            diagnostics.record(DiagnosticEventType.ALARM_SCHEDULED)
         }
     }
 
@@ -201,6 +207,7 @@ class ReminderStore private constructor(context: Context) {
 
         if (!reminder.isDone && reminder.kind == ReminderKind.TIME) {
             scheduler.schedule(reminder)
+            diagnostics.record(DiagnosticEventType.ALARM_SCHEDULED)
         }
         if (touchesGeofences) {
             scheduler.resyncGeofences(_reminders.value)
@@ -243,13 +250,15 @@ class ReminderStore private constructor(context: Context) {
     }
 
     fun resyncAll() {
-        scheduler.resync(_reminders.value)
+        try {
+            scheduler.resync(_reminders.value)
+            diagnostics.markResyncSuccess()
+        } catch (error: Exception) {
+            diagnostics.markResyncFailure(error)
+            throw error
+        }
     }
 
-    /**
-     * Vrátí snapshot až ve chvíli, kdy předchozí reloady/zápisy ve stejné IO
-     * frontě doběhly. Backup tak nikdy neexportuje inicializační prázdný stav.
-     */
     suspend fun snapshotAfterPendingIo(): List<Reminder> = withContext(ioDispatcher) {
         _reminders.value
     }
@@ -270,9 +279,11 @@ class ReminderStore private constructor(context: Context) {
                     _dataIntegrityState.value = DataIntegrityState.OK
                 }
                 scheduler.resync(snapshot)
+                diagnostics.markResyncSuccess()
                 WidgetRefresher.refresh(appContext)
                 true
             } catch (e: Exception) {
+                diagnostics.markResyncFailure(e)
                 Log.w("ReminderStore", "Dávkové nahrazení dat po importu selhalo", e)
                 false
             }
