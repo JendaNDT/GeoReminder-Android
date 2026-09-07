@@ -103,6 +103,14 @@ class ReminderScheduler(context: Context) {
     fun schedule(reminder: Reminder) {
         if (reminder.isDone) return
         cancelLegacyPendingIntents(reminder.id)
+
+        val snoozeUntil = stateStore.snoozeUntil(reminder.id)
+        if (snoozeUntil != null && snoozeUntil > System.currentTimeMillis()) {
+            cancelOriginalTrigger(reminder)
+            setExact(snoozeUntil, alarmPendingIntent(reminder.id, snooze = true))
+            return
+        }
+
         when (reminder.kind) {
             ReminderKind.LOCATION -> addGeofence(reminder)
             ReminderKind.TIME -> scheduleAlarm(reminder)
@@ -159,10 +167,29 @@ class ReminderScheduler(context: Context) {
         snoozeAt(reminder, System.currentTimeMillis() + minutes * 60_000L)
     }
 
+    /**
+     * Odloží připomínku na konkrétní čas. Původní trigger se po dobu snooze
+     * fyzicky vypne, takže geo/time reminder nemůže vystřelit podruhé dřív.
+     */
     fun snoozeAt(reminder: Reminder, atMillis: Long) {
+        val target = atMillis.coerceAtLeast(System.currentTimeMillis() + 1_000L)
         cancelNag(reminder.id)
-        setExact(atMillis, alarmPendingIntent(reminder.id, snooze = true))
-        stateStore.setSnooze(reminder.id, atMillis)
+        cancelOriginalTrigger(reminder)
+        alarms.cancel(alarmPendingIntent(reminder.id, snooze = true))
+        stateStore.setSnooze(reminder.id, target)
+        setExact(target, alarmPendingIntent(reminder.id, snooze = true))
+    }
+
+    /** Po doručení snooze obnoví jen původní opakovaný trigger. */
+    fun resumeAfterSnooze(reminder: Reminder) {
+        stateStore.clearSnooze(reminder.id)
+        if (reminder.isDone) return
+
+        when {
+            reminder.kind == ReminderKind.LOCATION && reminder.repeats -> addGeofence(reminder)
+            reminder.kind == ReminderKind.TIME && reminder.timeRepeat != TimeRepeat.NEVER ->
+                scheduleNextOccurrence(reminder)
+        }
     }
 
     fun scheduleNextOccurrence(reminder: Reminder) {
@@ -184,14 +211,22 @@ class ReminderScheduler(context: Context) {
         LocationHolder.geofenceFailed.value = false
         val active = all.filter { !it.isDone }
 
-        active.filter { it.kind == ReminderKind.TIME }.forEach { scheduleAlarm(it) }
-        restoreSnoozes(active)
-        queueGeofenceResync(active.filter { it.kind == ReminderKind.LOCATION })
+        val snoozedIds = restoreSnoozes(active)
+
+        active
+            .filter { it.kind == ReminderKind.TIME && it.id !in snoozedIds }
+            .forEach { scheduleAlarm(it) }
+
+        queueGeofenceResync(
+            active.filter { it.kind == ReminderKind.LOCATION && it.id !in snoozedIds },
+        )
     }
 
-    private fun restoreSnoozes(active: List<Reminder>) {
+    /** Obnoví snooze po restartu a vrátí ID reminderů stále odložených do budoucna. */
+    private fun restoreSnoozes(active: List<Reminder>): Set<String> {
         val byId = active.associateBy { it.id }
         val now = System.currentTimeMillis()
+        val stillSnoozed = mutableSetOf<String>()
 
         for ((id, at) in stateStore.allSnoozes()) {
             val reminder = byId[id]
@@ -201,10 +236,20 @@ class ReminderScheduler(context: Context) {
             }
             if (at > now) {
                 setExact(at, alarmPendingIntent(id, snooze = true))
+                stillSnoozed += id
             } else {
                 NotificationHelper.show(appContext, reminder)
                 stateStore.clearSnooze(id)
             }
+        }
+        return stillSnoozed
+    }
+
+    /** Vypne původní trigger bez mazání fired/snooze technického stavu. */
+    private fun cancelOriginalTrigger(reminder: Reminder) {
+        when (reminder.kind) {
+            ReminderKind.LOCATION -> geofencing.removeGeofences(listOf(reminder.id))
+            ReminderKind.TIME -> alarms.cancel(alarmPendingIntent(reminder.id, snooze = false))
         }
     }
 
@@ -256,8 +301,11 @@ class ReminderScheduler(context: Context) {
 
     @SuppressLint("MissingPermission")
     private fun addGeofencesBatch(reminders: List<Reminder>, onComplete: () -> Unit) {
+        val now = System.currentTimeMillis()
         val eligible = reminders.filter { reminder ->
-            reminder.repeats || !stateStore.isFired(reminder.id)
+            val snoozeUntil = stateStore.snoozeUntil(reminder.id)
+            (snoozeUntil == null || snoozeUntil <= now) &&
+                (reminder.repeats || !stateStore.isFired(reminder.id))
         }
 
         if (eligible.isEmpty()) {
@@ -311,6 +359,8 @@ class ReminderScheduler(context: Context) {
     private fun addGeofence(reminder: Reminder) {
         if (!LocationHolder.hasFineLocation(appContext)) return
         if (!reminder.repeats && stateStore.isFired(reminder.id)) return
+        val snoozeUntil = stateStore.snoozeUntil(reminder.id)
+        if (snoozeUntil != null && snoozeUntil > System.currentTimeMillis()) return
 
         try {
             val request = GeofencingRequest.Builder()
@@ -367,6 +417,9 @@ class ReminderScheduler(context: Context) {
     private fun scheduleAlarm(reminder: Reminder) {
         val due = reminder.dueDate ?: return
         val now = System.currentTimeMillis()
+        val snoozeUntil = stateStore.snoozeUntil(reminder.id)
+        if (snoozeUntil != null && snoozeUntil > now) return
+
         val triggerAt = when (reminder.timeRepeat) {
             TimeRepeat.NEVER -> {
                 if (due <= now) {
