@@ -49,7 +49,8 @@ object TtsSpeaker {
 
     /** Ukázka z Nastavení funguje i když je automatické TTS vypnuté. */
     fun speakText(context: Context, text: String) {
-        val fallback = context.getString(R.string.tts_test_message)
+        val strings = LanguageController.localizedContext(context)
+        val fallback = strings.getString(R.string.tts_test_message)
         enqueueOrSpeak(
             context = context,
             request = SpeechRequest(text.ifBlank { fallback }, "sample_tts"),
