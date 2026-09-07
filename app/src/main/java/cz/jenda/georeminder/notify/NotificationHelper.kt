@@ -34,13 +34,11 @@ object NotificationHelper {
     const val ACTION_DONE = "cz.jenda.georeminder.ACTION_DONE"
     const val ACTION_SNOOZE = "cz.jenda.georeminder.ACTION_SNOOZE"
     const val ACTION_SNOOZE_MORNING = "cz.jenda.georeminder.ACTION_SNOOZE_MORNING"
-    // Sdílíme jednu hodnotu se schedulerem, ať se doručování nerozejde.
     const val EXTRA_REMINDER_ID = ReminderScheduler.EXTRA_REMINDER_ID
 
     fun createChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
 
-        // Výchozí: banner + běžný zvuk
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
@@ -51,7 +49,6 @@ object NotificationHelper {
             }
         )
 
-        // Tiché: jen v liště, žádný zvuk ani vyskakování
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_QUIET_ID,
@@ -64,7 +61,6 @@ object NotificationHelper {
             }
         )
 
-        // Naléhavé: budíkový zvuk (hraje na hlasitost budíku) + silná vibrace
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_URGENT_ID,
@@ -91,7 +87,6 @@ object NotificationHelper {
         AlertStyle.URGENT -> CHANNEL_URGENT_ID
     }
 
-    /** Tělo notifikace – s podpora CZ a EN. */
     fun body(reminder: Reminder): String {
         val isEn = FeatureSettings.appLanguage.value == LanguageController.LANG_EN
         return when (reminder.kind) {
@@ -181,7 +176,6 @@ object NotificationHelper {
 
         val notification = builder.build()
 
-        // Naléhavé: zvuk se opakuje, dokud uživatel notifikaci nezavře
         if (reminder.alertStyle == AlertStyle.URGENT) {
             notification.flags = notification.flags or Notification.FLAG_INSISTENT
         }
@@ -193,16 +187,13 @@ object NotificationHelper {
             // Uživatel nepovolil notifikace – appka to ukazuje oranžovým bannerem.
         }
 
-        // Dožadování: nepotvrzená připomínka se za 5 minut připomene znovu.
-        // Neplánovat, když jsou notifikace vypnuté celé NEBO jen tento kanál –
-        // jinak by neviditelná smyčka budíků běžela donekonečna.
         val channelBlocked = context.getSystemService(NotificationManager::class.java)
             .getNotificationChannel(channelFor(reminder.alertStyle))
             ?.importance == NotificationManager.IMPORTANCE_NONE
         if (reminder.nagging && !reminder.isDone && !channelBlocked &&
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         ) {
-            ReminderScheduler(context).scheduleNag(reminder)
+            ReminderScheduler.get(context).scheduleNag(reminder)
         }
     }
 
