@@ -72,12 +72,16 @@ jobs:
         timeout-minutes: 6
         run: |
           set -euo pipefail
+          EMULATOR_BIN="$ANDROID_HOME/emulator/emulator"
+          test -x "$EMULATOR_BIN"
+          "$EMULATOR_BIN" -version | head -n 3
+
           echo "no" | avdmanager create avd --force --name georeminder-api36 --package "system-images;android-36;google_apis;x86_64" --device "pixel_6"
           sudo chmod 666 /dev/kvm 2>/dev/null || true
           adb kill-server || true
           adb start-server
 
-          nohup emulator \
+          nohup "$EMULATOR_BIN" \
             -avd georeminder-api36 \
             -no-window \
             -no-audio \
