@@ -1,62 +1,103 @@
 # Zásady ochrany soukromí – GeoReminder
 
-**Poslední aktualizace: 22. 7. 2026**
+**Poslední aktualizace: 8. 9. 2026**
 
-Tyto zásady popisují, jak aplikace **GeoReminder** pro Android nakládá s vašimi daty. Aplikace je navržená tak, aby vaše data zůstávala ve vašem telefonu. Nemá žádné uživatelské účty, nesbírá data na server provozovatele, neobsahuje reklamy ani nástroje pro sledování.
+Tyto zásady popisují, jak aplikace **GeoReminder** pro Android nakládá s daty. Aplikace nemá vlastní uživatelské účty, reklamy ani vlastní analytický backend.
 
 Provozovatel aplikace: **Jenda** (kontakt: mcnegr@gmail.com).
 
-## Jaká data aplikace zpracovává a kde zůstávají
+## Data uložená v zařízení
 
-- **Připomínky, oblíbená místa a jejich nastavení** (název, souřadnice a poloměr místa, čas, druh upozornění) se ukládají **pouze do soukromého úložiště aplikace ve vašem telefonu**. Neodesílají se nikam jinam.
-- **Přílohy** (fotky, PDF a jiné soubory, které si k připomínce sami přidáte) se **zkopírují do soukromého úložiště aplikace** a zůstávají ve vašem telefonu.
-- **Poloha** se používá k tomu, aby aplikace poznala, že jste dorazili na místo připomínky nebo z něj odjeli (tzv. geofencing). Toto vyhodnocuje operační systém Android přímo v zařízení. Aplikace vaši polohu **neukládá a neodesílá na žádný server provozovatele**.
-- **Kalendář** aplikace **čte pouze na vaši výslovnou akci** (když si vyberete „Import z kalendáře"), a to jen kvůli zobrazení seznamu nadcházejících událostí, ze kterých si jednu vyberete. Aplikace kalendář needituje a jeho obsah nikam neodesílá.
+GeoReminder ukládá do soukromého úložiště aplikace zejména:
 
-## Kdy data opouštějí zařízení (služby třetích stran)
+- připomínky a jejich text,
+- uložená/oblíbená místa, souřadnice a poloměr,
+- čas a pravidlo opakování,
+- nastavení upozornění,
+- uživatelem přidané přílohy typu JPEG, PNG nebo PDF,
+- technický stav nutný pro spolehlivé doručení (například snooze, fired/registration state),
+- omezenou technickou diagnostickou historii.
 
-Aplikace nemá vlastní server, ale pro některé funkce využívá služby třetích stran. Předává se jen to, co je pro danou funkci nutné:
+Diagnostická historie je omezena na posledních 50 technických událostí a záměrně neukládá názvy reminderů, jejich interní ID ani přesné GPS souřadnice uživatele.
 
-- **Mapy Google (Google Maps SDK for Android):** k vykreslení mapy při výběru místa. Google při tom může zpracovávat údaje o zařízení a poloze podle vlastních zásad ochrany soukromí Google.
-- **Hledání míst – Photon (photon.komoot.io, data z OpenStreetMap):** když v aplikaci hledáte místo, odešle se **text vašeho dotazu** této službě, která vrátí odpovídající místa.
-- **Převod adresy na souřadnice (geokódování):** při importu události z kalendáře (a jako záloha hledání) může aplikace použít geokódovací službu systému Android, které se předá **text adresy**.
-- **Rozbalení odkazu z Map Google:** když do aplikace nasdílíte místo z Map Google, aplikace navštíví daný odkaz, aby z něj zjistila souřadnice.
+## Poloha
 
-Veškerá tato komunikace probíhá přes zabezpečené připojení (HTTPS).
+Aplikace používá přesnou/přibližnou polohu a podle nastavení Androidu také polohu na pozadí k funkci geofencingu: připomínka se může spustit při příchodu na zadané místo nebo při odchodu z něj i tehdy, když aplikace není právě otevřená.
 
-## Zálohování
+GeoReminder nevytváří vlastní historii pohybu uživatele a neposílá polohu na server provozovatele aplikace. Samotné vyhodnocování geofence zajišťuje Android/Google Play Services v zařízení.
 
-Pokud máte na telefonu zapnuté zálohování Androidu, systém může zálohovat vaše připomínky, oblíbená místa a přílohy do **vašeho vlastního účtu Google** (tzv. řízená záloha), aby přežily výměnu telefonu. Tuto zálohu spravuje Google podle vlastních zásad; provozovatel aplikace k ní nemá přístup. Zálohování si můžete v nastavení telefonu vypnout.
+Uložená místa reminderů samozřejmě obsahují souřadnice, protože bez nich by geografická připomínka měla poněkud těžký pracovní den.
 
-## Co aplikace NEdělá
+## Kalendář
 
-- Nemá uživatelské účty ani přihlašování.
+Aplikace může po výslovné akci uživatele číst nadcházející události z kalendáře a nabídnout jejich jednorázový import do reminderu. Kalendář needituje a jeho obsah neodesílá na server provozovatele aplikace.
+
+## Kdy data opouštějí zařízení
+
+GeoReminder nemá vlastní server, ale některé funkce používají služby třetích stran:
+
+- **Google Maps SDK / Google Play Services** – vykreslení mapy, geofencing a související systémové funkce,
+- **Photon / OpenStreetMap** – při hledání místa se odešle text hledaného dotazu,
+- **systémový Geocoder** – může zpracovat text adresy jako fallback při hledání/importu,
+- **rozbalení sdíleného odkazu** – pokud uživatel nasdílí podporovaný mapový odkaz, aplikace může daný odkaz načíst, aby zjistila cílové místo.
+
+Komunikace aplikace s internetovými službami probíhá přes HTTPS tam, kde ji GeoReminder přímo vytváří.
+
+Třetí strany mohou zpracovávat technické údaje podle svých vlastních zásad ochrany soukromí. Pro Data safety formulář v Google Play je potřeba vycházet z aktuálních definic Googlu pro „collected“ a „shared“, ne pouze z toho, zda data vidí provozovatel GeoReminderu.
+
+## Zálohování a přenos zařízení
+
+Android může podle nastavení uživatele zálohovat nebo přenést:
+
+- `reminders.json`,
+- `favorites.json`,
+- spravované soubory v adresáři `attachments/`.
+
+Cloud backup je spravovaný operačním systémem/účtem Google. Provozovatel GeoReminderu k této záloze nemá vlastní přístup.
+
+Aplikace navíc umožňuje ruční export/import vlastního ZIP backupu. Backup může obsahovat remindery, oblíbená místa a podporované spravované přílohy. Starší JSON backupy jsou podporované pro zpětnou kompatibilitu.
+
+## Oprávnění
+
+Aplikace může používat:
+
+- **přibližnou a přesnou polohu** – výběr a hlídání míst,
+- **polohu na pozadí** – geofence připomínky bez otevřené Activity,
+- **notifikace** – doručení připomínek,
+- **SCHEDULE_EXACT_ALARM** – uživatelsky udělovaný special access pro přesnější časové remindery,
+- **spuštění po restartu** – obnovení alarmů/geofence,
+- **vyjmutí z optimalizace baterie** – volitelná podpora spolehlivosti na pozadí,
+- **internet** – mapy, hledání míst a zpracování podporovaných sdílených odkazů,
+- **čtení kalendáře** – pouze při použití importu z kalendáře.
+
+Pokud přesné alarmy nejsou povolené, aplikace používá méně přesný AlarmManager fallback a stav zpřístupňuje v diagnostice.
+
+## Co aplikace nedělá
+
+- Nemá vlastní uživatelské účty ani přihlašování.
 - Neobsahuje reklamy.
-- Neobsahuje analytiku ani nástroje pro sledování chování.
-- Neprodává ani nesdílí vaše data třetím stranám pro reklamní účely.
+- Neobsahuje vlastní analytiku ani reklamní tracking SDK.
+- Neprodává data uživatelů.
+- Nevytváří vlastní serverovou databázi reminderů nebo historie polohy.
 
-## Oprávnění a proč je aplikace používá
+## Kontrola a mazání dat
 
-- **Poloha (přesná, přibližná a na pozadí / „Povolit vždy"):** hlídání míst připomínek i se zavřenou aplikací.
-- **Notifikace:** zobrazení připomínek.
-- **Přesné budíky:** doručení časových připomínek v přesný zvolený čas.
-- **Spuštění po restartu:** obnovení hlídání po restartu telefonu.
-- **Vyjmutí z optimalizace baterie:** spolehlivé doručení připomínek na pozadí (volitelné).
-- **Internet:** zobrazení mapy a hledání míst.
-- **Čtení kalendáře:** jednorázový import události do připomínky (jen na vaši akci).
+Uživatel může data odstranit:
 
-## Vaše kontrola nad daty
+- smazáním reminderů/oblíbených míst/příloh v aplikaci,
+- vymazáním dat aplikace v systému Android,
+- odinstalací aplikace.
 
-Data můžete kdykoli odstranit – smazáním jednotlivých připomínek a příloh v aplikaci, vymazáním dat aplikace v nastavení telefonu, nebo odinstalací aplikace. Protože aplikace neukládá žádná vaše data na server provozovatele, odinstalací se vaše data z aplikace odstraní.
+Ruční backup vytvořený uživatelem je samostatný soubor a musí být odstraněn tam, kam jej uživatel uložil.
 
 ## Děti
 
-Aplikace není určena dětem a záměrně od nich neshromažďuje žádná data.
+Aplikace není navržena jako služba určená dětem a záměrně od dětí neshromažďuje osobní údaje.
 
-## Změny těchto zásad
+## Změny zásad
 
-Tyto zásady můžeme čas od času aktualizovat. Aktuální verze je vždy dostupná na této stránce s uvedeným datem poslední aktualizace.
+Tyto zásady mohou být při změně funkcí nebo požadavků Google Play aktualizovány. Datum poslední aktualizace je uvedeno nahoře.
 
 ## Kontakt
 
-Máte-li dotaz k ochraně soukromí v aplikaci GeoReminder, napište na: **mcnegr@gmail.com**.
+Dotazy k ochraně soukromí: **mcnegr@gmail.com**
