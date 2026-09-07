@@ -19,12 +19,12 @@ val mapsKey: String = run {
 
 android {
     namespace = "cz.jenda.georeminder"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "cz.jenda.georeminder"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 19
         versionName = "2.7"
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
@@ -85,7 +85,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
