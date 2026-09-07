@@ -39,6 +39,7 @@ class GeofenceReceiver : BroadcastReceiver() {
                     return@launch
                 }
                 val reminders = store.reminders.value
+                val scheduler = ReminderScheduler.get(context)
 
                 for (id in ids) {
                     val reminder = reminders.firstOrNull { it.id == id } ?: continue
@@ -55,8 +56,8 @@ class GeofenceReceiver : BroadcastReceiver() {
 
                     if (!reminder.repeats) {
                         // Jednorázová: geofence už nehlídat (notifikace „vystřelila")
-                        // a zapamatovat si to, aby ji resync znovu nezaregistroval
-                        ReminderScheduler(context).markGeofenceFired(id)
+                        // a zapamatovat si to, aby ji resync znovu nezaregistroval.
+                        scheduler.markGeofenceFired(id)
                         LocationServices.getGeofencingClient(context)
                             .removeGeofences(listOf(id))
                     }
