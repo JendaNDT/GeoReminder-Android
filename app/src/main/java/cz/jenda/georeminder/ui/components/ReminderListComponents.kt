@@ -31,8 +31,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.ui.res.stringResource
-import cz.jenda.georeminder.R
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -42,16 +40,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
+import cz.jenda.georeminder.notify.GeofenceRegistrationState
+import cz.jenda.georeminder.notify.GeofenceRegistrationStatus
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 import java.util.Calendar
@@ -228,6 +230,7 @@ fun rememberCategoryStyle(reminder: Reminder): Triple<ImageVector, Color, String
 fun SwipeReminderRow(
     reminder: Reminder,
     distance: String?,
+    geofenceState: GeofenceRegistrationState? = null,
     onTap: () -> Unit,
     onLongTap: () -> Unit,
     onToggleDone: () -> Unit,
@@ -297,6 +300,7 @@ fun SwipeReminderRow(
         ReminderRow(
             reminder = reminder,
             distance = distance,
+            geofenceState = geofenceState,
             onTap = onTap,
             onLongTap = onLongTap,
             modifier = Modifier.semantics {
@@ -317,6 +321,7 @@ fun SwipeReminderRow(
 fun ReminderRow(
     reminder: Reminder,
     distance: String?,
+    geofenceState: GeofenceRegistrationState? = null,
     onTap: () -> Unit,
     onLongTap: () -> Unit,
     modifier: Modifier = Modifier,
@@ -325,6 +330,18 @@ fun ReminderRow(
     val haptics = LocalHapticFeedback.current
     val (icon, categoryColor, defaultBadge) = rememberCategoryStyle(reminder)
     val chipText = distance ?: defaultBadge
+    val geofenceStatusText = if (reminder.kind == ReminderKind.LOCATION && !reminder.isDone) {
+        when (geofenceState?.status) {
+            GeofenceRegistrationStatus.FAILED_PERMISSION -> "Hlídání neaktivní: chybí poloha „Vždy“"
+            GeofenceRegistrationStatus.FAILED_LOCATION_DISABLED -> "Hlídání neaktivní: poloha v telefonu je vypnutá"
+            GeofenceRegistrationStatus.FAILED_TOO_MANY -> "Hlídání neaktivní: limit 100 míst"
+            GeofenceRegistrationStatus.FAILED_SERVICE -> "Hlídání místa se nepodařilo aktivovat"
+            GeofenceRegistrationStatus.FAILED_INVALID_REGION -> "Hlídání neaktivní: neplatná oblast"
+            GeofenceRegistrationStatus.SNOOZED -> "Odloženo"
+            GeofenceRegistrationStatus.FIRED -> "Již spuštěno – jednorázové hlídání je vypnuté"
+            GeofenceRegistrationStatus.ACTIVE, null -> null
+        }
+    } else null
 
     Row(
         modifier = modifier
@@ -391,6 +408,15 @@ fun ReminderRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (geofenceStatusText != null) {
+                Text(
+                    text = geofenceStatusText,
+                    style = GeoType.caption2,
+                    color = if (geofenceState?.status?.isFailure == true) colors.orange else colors.secondaryLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         // Vpravo čip laděný k typu (320 m, odjezd, hotovo apod.)
         if (!chipText.isNullOrEmpty()) {
