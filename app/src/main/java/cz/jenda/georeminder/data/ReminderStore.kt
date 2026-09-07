@@ -247,9 +247,13 @@ class ReminderStore private constructor(context: Context) {
     }
 
     /**
-     * Dávkový import běží na stejné jednovláknové IO frontě jako běžné zápisy,
-     * takže žádný starší pending persist nemůže později přepsat importovaná data.
+     * Vrátí snapshot až ve chvíli, kdy předchozí reloady/zápisy ve stejné IO
+     * frontě doběhly. Backup tak nikdy neexportuje inicializační prázdný stav.
      */
+    suspend fun snapshotAfterPendingIo(): List<Reminder> = withContext(ioDispatcher) {
+        _reminders.value
+    }
+
     suspend fun replaceAllFromImport(snapshot: List<Reminder>): Boolean =
         withContext(ioDispatcher) {
             try {
