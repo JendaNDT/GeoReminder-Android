@@ -41,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,9 @@ import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 import cz.jenda.georeminder.ui.theme.ThemeController
 import cz.jenda.georeminder.ui.theme.ThemeMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +72,7 @@ fun SettingsSheet(onClose: () -> Unit) {
     val context = LocalContext.current
     val colors = GeoTheme.colors
     val currentMode by ThemeController.mode.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     val ttsEnabled by FeatureSettings.ttsEnabled.collectAsStateWithLifecycle()
     val ttsReadFullText by FeatureSettings.ttsReadFullText.collectAsStateWithLifecycle()
@@ -76,15 +81,19 @@ fun SettingsSheet(onClose: () -> Unit) {
     var showCalendarSheet by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         if (uri != null) {
-            val success = BackupManager.exportBackup(context, uri)
-            Toast.makeText(
-                context,
-                if (success) "Záloha byla úspěšně vytvořena" else "Export zálohy selhal",
-                Toast.LENGTH_SHORT
-            ).show()
+            scope.launch {
+                val success = withContext(Dispatchers.IO) {
+                    BackupManager.exportBackup(context, uri)
+                }
+                Toast.makeText(
+                    context,
+                    if (success) "Záloha byla úspěšně vytvořena" else "Export zálohy selhal",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
@@ -92,12 +101,16 @@ fun SettingsSheet(onClose: () -> Unit) {
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            val success = BackupManager.importBackup(context, uri)
-            Toast.makeText(
-                context,
-                if (success) "Záloha byla úspěšně obnovena" else "Obnovení zálohy selhalo",
-                Toast.LENGTH_SHORT
-            ).show()
+            scope.launch {
+                val success = withContext(Dispatchers.IO) {
+                    BackupManager.importBackup(context, uri)
+                }
+                Toast.makeText(
+                    context,
+                    if (success) "Záloha byla úspěšně obnovena" else "Obnovení zálohy selhalo",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
@@ -340,15 +353,15 @@ fun SettingsSheet(onClose: () -> Unit) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .iosClickable { exportLauncher.launch("georeminder_backup.json") }
+                            .iosClickable { exportLauncher.launch("georeminder_backup.zip") }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.Upload, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.size(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Exportovat zálohu (JSON)", style = GeoType.body, color = colors.accent)
-                            Text("Uloží seznam připomínek a oblíbených do souboru (bez příloh)", style = GeoType.caption, color = colors.secondaryLabel)
+                            Text("Exportovat kompletní zálohu (ZIP)", style = GeoType.body, color = colors.accent)
+                            Text("Uloží připomínky, oblíbená místa i přílohy", style = GeoType.caption, color = colors.secondaryLabel)
                         }
                         Icon(Icons.Filled.ChevronRight, null, tint = colors.tertiaryLabel, modifier = Modifier.size(20.dp))
                     }
@@ -356,15 +369,19 @@ fun SettingsSheet(onClose: () -> Unit) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .iosClickable { importLauncher.launch(arrayOf("application/json")) }
+                            .iosClickable {
+                                importLauncher.launch(
+                                    arrayOf("application/zip", "application/json", "application/octet-stream")
+                                )
+                            }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.FileDownload, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.size(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Importovat zálohu (JSON)", style = GeoType.body, color = colors.accent)
-                            Text("Načte seznam připomínek a oblíbených ze záložního JSONu", style = GeoType.caption, color = colors.secondaryLabel)
+                            Text("Importovat zálohu", style = GeoType.body, color = colors.accent)
+                            Text("Podporuje nový ZIP i starší JSON zálohy", style = GeoType.caption, color = colors.secondaryLabel)
                         }
                         Icon(Icons.Filled.ChevronRight, null, tint = colors.tertiaryLabel, modifier = Modifier.size(20.dp))
                     }
