@@ -13,11 +13,30 @@ object AttachmentHelper {
 
     private const val MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024L // 10 MB
 
+    private fun attachmentsDir(context: Context): File =
+        File(context.applicationContext.filesDir, DIR_ATTACHMENTS)
+
+    /**
+     * Vrátí soubor jen tehdy, pokud jeho kanonická cesta skutečně leží uvnitř
+     * interního adresáře attachments. Tím se importovaná nebo poškozená cesta
+     * nemůže použít k otevření/smazání jiného souboru aplikace.
+     */
+    private fun managedAttachmentFile(context: Context, path: String): File? {
+        return try {
+            val base = attachmentsDir(context).canonicalFile
+            val candidate = File(path).canonicalFile
+            val prefix = base.path + File.separator
+            candidate.takeIf { it.path.startsWith(prefix) }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** Zkopíruje vybraný URI soubor do interního úložiště aplikace. Povoleno max 10 MB. */
     fun copyToInternal(context: Context, uri: Uri): String? {
         return try {
             val contentResolver = context.contentResolver
-            
+
             // Kontrola velikosti přes ContentResolver query pokud je k dispozici
             contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
@@ -39,8 +58,11 @@ object AttachmentHelper {
                 mimeType.contains("jpeg") || mimeType.contains("jpg") -> "jpg"
                 else -> "bin"
             }
-            val dir = File(context.filesDir, DIR_ATTACHMENTS)
-            if (!dir.exists()) dir.mkdirs()
+            val dir = attachmentsDir(context)
+            if (!dir.exists() && !dir.mkdirs()) {
+                android.util.Log.w("AttachmentHelper", "Nepodařilo se vytvořit adresář příloh")
+                return null
+            }
 
             val targetFile = File(dir, "${UUID.randomUUID()}.$ext")
             var bytesCopied = 0L
@@ -58,7 +80,6 @@ object AttachmentHelper {
                     while (input.read(buffer).also { read = it } >= 0) {
                         bytesCopied += read
                         if (bytesCopied > MAX_ATTACHMENT_SIZE_BYTES) {
-                            output.close()
                             targetFile.delete()
                             android.util.Log.w("AttachmentHelper", "Příloha přesahuje limit 10 MB během kopírování")
                             return null
@@ -80,11 +101,14 @@ object AttachmentHelper {
         }
     }
 
-    /** Smaže soubor přílohy z interního úložiště. */
+    /** Smaže pouze soubor spravované přílohy z interního úložiště. */
     fun deleteAttachment(context: Context, path: String?) {
         if (path.isNullOrBlank()) return
+        val file = managedAttachmentFile(context, path) ?: run {
+            android.util.Log.w("AttachmentHelper", "Odmítnuto mazání cesty mimo attachments")
+            return
+        }
         try {
-            val file = File(path)
             if (file.exists()) {
                 file.delete()
             }
@@ -94,11 +118,13 @@ object AttachmentHelper {
     /** Smaže soubory příloh, které už nepatří žádné aktivní připomínce. */
     fun cleanupOrphanedAttachments(context: Context, activeReminders: List<cz.jenda.georeminder.model.Reminder>) {
         try {
-            val dir = File(context.filesDir, DIR_ATTACHMENTS)
+            val dir = attachmentsDir(context)
             if (!dir.exists() || !dir.isDirectory) return
-            val activePaths = activeReminders.mapNotNull { it.attachmentPath }.toSet()
+            val activePaths = activeReminders.mapNotNull { reminder ->
+                reminder.attachmentPath?.let { managedAttachmentFile(context, it)?.absolutePath }
+            }.toSet()
             dir.listFiles()?.forEach { file ->
-                if (!activePaths.contains(file.absolutePath)) {
+                if (!activePaths.contains(file.canonicalFile.absolutePath)) {
                     android.util.Log.i("AttachmentHelper", "Mazání osiřelé přílohy: ${file.name}")
                     file.delete()
                 }
@@ -106,11 +132,11 @@ object AttachmentHelper {
         } catch (_: Exception) {}
     }
 
-    /** Otevře přílohu v systémové aplikaci přes FileProvider. */
+    /** Otevře pouze spravovanou přílohu v systémové aplikaci přes FileProvider. */
     fun openAttachment(context: Context, path: String) {
         try {
-            val file = File(path)
-            if (!file.exists()) return
+            val file = managedAttachmentFile(context, path) ?: return
+            if (!file.exists() || !file.isFile) return
 
             val uri = FileProvider.getUriForFile(
                 context,
@@ -118,9 +144,9 @@ object AttachmentHelper {
                 file
             )
             val mimeType = when {
-                path.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
-                path.endsWith(".png", ignoreCase = true) -> "image/png"
-                path.endsWith(".jpg", ignoreCase = true) || path.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
+                file.name.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
+                file.name.endsWith(".png", ignoreCase = true) -> "image/png"
+                file.name.endsWith(".jpg", ignoreCase = true) || file.name.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
                 else -> "*/*"
             }
 
