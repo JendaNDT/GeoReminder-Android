@@ -140,6 +140,11 @@ data class Reminder(
     val attachmentPath: String? = null,
     /** ID skupiny míst (kategorie) pro hromadný geofence. */
     val categoryId: String? = null,
+    /**
+     * Zdrojová instance systémového kalendáře ve tvaru "eventId:beginMillis".
+     * Slouží jen k deduplikaci importu konkrétního výskytu opakované události.
+     */
+    val calendarSourceKey: String? = null,
 ) {
     /** Popisek do seznamu (druhý řádek) – bez vzdálenosti. */
     val subtitle: String
