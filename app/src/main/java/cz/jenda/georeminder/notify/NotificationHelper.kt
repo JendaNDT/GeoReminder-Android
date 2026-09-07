@@ -24,8 +24,8 @@ import java.util.UUID
 
 /**
  * Stavba a zobrazování notifikací s tlačítky „Hotovo" a „Odložit".
- * Každé zobrazení dostává vlastní akční token, takže první tlačítko atomicky
- * vyhraje a dvojité/souběžné akce ze stejné notifikace se ignorují.
+ * Každé zobrazení dostává vlastní akční token, takže první interakce atomicky
+ * vyhraje a dvojité/souběžné interakce ze stejné notifikace se ignorují.
  */
 object NotificationHelper {
     const val CHANNEL_ID = "reminders"
@@ -125,6 +125,7 @@ object NotificationHelper {
             Intent(context, MainActivity::class.java)
                 .setAction(ACTION_OPEN_REMINDER)
                 .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .putExtra(EXTRA_NOTIFICATION_TOKEN, actionToken)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -210,6 +211,10 @@ object NotificationHelper {
             ReminderScheduler.get(context).scheduleNag(reminder)
         }
     }
+
+    /** První interakce s konkrétním zobrazením notifikace vyhraje. */
+    fun consumeInteractionToken(context: Context, reminderId: String, token: String): Boolean =
+        SchedulerStateStore(context).consumeNotificationActionToken(reminderId, token)
 
     fun cancel(context: Context, reminderId: String) {
         val stateStore = SchedulerStateStore(context)
