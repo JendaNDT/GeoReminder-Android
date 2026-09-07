@@ -12,7 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * Uživatelská data patří do ReminderStore. Sem patří jen technické značky,
  * které musí přežít restart procesu/telefonu: jednorázové „už vystřeleno",
- * snooze timestamp, stabilní requestCode pro PendingIntent a stav geofence.
+ * snooze timestamp, stabilní requestCode, stav geofence a token aktuální
+ * notifikace pro idempotentní zpracování jejích akcí.
  */
 internal class SchedulerStateStore(context: Context) {
     private val prefs: SharedPreferences = context.applicationContext
@@ -34,6 +35,7 @@ internal class SchedulerStateStore(context: Context) {
         private const val KEY_REQUEST_CODE_PREFIX = "scheduler_request_code_"
         private const val KEY_NEXT_REQUEST_CODE = "scheduler_next_request_code"
         private const val KEY_GEOFENCE_STATE_PREFIX = "scheduler_geofence_state_"
+        private const val KEY_NOTIFICATION_TOKEN_PREFIX = "scheduler_notification_token_"
 
         private const val REQUEST_CODE_START = 10_000
         private const val REQUEST_CODE_STRIDE = 8
@@ -41,6 +43,10 @@ internal class SchedulerStateStore(context: Context) {
         const val OFFSET_ALARM = 0
         const val OFFSET_SNOOZE = 1
         const val OFFSET_NAG = 2
+        const val OFFSET_NOTIFICATION_CONTENT = 3
+        const val OFFSET_NOTIFICATION_DONE = 4
+        const val OFFSET_NOTIFICATION_SNOOZE = 5
+        const val OFFSET_NOTIFICATION_MORNING = 6
 
         private val lock = Any()
     }
@@ -102,6 +108,35 @@ internal class SchedulerStateStore(context: Context) {
             .toMap()
     }
 
+    /**
+     * Uloží token právě zobrazené notifikace. Každá další notifikace stejného
+     * reminderu token nahradí, takže akce ze starší notifikace už nejsou platné.
+     */
+    fun setNotificationActionToken(reminderId: String, token: String) = synchronized(lock) {
+        require(token.isNotBlank())
+        prefs.edit()
+            .putString(KEY_NOTIFICATION_TOKEN_PREFIX + reminderId, token)
+            .commit()
+    }
+
+    /**
+     * Atomicky spotřebuje token notifikace. První tlačítko (Hotovo/Snooze/...)
+     * vyhraje; dvojité klepnutí nebo jiná souběžná akce se stejným tokenem už
+     * vrátí false. Používá synchronní commit, aby výsledek přežil i okamžité
+     * ukončení procesu po BroadcastReceiveru.
+     */
+    fun consumeNotificationActionToken(reminderId: String, token: String): Boolean =
+        synchronized(lock) {
+            if (token.isBlank()) return@synchronized false
+            val key = KEY_NOTIFICATION_TOKEN_PREFIX + reminderId
+            if (prefs.getString(key, null) != token) return@synchronized false
+            prefs.edit().remove(key).commit()
+        }
+
+    fun clearNotificationActionToken(reminderId: String) = synchronized(lock) {
+        prefs.edit().remove(KEY_NOTIFICATION_TOKEN_PREFIX + reminderId).apply()
+    }
+
     fun setGeofenceState(
         reminderId: String,
         status: GeofenceRegistrationStatus,
@@ -143,9 +178,8 @@ internal class SchedulerStateStore(context: Context) {
 
     /**
      * Vrací stabilní unikátní základ requestCode pro reminder. Každý reminder
-     * dostane blok několika integerů (alarm/snooze/nag), takže jednotlivé typy
-     * PendingIntentů nemohou kolidovat ani při shodě String.hashCode().
-     * Čítač je perzistentní, takže stejné ID používá stejný blok i po rebootu.
+     * dostane blok několika integerů, takže jednotlivé typy PendingIntentů
+     * nemohou kolidovat ani při shodě String.hashCode(). Čítač je perzistentní.
      */
     fun requestCode(reminderId: String, offset: Int): Int = synchronized(lock) {
         require(offset in 0 until REQUEST_CODE_STRIDE)
