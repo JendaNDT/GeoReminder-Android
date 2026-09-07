@@ -33,10 +33,6 @@ sealed interface CalendarLoadResult {
 object CalendarImporter {
     private const val WINDOW_DAYS = 30L
 
-    /**
-     * Načte skutečné výskyty událostí na příštích 30 dní přes Instances.
-     * Opakované kalendářové události jsou tak rozbalené na konkrétní termíny.
-     */
     suspend fun getUpcomingEvents(context: Context): CalendarLoadResult =
         withContext(Dispatchers.IO) {
             if (
@@ -62,35 +58,37 @@ object CalendarImporter {
                     CalendarContract.Instances.ALL_DAY,
                 )
 
-                val byInstance = linkedMapOf<String, CalendarEventItem>()
-                context.contentResolver.query(
+                val cursor = context.contentResolver.query(
                     builder.build(),
                     projection,
                     null,
                     null,
                     "${CalendarContract.Instances.BEGIN} ASC",
-                )?.use { cursor ->
-                    val eventIdIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_ID)
-                    val titleIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
-                    val beginIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
-                    val endIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.END)
-                    val locationIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_LOCATION)
-                    val allDayIdx = cursor.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
+                ) ?: return@withContext CalendarLoadResult.Error("null_cursor")
 
-                    while (cursor.moveToNext()) {
-                        val eventId = cursor.getLong(eventIdIdx)
-                        val begin = cursor.getLong(beginIdx)
+                val byInstance = linkedMapOf<String, CalendarEventItem>()
+                cursor.use {
+                    val eventIdIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_ID)
+                    val titleIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
+                    val beginIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
+                    val endIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.END)
+                    val locationIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_LOCATION)
+                    val allDayIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
+
+                    while (it.moveToNext()) {
+                        val eventId = it.getLong(eventIdIdx)
+                        val begin = it.getLong(beginIdx)
                         if (begin < now || begin > future) continue
 
                         val key = sourceKey(eventId, begin)
                         byInstance[key] = CalendarEventItem(
                             eventId = eventId,
                             instanceKey = key,
-                            title = cursor.getString(titleIdx)?.takeIf { it.isNotBlank() } ?: "Událost",
+                            title = it.getString(titleIdx)?.takeIf { value -> value.isNotBlank() } ?: "Událost",
                             startTimeMillis = begin,
-                            endTimeMillis = cursor.getLong(endIdx),
-                            location = cursor.getString(locationIdx)?.takeIf { it.isNotBlank() },
-                            allDay = cursor.getInt(allDayIdx) != 0,
+                            endTimeMillis = it.getLong(endIdx),
+                            location = it.getString(locationIdx)?.takeIf { value -> value.isNotBlank() },
+                            allDay = it.getInt(allDayIdx) != 0,
                         )
                     }
                 }
@@ -108,7 +106,6 @@ object CalendarImporter {
 
     fun sourceKey(eventId: Long, beginMillis: Long): String = "$eventId:$beginMillis"
 
-    /** Převádí konkrétní instanci kalendáře na jednorázový časový reminder. */
     fun toReminder(event: CalendarEventItem): Reminder = Reminder(
         title = event.title,
         kind = ReminderKind.TIME,
