@@ -6,13 +6,13 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.CalendarContract
 import androidx.core.content.ContextCompat
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Jeden konkrétní výskyt události z CalendarContract.Instances. */
 data class CalendarEventItem(
     val eventId: Long,
     val instanceKey: String,
@@ -66,6 +66,7 @@ object CalendarImporter {
                     "${CalendarContract.Instances.BEGIN} ASC",
                 ) ?: return@withContext CalendarLoadResult.Error("null_cursor")
 
+                val untitled = context.getString(R.string.location_no_name)
                 val byInstance = linkedMapOf<String, CalendarEventItem>()
                 cursor.use {
                     val eventIdIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_ID)
@@ -84,7 +85,7 @@ object CalendarImporter {
                         byInstance[key] = CalendarEventItem(
                             eventId = eventId,
                             instanceKey = key,
-                            title = it.getString(titleIdx)?.takeIf { value -> value.isNotBlank() } ?: "Událost",
+                            title = it.getString(titleIdx)?.takeIf { value -> value.isNotBlank() } ?: untitled,
                             startTimeMillis = begin,
                             endTimeMillis = it.getLong(endIdx),
                             location = it.getString(locationIdx)?.takeIf { value -> value.isNotBlank() },
@@ -99,7 +100,7 @@ object CalendarImporter {
             } catch (_: SecurityException) {
                 CalendarLoadResult.PermissionDenied
             } catch (e: Exception) {
-                android.util.Log.w("CalendarImporter", "Načtení instancí kalendáře selhalo", e)
+                android.util.Log.w("CalendarImporter", "Calendar instances query failed", e)
                 CalendarLoadResult.Error(e.javaClass.simpleName)
             }
         }
