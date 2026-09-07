@@ -21,7 +21,7 @@ import kotlinx.serialization.builtins.ListSerializer
  */
 class ReminderStore private constructor(context: Context) {
     private val appContext = context.applicationContext
-    private val scheduler = ReminderScheduler(appContext)
+    private val scheduler = ReminderScheduler.get(appContext)
 
     // Čtení i zápisy používají stejnou sériovou IO frontu. Tím se zabrání tomu,
     // aby receiver četl napůl probíhající změnu nebo resync předběhl načtení.
