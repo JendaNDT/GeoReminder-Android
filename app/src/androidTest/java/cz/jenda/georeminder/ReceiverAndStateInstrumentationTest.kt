@@ -57,8 +57,7 @@ class ReceiverAndStateInstrumentationTest : InstrumentationTestCase() {
         val state = SchedulerStateStore(context)
         state.clearFired(reminder.id)
 
-        AlarmReceiver().onReceive(
-            context,
+        context.sendBroadcast(
             Intent(context, AlarmReceiver::class.java)
                 .setAction(ReminderScheduler.ACTION_ALARM_FIRE)
                 .putExtra(ReminderScheduler.EXTRA_REMINDER_ID, reminder.id),
@@ -85,7 +84,7 @@ class ReceiverAndStateInstrumentationTest : InstrumentationTestCase() {
             .putExtra(NotificationHelper.EXTRA_REMINDER_ID, reminder.id)
             .putExtra(NotificationHelper.EXTRA_NOTIFICATION_TOKEN, "done-token")
 
-        NotificationActionReceiver().onReceive(context, action)
+        context.sendBroadcast(action)
         waitUntil {
             val loaded = runBlocking { ReminderStore.get(context).reloadAndWait() }
             loaded != ReminderStore.ReloadResult.ERROR &&
@@ -93,7 +92,7 @@ class ReceiverAndStateInstrumentationTest : InstrumentationTestCase() {
         }
 
         // Stejný token podruhé nesmí změnu aplikovat znovu ani založit nový stav.
-        NotificationActionReceiver().onReceive(context, action)
+        context.sendBroadcast(action)
         Thread.sleep(300)
         runBlocking { ReminderStore.get(context).reloadAndWait() }
         assertTrue(ReminderStore.get(context).reminders.value.single { it.id == reminder.id }.isDone)
