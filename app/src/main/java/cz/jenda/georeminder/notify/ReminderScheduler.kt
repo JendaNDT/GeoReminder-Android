@@ -18,7 +18,9 @@ import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
-import java.util.Calendar
+import java.time.Instant
+import java.time.ZonedDateTime
+import java.time.ZoneId
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -63,46 +65,48 @@ class ReminderScheduler(context: Context) {
             }
 
         fun nextDaily(dueMillis: Long, now: Long = System.currentTimeMillis()): Long {
-            val due = Calendar.getInstance().apply { timeInMillis = dueMillis }
-            val next = Calendar.getInstance().apply {
-                timeInMillis = now
-                set(Calendar.HOUR_OF_DAY, due.get(Calendar.HOUR_OF_DAY))
-                set(Calendar.MINUTE, due.get(Calendar.MINUTE))
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
+            val zone = ZoneId.systemDefault()
+            val dueTime = Instant.ofEpochMilli(dueMillis)
+                .atZone(zone)
+                .toLocalTime()
+                .withSecond(0)
+                .withNano(0)
+            val nowInstant = Instant.ofEpochMilli(now)
+            val nowLocal = nowInstant.atZone(zone)
+            var candidate = ZonedDateTime.of(nowLocal.toLocalDate(), dueTime, zone)
+            if (!candidate.toInstant().isAfter(nowInstant)) {
+                candidate = ZonedDateTime.of(nowLocal.toLocalDate().plusDays(1), dueTime, zone)
             }
-            if (next.timeInMillis <= now) next.add(Calendar.DAY_OF_YEAR, 1)
-            return next.timeInMillis
+            return candidate.toInstant().toEpochMilli()
         }
 
-        fun isoWeekday(millis: Long): Int {
-            val dow = Calendar.getInstance().apply { timeInMillis = millis }
-                .get(Calendar.DAY_OF_WEEK)
-            return ((dow + 5) % 7) + 1
-        }
+        fun isoWeekday(millis: Long): Int =
+            Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).dayOfWeek.value
 
         fun nextWeekly(
             dueMillis: Long,
             weekdays: List<Int>?,
             now: Long = System.currentTimeMillis(),
         ): Long {
-            val targetDays = weekdays?.takeIf { it.isNotEmpty() }
-                ?: listOf(isoWeekday(dueMillis))
-            val due = Calendar.getInstance().apply { timeInMillis = dueMillis }
-            val next = Calendar.getInstance().apply {
-                timeInMillis = now
-                set(Calendar.HOUR_OF_DAY, due.get(Calendar.HOUR_OF_DAY))
-                set(Calendar.MINUTE, due.get(Calendar.MINUTE))
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
+            val zone = ZoneId.systemDefault()
+            val dueZoned = Instant.ofEpochMilli(dueMillis).atZone(zone)
+            val dueTime = dueZoned.toLocalTime().withSecond(0).withNano(0)
+            val targetDays = weekdays?.filter { it in 1..7 }?.takeIf { it.isNotEmpty() }?.toSet()
+                ?: setOf(dueZoned.dayOfWeek.value)
+            val nowInstant = Instant.ofEpochMilli(now)
+            val startDate = nowInstant.atZone(zone).toLocalDate()
+
+            for (offset in 0..14) {
+                val date = startDate.plusDays(offset.toLong())
+                if (date.dayOfWeek.value !in targetDays) continue
+                val candidate = ZonedDateTime.of(date, dueTime, zone)
+                if (candidate.toInstant().isAfter(nowInstant)) {
+                    return candidate.toInstant().toEpochMilli()
+                }
             }
-            var safety = 0
-            while ((isoWeekday(next.timeInMillis) !in targetDays || next.timeInMillis <= now) && safety < 15) {
-                next.add(Calendar.DAY_OF_YEAR, 1)
-                safety++
-            }
-            if (next.timeInMillis <= now) next.add(Calendar.DAY_OF_YEAR, 7)
-            return next.timeInMillis
+
+            val fallbackDate = startDate.plusWeeks(1)
+            return ZonedDateTime.of(fallbackDate, dueTime, zone).toInstant().toEpochMilli()
         }
     }
 
