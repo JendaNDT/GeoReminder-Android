@@ -98,6 +98,7 @@ internal class SchedulerStateStore(context: Context) {
      * Vrací stabilní unikátní základ requestCode pro reminder. Každý reminder
      * dostane blok několika integerů (alarm/snooze/nag), takže jednotlivé typy
      * PendingIntentů nemohou kolidovat ani při shodě String.hashCode().
+     * Čítač je perzistentní, takže stejné ID používá stejný blok i po rebootu.
      */
     fun requestCode(reminderId: String, offset: Int): Int = synchronized(lock) {
         require(offset in 0 until REQUEST_CODE_STRIDE)
