@@ -62,6 +62,7 @@ object ReminderText {
 
     fun subtitle(context: Context, reminder: Reminder): String {
         val localized = strings(context)
+        val locale = LanguageController.localeForContext(localized)
         return when (reminder.kind) {
             ReminderKind.LOCATION -> buildString {
                 append(
@@ -80,14 +81,14 @@ object ReminderText {
                 val due = reminder.dueDate
                     ?: return localized.getString(R.string.reminder_no_due_date)
                 when (reminder.timeRepeat) {
-                    TimeRepeat.NEVER -> CzechFormat.dateTime(due)
+                    TimeRepeat.NEVER -> CzechFormat.dateTimeForLocale(due, locale)
                     TimeRepeat.DAILY -> localized.getString(
                         R.string.reminder_time_daily_subtitle,
-                        CzechFormat.time(due),
+                        CzechFormat.timeForLocale(due, locale),
                     )
                     TimeRepeat.WEEKLY -> localized.getString(
                         R.string.reminder_time_weekly_subtitle,
-                        CzechFormat.weeklyLabel(due, reminder.weekdays),
+                        CzechFormat.weeklyLabelForLocale(due, reminder.weekdays, locale),
                     )
                 }
             }
