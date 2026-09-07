@@ -43,7 +43,13 @@ import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
+import cz.jenda.georeminder.model.ReminderText
 import cz.jenda.georeminder.model.TriggerType
+
+private data class WidgetReminder(
+    val reminder: Reminder,
+    val subtitle: String,
+)
 
 /** Widget „Nejbližší připomínky". */
 class GeoReminderWidget : GlanceAppWidget() {
@@ -55,12 +61,18 @@ class GeoReminderWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val reminders = loadActive(context)
+        val reminders = loadActive(context).map {
+            WidgetReminder(it, ReminderText.subtitle(context, it))
+        }
+        val allDoneText = context.getString(R.string.widget_all_done)
+        val addDescription = context.getString(R.string.widget_add_reminder)
         val addIntent = Intent(context, MainActivity::class.java)
             .setAction(Intent.ACTION_VIEW)
             .putExtra("shortcut_kind", "location")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        provideContent { WidgetContent(reminders, addIntent) }
+        provideContent {
+            WidgetContent(reminders, addIntent, allDoneText, addDescription)
+        }
     }
 
     private fun loadActive(context: Context): List<Reminder> {
@@ -90,12 +102,21 @@ private val labelColor = ColorProvider(day = Color(0xFF000000), night = Color(0x
 private val secondaryColor = ColorProvider(day = Color(0x993C3C43), night = Color(0x99EBEBF5))
 
 @Composable
-private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
+private fun WidgetContent(
+    reminders: List<WidgetReminder>,
+    addIntent: Intent,
+    allDoneText: String,
+    addDescription: String,
+) {
     val size = LocalSize.current
     val limit = if (size.width >= 200.dp) 3 else 2
     Box(
-        modifier = GlanceModifier.fillMaxSize().background(widgetBackground).cornerRadius(24.dp)
-            .clickable(actionStartActivity<MainActivity>()).padding(14.dp),
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .background(widgetBackground)
+            .cornerRadius(24.dp)
+            .clickable(actionStartActivity<MainActivity>())
+            .padding(14.dp),
     ) {
         if (reminders.isEmpty()) {
             Column(
@@ -109,11 +130,12 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
                     modifier = GlanceModifier.size(22.dp),
                     colorFilter = ColorFilter.tint(secondaryColor),
                 )
-                Text("Vše vyřízeno", style = TextStyle(color = secondaryColor, fontSize = 12.sp))
+                Text(allDoneText, style = TextStyle(color = secondaryColor, fontSize = 12.sp))
             }
         } else {
             Column(modifier = GlanceModifier.fillMaxSize().padding(end = 20.dp)) {
-                reminders.take(limit).forEach { reminder ->
+                reminders.take(limit).forEach { item ->
+                    val reminder = item.reminder
                     Row(
                         modifier = GlanceModifier.fillMaxWidth().padding(bottom = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -128,10 +150,18 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
                         Column {
                             Text(
                                 reminder.title,
-                                style = TextStyle(color = labelColor, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                                style = TextStyle(
+                                    color = labelColor,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                ),
                                 maxLines = 1,
                             )
-                            Text(reminder.subtitle, style = TextStyle(color = secondaryColor, fontSize = 11.sp), maxLines = 1)
+                            Text(
+                                item.subtitle,
+                                style = TextStyle(color = secondaryColor, fontSize = 11.sp),
+                                maxLines = 1,
+                            )
                         }
                     }
                 }
@@ -141,7 +171,7 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
         Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
             Image(
                 provider = ImageProvider(R.drawable.ic_widget_add),
-                contentDescription = "Nová připomínka",
+                contentDescription = addDescription,
                 modifier = GlanceModifier.size(18.dp).clickable(actionStartActivityIntent(addIntent)),
                 colorFilter = ColorFilter.tint(accentColor),
             )
