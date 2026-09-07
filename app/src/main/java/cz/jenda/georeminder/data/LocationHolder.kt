@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
@@ -28,9 +29,8 @@ object LocationHolder {
     val location = MutableStateFlow<Location?>(null)
 
     /**
-     * true = poslední pokus o registraci geofence selhal (např. systémový limit
-     * 100 geofence nebo vypnuté služby polohy). UI to ukáže bannerem, aby
-     * hlídání místa neselhalo potichu.
+     * Zpětně kompatibilní souhrnný příznak. Nový scheduler drží přesnější stav
+     * pro každý reminder zvlášť; tento boolean zůstává pro starší UI vazby.
      */
     val geofenceFailed = MutableStateFlow(false)
 
@@ -46,6 +46,19 @@ object LocationHolder {
         return ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /** Rozlišuje udělené oprávnění od situace, kdy má uživatel polohu v telefonu vypnutou. */
+    fun isSystemLocationEnabled(context: Context): Boolean {
+        val manager = context.getSystemService(LocationManager::class.java) ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            manager.isLocationEnabled
+        } else {
+            runCatching {
+                manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                    manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+            }.getOrDefault(false)
+        }
     }
 
     /** Jednorázově zjistí aktuální polohu (pokud je povolená). */
