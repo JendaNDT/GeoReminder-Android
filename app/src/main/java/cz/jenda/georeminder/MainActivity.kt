@@ -46,9 +46,16 @@ class MainActivity : ComponentActivity() {
         if (intent == null) return
 
         if (intent.action == NotificationHelper.ACTION_OPEN_REMINDER) {
-            intent.getStringExtra(NotificationHelper.EXTRA_REMINDER_ID)
+            val reminderId = intent.getStringExtra(NotificationHelper.EXTRA_REMINDER_ID)
                 ?.takeIf { it.isNotBlank() }
-                ?.let { notificationReminderRequest.value = it }
+                ?: return
+            val token = intent.getStringExtra(NotificationHelper.EXTRA_NOTIFICATION_TOKEN)
+                ?.takeIf { it.isNotBlank() }
+                ?: return
+
+            if (NotificationHelper.consumeInteractionToken(this, reminderId, token)) {
+                notificationReminderRequest.value = reminderId
+            }
             return
         }
 
