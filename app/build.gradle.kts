@@ -45,8 +45,9 @@ android {
 
     buildTypes {
         release {
-            // Minifikace/R8 zatím VYPNUTÁ – zapnout až po úspěšném testu na zařízení
-            // (proguard-rules.pro chrání JSON modely kompatibilní s iOS).
+            // První release-hardening průchod zůstává bez minifikace. Po zeleném
+            // lint + release buildu se R8 zapne samostatným krokem, aby šla
+            // případná regrese jednoznačně připsat minifikaci.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -74,8 +75,8 @@ android {
         compose = true
     }
     lint {
-        checkReleaseBuilds = false
-        abortOnError = false
+        checkReleaseBuilds = true
+        abortOnError = true
     }
 }
 
