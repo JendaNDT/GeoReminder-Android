@@ -1,6 +1,7 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
+import android.content.res.Resources
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import java.util.Locale
@@ -46,6 +47,22 @@ object LanguageController {
         }
     }
 
+    /**
+     * Efektivní podporovaný jazyk. Aplikace má jen české výchozí resources a
+     * values-en, takže jiný systémový jazyk spadne stejně jako resources do češtiny.
+     */
+    fun effectiveLanguageCode(systemLocale: Locale = systemLocale()): String =
+        when (val selected = currentLanguageCode()) {
+            LANG_CS, LANG_EN -> selected
+            else -> if (systemLocale.language.equals("en", ignoreCase = true)) LANG_EN else LANG_CS
+        }
+
+    fun effectiveLocale(systemLocale: Locale = systemLocale()): Locale =
+        when (effectiveLanguageCode(systemLocale)) {
+            LANG_EN -> Locale.US
+            else -> Locale.forLanguageTag("cs-CZ")
+        }
+
     fun localeListFor(langCode: String): LocaleListCompat = when (langCode) {
         LANG_CS -> LocaleListCompat.forLanguageTags("cs-CZ")
         LANG_EN -> LocaleListCompat.forLanguageTags("en-US")
@@ -55,6 +72,11 @@ object LanguageController {
     fun getLocale(langCode: String): Locale = when (langCode) {
         LANG_CS -> Locale.forLanguageTag("cs-CZ")
         LANG_EN -> Locale.US
-        else -> Locale.getDefault()
+        else -> effectiveLocale()
+    }
+
+    private fun systemLocale(): Locale {
+        val locales = Resources.getSystem().configuration.locales
+        return if (!locales.isEmpty) locales[0] else Locale.US
     }
 }
