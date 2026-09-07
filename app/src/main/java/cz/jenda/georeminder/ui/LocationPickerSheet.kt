@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,8 +74,10 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.ActivityInsets
 import cz.jenda.georeminder.data.FavoritesStore
+import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.PhotonLocationRepository
 import cz.jenda.georeminder.data.PhotonSearchResult
@@ -92,7 +95,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.ln
 
@@ -171,9 +173,18 @@ fun LocationPickerSheet(
     val cameraPositionState = rememberCameraPositionState {
         val user = LocationHolder.location.value
         position = when {
-            initialCoordinate != null -> CameraPosition.fromLatLngZoom(initialCoordinate, zoomForSpan(1200.0, initialCoordinate.latitude))
-            user != null -> CameraPosition.fromLatLngZoom(LatLng(user.latitude, user.longitude), zoomForSpan(1500.0, user.latitude))
-            else -> CameraPosition.fromLatLngZoom(LatLng(50.0755, 14.4378), zoomForSpan(5000.0, 50.0755))
+            initialCoordinate != null -> CameraPosition.fromLatLngZoom(
+                initialCoordinate,
+                zoomForSpan(1200.0, initialCoordinate.latitude),
+            )
+            user != null -> CameraPosition.fromLatLngZoom(
+                LatLng(user.latitude, user.longitude),
+                zoomForSpan(1500.0, user.latitude),
+            )
+            else -> CameraPosition.fromLatLngZoom(
+                LatLng(50.0755, 14.4378),
+                zoomForSpan(5000.0, 50.0755),
+            )
         }
     }
 
@@ -188,12 +199,17 @@ fun LocationPickerSheet(
         scope.launch {
             runCatching {
                 cameraPositionState.animate(
-                    CameraUpdateFactory.newLatLngBounds(boundsAround(coord, maxOf(radius * 6, 800.0)), 40),
+                    CameraUpdateFactory.newLatLngBounds(
+                        boundsAround(coord, maxOf(radius * 6, 800.0)),
+                        40,
+                    ),
                     600,
                 )
             }
             if (name.isEmpty()) {
-                reverseGeocode(context, coord)?.let { if (selected == coord) selectedName = it }
+                reverseGeocode(context, coord)?.let {
+                    if (selected == coord) selectedName = it
+                }
             }
         }
     }
@@ -217,7 +233,10 @@ fun LocationPickerSheet(
             onMapClick = { select(it, "") },
         ) {
             selected?.let { coord ->
-                Marker(state = MarkerState(coord), title = selectedName.ifEmpty { "Vybrané místo" })
+                Marker(
+                    state = MarkerState(coord),
+                    title = selectedName.ifEmpty { context.getString(R.string.location_selected_place) },
+                )
                 Circle(
                     center = coord,
                     radius = radius,
@@ -230,17 +249,36 @@ fun LocationPickerSheet(
 
         Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                CapsulePillButton("Zrušit", modifier = Modifier.align(Alignment.CenterStart), onClick = onCancel)
-                Text("Vybrat místo", style = GeoType.headline, color = colors.label, textAlign = TextAlign.Center, modifier = Modifier.align(Alignment.Center))
+                CapsulePillButton(
+                    stringResource(R.string.action_cancel),
+                    modifier = Modifier.align(Alignment.CenterStart),
+                    onClick = onCancel,
+                )
+                Text(
+                    stringResource(R.string.location_picker_title),
+                    style = GeoType.headline,
+                    color = colors.label,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center),
+                )
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
                     .shadow(3.dp, RoundedCornerShape(10.dp), spotColor = Color.Black.copy(alpha = 0.2f))
-                    .clip(RoundedCornerShape(10.dp)).background(colors.glass).padding(10.dp),
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(colors.glass)
+                    .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.Search, "Hledat místo", tint = colors.secondaryLabel, modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Filled.Search,
+                    stringResource(R.string.location_picker_search_hint),
+                    tint = colors.secondaryLabel,
+                    modifier = Modifier.size(20.dp),
+                )
                 Spacer(Modifier.width(8.dp))
                 BasicTextField(
                     value = searchText,
@@ -254,13 +292,23 @@ fun LocationPickerSheet(
                     modifier = Modifier.weight(1f),
                     decorationBox = { inner ->
                         Box {
-                            if (searchText.isEmpty()) Text("Hledat adresu nebo místo…", style = GeoType.body, color = colors.tertiaryLabel)
+                            if (searchText.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.location_picker_search_hint),
+                                    style = GeoType.body,
+                                    color = colors.tertiaryLabel,
+                                )
+                            }
                             inner()
                         }
                     },
                 )
                 if (isSearching) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.accent)
+                    CircularProgressIndicator(
+                        Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = colors.accent,
+                    )
                 } else if (searchText.isNotEmpty()) {
                     Box(
                         modifier = Modifier.size(40.dp).iosClickable {
@@ -270,65 +318,117 @@ fun LocationPickerSheet(
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Filled.Cancel, "Smazat hledání", tint = colors.secondaryLabel, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Filled.Cancel,
+                            stringResource(R.string.action_clear),
+                            tint = colors.secondaryLabel,
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 }
             }
 
             if (results.isNotEmpty()) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
                         .shadow(3.dp, RoundedCornerShape(10.dp), spotColor = Color.Black.copy(alpha = 0.2f))
-                        .clip(RoundedCornerShape(10.dp)).background(colors.glass),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colors.glass),
                 ) {
-                    results.take(5).forEachIndexed { index, result ->
+                    val shown = results.take(5)
+                    shown.forEachIndexed { index, result ->
                         Row(
-                            modifier = Modifier.fillMaxWidth().iosClickable { select(result.position, result.title) }
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .iosClickable { select(result.position, result.title) }
                                 .padding(horizontal = 12.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(categoryIcon(result.category), null, tint = colors.secondaryLabel, modifier = Modifier.size(20.dp))
+                            Icon(
+                                categoryIcon(result.category),
+                                null,
+                                tint = colors.secondaryLabel,
+                                modifier = Modifier.size(20.dp),
+                            )
                             Spacer(Modifier.width(10.dp))
                             Column {
-                                Text(result.title, style = GeoType.body, color = colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    result.title,
+                                    style = GeoType.body,
+                                    color = colors.label,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                                 val detail = listOfNotNull(
                                     result.subtitle.takeIf { it.isNotBlank() },
                                     result.distanceMeters?.let { CzechFormat.distanceShort(it) },
                                 ).joinToString(" • ")
-                                if (detail.isNotEmpty()) Text(detail, style = GeoType.caption, color = colors.secondaryLabel, maxLines = 1)
+                                if (detail.isNotEmpty()) {
+                                    Text(
+                                        detail,
+                                        style = GeoType.caption,
+                                        color = colors.secondaryLabel,
+                                        maxLines = 1,
+                                    )
+                                }
                             }
                         }
-                        if (index != results.take(5).lastIndex) HorizontalDivider(thickness = 0.7.dp, color = colors.separator)
+                        if (index != shown.lastIndex) {
+                            HorizontalDivider(thickness = 0.7.dp, color = colors.separator)
+                        }
                     }
                 }
             } else if (!isSearching && searchText.trim().length >= 2 && searchOutcome != null) {
-                val message = when (val outcome = searchOutcome) {
-                    SearchOutcome.NoResults -> "Nic jsem nenašel – zkus jiný název, nebo ťukni rovnou do mapy."
-                    SearchOutcome.NetworkError -> "Vyhledávání je offline – zkontroluj internet, nebo ťukni rovnou do mapy."
-                    is SearchOutcome.ServerError -> "Vyhledávací služba teď neodpovídá správně (HTTP ${outcome.code}). Zkus to později."
-                    SearchOutcome.ParseError -> "Vyhledávací služba poslala nečitelnou odpověď. Zkus hledání znovu."
-                    else -> "Nic jsem nenašel."
+                val message = when (searchOutcome) {
+                    SearchOutcome.NoResults -> stringResource(R.string.location_search_no_results)
+                    SearchOutcome.NetworkError -> stringResource(R.string.location_search_network_error)
+                    is SearchOutcome.ServerError -> stringResource(R.string.location_search_server_error)
+                    SearchOutcome.ParseError -> stringResource(R.string.location_search_parse_error)
+                    else -> stringResource(R.string.location_search_no_results)
                 }
                 Text(
                     message,
                     style = GeoType.footnote,
                     color = colors.secondaryLabel,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clip(RoundedCornerShape(10.dp)).background(colors.glass).padding(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colors.glass)
+                        .padding(12.dp),
                 )
-            } else if (searchFocused && searchText.isBlank() && (favoritePlaces.isNotEmpty() || recentPlaces.isNotEmpty())) {
+            } else if (
+                searchFocused && searchText.isBlank() &&
+                (favoritePlaces.isNotEmpty() || recentPlaces.isNotEmpty())
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-                        .shadow(3.dp, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp)).background(colors.glass),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .shadow(3.dp, RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colors.glass),
                 ) {
                     favoritePlaces.take(3).forEach { place ->
-                        SuggestionRow(Icons.Filled.Star, colors.yellow, place.name, "oblíbené místo") {
+                        SuggestionRow(
+                            Icons.Filled.Star,
+                            colors.yellow,
+                            place.name,
+                            stringResource(R.string.location_favorite_badge),
+                        ) {
                             radius = place.radius
                             select(LatLng(place.latitude, place.longitude), place.name)
                         }
                     }
                     recentPlaces.take(3).forEach { recent ->
-                        SuggestionRow(Icons.Filled.History, colors.secondaryLabel, recent.name, "nedávné místo") {
+                        SuggestionRow(
+                            Icons.Filled.History,
+                            colors.secondaryLabel,
+                            recent.name,
+                            stringResource(R.string.location_recent_badge),
+                        ) {
                             select(LatLng(recent.latitude, recent.longitude), recent.name)
                         }
                     }
@@ -341,22 +441,41 @@ fun LocationPickerSheet(
             val dialogNavPx = WindowInsets.navigationBars.getBottom(density)
             val bottomInset = with(density) { maxOf(activityNavPx, dialogNavPx).toDp() }
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(colors.glass)
-                    .padding(16.dp).padding(bottom = bottomInset),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(colors.glass)
+                    .padding(16.dp)
+                    .padding(bottom = bottomInset),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(selectedName.ifEmpty { "Vybrané místo" }, style = GeoType.headline, color = colors.label, maxLines = 1)
+                Text(
+                    selectedName.ifEmpty { stringResource(R.string.location_selected_place) },
+                    style = GeoType.headline,
+                    color = colors.label,
+                    maxLines = 1,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Poloměr", style = GeoType.subheadline, color = colors.label)
+                    Text(
+                        stringResource(R.string.location_radius),
+                        style = GeoType.subheadline,
+                        color = colors.label,
+                    )
                     Spacer(Modifier.width(10.dp))
                     RadiusSlider(radius, { radius = it }, Modifier.weight(1f))
                     Box(Modifier.width(64.dp), contentAlignment = Alignment.CenterEnd) {
-                        Text("${radius.toInt()} m", style = GeoType.subheadline, color = colors.label)
+                        Text(
+                            stringResource(R.string.location_radius_value, radius.toInt()),
+                            style = GeoType.subheadline,
+                            color = colors.label,
+                        )
                     }
                 }
-                PrimaryButton("Použít toto místo") {
-                    val finalName = selectedName.ifEmpty { "Vybrané místo" }
+                PrimaryButton(stringResource(R.string.location_use_this)) {
+                    val finalName = selectedName.ifEmpty {
+                        context.getString(R.string.location_selected_place)
+                    }
                     RecentPlaces.add(context, finalName, coord.latitude, coord.longitude)
                     onConfirm(finalName, coord, radius)
                 }
@@ -375,13 +494,22 @@ private fun SuggestionRow(
 ) {
     val colors = GeoTheme.colors
     Row(
-        modifier = Modifier.fillMaxWidth().iosClickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 9.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .iosClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = iconTint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
         Column {
-            Text(title, style = GeoType.body, color = colors.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                title,
+                style = GeoType.body,
+                color = colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(subtitle, style = GeoType.caption, color = colors.secondaryLabel)
         }
     }
@@ -423,7 +551,11 @@ private suspend fun searchPlaces(
         val withDistance = if (near == null) base else base.map { result ->
             val out = FloatArray(1)
             android.location.Location.distanceBetween(
-                near.latitude, near.longitude, result.position.latitude, result.position.longitude, out,
+                near.latitude,
+                near.longitude,
+                result.position.latitude,
+                result.position.longitude,
+                out,
             )
             result.copy(distanceMeters = out[0])
         }
@@ -439,11 +571,20 @@ private suspend fun searchPlaces(
 
 private fun placeCategory(key: String, value: String): PlaceCategory = when {
     key == "shop" -> PlaceCategory.SHOP
-    key == "amenity" && value in setOf("restaurant", "cafe", "fast_food", "pub", "bar", "food_court", "ice_cream", "biergarten") -> PlaceCategory.FOOD
-    key == "amenity" && value in setOf("pharmacy", "hospital", "clinic", "doctors", "dentist", "veterinary") -> PlaceCategory.HEALTH
-    key == "amenity" && value in setOf("school", "university", "college", "kindergarten", "library") -> PlaceCategory.SCHOOL
-    key == "railway" || key == "public_transport" || (key == "highway" && value == "bus_stop") -> PlaceCategory.TRANSIT
-    key == "place" && value in setOf("city", "town", "village", "suburb", "hamlet", "quarter", "neighbourhood") -> PlaceCategory.CITY
+    key == "amenity" && value in setOf(
+        "restaurant", "cafe", "fast_food", "pub", "bar", "food_court", "ice_cream", "biergarten"
+    ) -> PlaceCategory.FOOD
+    key == "amenity" && value in setOf(
+        "pharmacy", "hospital", "clinic", "doctors", "dentist", "veterinary"
+    ) -> PlaceCategory.HEALTH
+    key == "amenity" && value in setOf(
+        "school", "university", "college", "kindergarten", "library"
+    ) -> PlaceCategory.SCHOOL
+    key == "railway" || key == "public_transport" ||
+        (key == "highway" && value == "bus_stop") -> PlaceCategory.TRANSIT
+    key == "place" && value in setOf(
+        "city", "town", "village", "suburb", "hamlet", "quarter", "neighbourhood"
+    ) -> PlaceCategory.CITY
     else -> PlaceCategory.PLACE
 }
 
@@ -453,36 +594,61 @@ private fun geocoderSearch(
     query: String,
     near: android.location.Location?,
 ): List<GeoSearchResult> = try {
-    val geocoder = Geocoder(context, Locale("cs", "CZ"))
+    val geocoder = Geocoder(context, LanguageController.effectiveLocale())
     val nearby: List<Address> = if (near != null) {
         val dLat = 0.135
         val dLng = 0.135 / cos(Math.toRadians(near.latitude)).coerceAtLeast(0.1)
-        geocoder.getFromLocationName(query, 5, near.latitude - dLat, near.longitude - dLng, near.latitude + dLat, near.longitude + dLng) ?: emptyList()
+        geocoder.getFromLocationName(
+            query,
+            5,
+            near.latitude - dLat,
+            near.longitude - dLng,
+            near.latitude + dLat,
+            near.longitude + dLng,
+        ) ?: emptyList()
     } else emptyList()
     val addresses = nearby.ifEmpty { geocoder.getFromLocationName(query, 5) ?: emptyList() }
+    val noName = context.getString(R.string.location_no_name)
     addresses.mapNotNull { address ->
-        if (!address.latitude.isFinite() || !address.longitude.isFinite() || address.latitude !in -90.0..90.0 || address.longitude !in -180.0..180.0) null
-        else GeoSearchResult(addressTitle(address), address.getAddressLine(0) ?: "", LatLng(address.latitude, address.longitude))
+        if (
+            !address.latitude.isFinite() || !address.longitude.isFinite() ||
+            address.latitude !in -90.0..90.0 || address.longitude !in -180.0..180.0
+        ) null
+        else GeoSearchResult(
+            addressTitle(address, noName),
+            address.getAddressLine(0) ?: "",
+            LatLng(address.latitude, address.longitude),
+        )
     }
-} catch (_: Exception) { emptyList() }
-
-@Suppress("DEPRECATION")
-private suspend fun reverseGeocode(context: android.content.Context, coord: LatLng): String? = withContext(Dispatchers.IO) {
-    try {
-        val address = Geocoder(context, Locale("cs", "CZ")).getFromLocation(coord.latitude, coord.longitude, 1)?.firstOrNull()
-            ?: return@withContext null
-        addressTitle(address)
-    } catch (_: Exception) { null }
+} catch (_: Exception) {
+    emptyList()
 }
 
-private fun addressTitle(address: Address): String {
+@Suppress("DEPRECATION")
+private suspend fun reverseGeocode(
+    context: android.content.Context,
+    coord: LatLng,
+): String? = withContext(Dispatchers.IO) {
+    try {
+        val address = Geocoder(context, LanguageController.effectiveLocale())
+            .getFromLocation(coord.latitude, coord.longitude, 1)
+            ?.firstOrNull()
+            ?: return@withContext null
+        addressTitle(address, context.getString(R.string.location_no_name))
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun addressTitle(address: Address, noName: String): String {
     val street = listOfNotNull(address.thoroughfare, address.subThoroughfare).joinToString(" ")
     val feature = address.featureName
     return when {
-        !feature.isNullOrBlank() && feature != address.subThoroughfare && !feature.matches(Regex("^[\\d/]+$")) -> feature
+        !feature.isNullOrBlank() && feature != address.subThoroughfare &&
+            !feature.matches(Regex("^[\\d/]+$")) -> feature
         street.isNotBlank() -> street
         !feature.isNullOrBlank() -> feature
         !address.locality.isNullOrBlank() -> address.locality
-        else -> "Bez názvu"
+        else -> noName
     }
 }
