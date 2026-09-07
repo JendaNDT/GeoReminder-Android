@@ -167,16 +167,12 @@ object TtsSpeaker {
 
         val result = engine.setLanguage(preferred)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            if (preferred != systemLocale) {
-                val fallback = engine.setLanguage(systemLocale)
-                if (fallback != TextToSpeech.LANG_MISSING_DATA &&
-                    fallback != TextToSpeech.LANG_NOT_SUPPORTED
-                ) {
-                    return
-                }
+            val fallback = if (preferred.language == "en") {
+                Locale.forLanguageTag("cs-CZ")
+            } else {
+                Locale.US
             }
-            // Poslední konzervativní fallback. Text zůstane beze změny.
-            engine.setLanguage(Locale.US)
+            engine.setLanguage(fallback)
         }
     }
 
@@ -185,11 +181,20 @@ object TtsSpeaker {
         return if (!locales.isEmpty) locales[0] else Locale.US
     }
 
+    /**
+     * Aplikace má v této verzi jen české výchozí resources a values-en.
+     * SYSTEM tedy znamená anglický hlas pro anglický systém, jinak český
+     * fallback, aby např. německý hlas nečetl české texty.
+     */
     internal fun resolvePreferredLocale(appLanguage: String, systemLocale: Locale): Locale =
         when (appLanguage) {
             LanguageController.LANG_CS -> Locale.forLanguageTag("cs-CZ")
             LanguageController.LANG_EN -> Locale.US
-            else -> systemLocale
+            else -> if (systemLocale.language.equals("en", ignoreCase = true)) {
+                Locale.US
+            } else {
+                Locale.forLanguageTag("cs-CZ")
+            }
         }
 
     fun shutdown() {
