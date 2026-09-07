@@ -22,10 +22,15 @@ object BackupManager {
         encodeDefaults = true
     }
 
-    /** Exportuje data připomínek a oblíbených do daného URI souboru. */
+    /**
+     * Exportuje data připomínek a oblíbených do daného URI souboru.
+     * JSON záloha fyzické přílohy neobsahuje, proto do ní nepatří ani absolutní
+     * cesta z interního úložiště konkrétního telefonu.
+     */
     fun exportBackup(context: Context, targetUri: Uri): Boolean {
         return try {
             val reminders = ReminderStore.get(context).reminders.value
+                .map { it.copy(attachmentPath = null) }
             val favorites = FavoritesStore.get(context).favorites.value
             val backupObj = GeoReminderBackupData(
                 reminders = reminders,
@@ -33,11 +38,13 @@ object BackupManager {
             )
             val jsonText = json.encodeToString(backupObj)
 
-            context.contentResolver.openOutputStream(targetUri)?.use { stream ->
-                stream.write(jsonText.toByteArray(Charsets.UTF_8))
+            val stream = context.contentResolver.openOutputStream(targetUri) ?: return false
+            stream.use {
+                it.write(jsonText.toByteArray(Charsets.UTF_8))
             }
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.w("BackupManager", "Export zálohy selhal", e)
             false
         }
     }
@@ -58,7 +65,14 @@ object BackupManager {
                 val latValid = !r.latitude.isNaN() && r.latitude in -90.0..90.0
                 val lonValid = !r.longitude.isNaN() && r.longitude in -180.0..180.0
                 if (!latValid || !lonValid) return@forEach
-                val sanitized = r.copy(radius = r.radius.coerceIn(50.0, 1000.0))
+
+                // JSON záloha neobsahuje soubor přílohy. Cizí absolutní cestu proto
+                // nikdy nepřebíráme do aplikace; jinak by mohla ukazovat mimo
+                // spravovaný attachments adresář nebo na neexistující soubor.
+                val sanitized = r.copy(
+                    radius = r.radius.coerceIn(50.0, 1000.0),
+                    attachmentPath = null,
+                )
                 if (currentReminders.containsKey(sanitized.id)) {
                     store.update(sanitized)
                 } else {
