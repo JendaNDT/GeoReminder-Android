@@ -39,6 +39,7 @@ import androidx.glance.text.TextStyle
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.LocationHolder
+import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
@@ -63,7 +64,7 @@ class GeoReminderWidget : GlanceAppWidget() {
     }
 
     private fun loadActive(context: Context): List<Reminder> {
-        val text = SharedStorage.readText(context, ReminderStoreFile.NAME) ?: return emptyList()
+        val text = SharedStorage.readText(context, ReminderStore.FILE) ?: return emptyList()
         val decoded = when (val result = SharedStorage.decodeReminders(text)) {
             is SharedStorage.DecodeRemindersResult.Success -> result.reminders
             is SharedStorage.DecodeRemindersResult.Partial -> result.reminders
@@ -77,8 +78,6 @@ class GeoReminderWidget : GlanceAppWidget() {
             userLocation = location,
         ).take(3)
     }
-
-    private object ReminderStoreFile { const val NAME = "reminders.json" }
 }
 
 class GeoReminderWidgetReceiver : GlanceAppWidgetReceiver() {
