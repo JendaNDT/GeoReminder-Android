@@ -1,5 +1,6 @@
 package cz.jenda.georeminder
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -17,6 +18,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -80,7 +83,7 @@ class ReceiverAndStateInstrumentationTest {
     }
 
     @Test
-    fun notificationDoneActionLoadsFromDiskAndIsIdempotent() {
+    fun notificationDoneActionLoadsFromDiskIsIdempotentAndCancelsAlarms() {
         val reminder = Reminder(
             id = "done-cold-start",
             title = "Cold start done",
@@ -90,6 +93,11 @@ class ReceiverAndStateInstrumentationTest {
         )
         writeSnapshot(listOf(reminder))
         val state = SchedulerStateStore(context)
+        val scheduler = ReminderScheduler.get(context)
+        scheduler.schedule(reminder)
+        scheduler.scheduleNag(reminder)
+        assertNotNull(normalAlarmPendingIntent(reminder.id, state))
+        assertNotNull(nagPendingIntent(reminder.id, state))
         state.setNotificationActionToken(reminder.id, "done-token")
 
         val action = Intent(context, NotificationActionReceiver::class.java)
@@ -104,12 +112,35 @@ class ReceiverAndStateInstrumentationTest {
                 ReminderStore.get(context).reminders.value.firstOrNull { it.id == reminder.id }?.isDone == true
         }
 
+        assertNull(normalAlarmPendingIntent(reminder.id, state))
+        assertNull(nagPendingIntent(reminder.id, state))
+
         context.sendBroadcast(action)
         Thread.sleep(300)
         runBlocking { ReminderStore.get(context).reloadAndWait() }
         assertTrue(ReminderStore.get(context).reminders.value.single { it.id == reminder.id }.isDone)
         assertFalse(SchedulerStateStore(context).consumeNotificationActionToken(reminder.id, "done-token"))
     }
+
+    private fun normalAlarmPendingIntent(reminderId: String, state: SchedulerStateStore): PendingIntent? =
+        PendingIntent.getBroadcast(
+            context,
+            state.requestCode(reminderId, SchedulerStateStore.OFFSET_ALARM),
+            Intent(context, AlarmReceiver::class.java)
+                .setAction(ReminderScheduler.ACTION_ALARM_FIRE)
+                .putExtra(ReminderScheduler.EXTRA_REMINDER_ID, reminderId),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+    private fun nagPendingIntent(reminderId: String, state: SchedulerStateStore): PendingIntent? =
+        PendingIntent.getBroadcast(
+            context,
+            state.requestCode(reminderId, SchedulerStateStore.OFFSET_NAG),
+            Intent(context, AlarmReceiver::class.java)
+                .setAction(ReminderScheduler.ACTION_NAG_FIRE)
+                .putExtra(ReminderScheduler.EXTRA_REMINDER_ID, reminderId),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        )
 
     private fun writeSnapshot(reminders: List<Reminder>) {
         val text = SharedStorage.json.encodeToString(
