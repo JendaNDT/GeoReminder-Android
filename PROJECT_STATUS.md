@@ -4,9 +4,9 @@
 **Aktuální build:** versionName **2.7**, versionCode **19**  
 **SDK:** minSdk 26, compileSdk 36, targetSdk 36  
 **Větev stabilizace:** `fix/stabilizace-etapa-1`  
-**PR:** #1, stále draft do dokončení release/device hardeningu.
+**PR:** #1, stále draft do dokončení device/Play release gate.
 
-Tento soubor je aktuální zdroj pravdy pro stav projektu. `AUDIT1.md` a `AUDIT3.md` jsou historické snapshoty starších verzí a jejich čísla verzí, target SDK nebo seznam nevyřešených nálezů se nemají používat jako současný stav.
+Tento soubor je aktuální zdroj pravdy pro stav projektu. `AUDIT1.md` a `AUDIT3.md` jsou historické snapshoty starších verzí. Detailní plán je v `IMPLEMENTACNI-PLAN-OPRAV-2026-09.md`; autoritativní stav jeho dokončení je v `IMPLEMENTACNI-PLAN-OPRAV-2026-09-COMPLETION.md`.
 
 ## Aktuální funkce
 
@@ -42,7 +42,7 @@ Implementované:
 - AppCompat per-app locales, CZ/EN resources, dirty editor protection a MIME policy příloh.
 
 ### Etapa 10 – automatické testy
-Implementovaná automatická část.
+Automatická část implementovaná a ověřená.
 
 - JVM testy pokrývají scheduler math, DST, přechod roku, storage recovery, Apple date kompatibilitu, backup/import, geofence policy, resolver, localization a další kritickou logiku.
 - Android instrumentation pokrývá mimo jiné scheduler/snooze/PendingIntent stav, cold-start receivery a permission/system-access scénáře.
@@ -57,13 +57,18 @@ Implementovaná.
 Diagnostika drží maximálně 50 technických událostí a záměrně neukládá názvy reminderů, jejich ID ani GPS souřadnice. Umí vytvořit anonymizovaný technický report, spustit resync a založit testovací reminder za jednu minutu.
 
 ### Etapa 12 – release hardening
-Probíhá.
+Implementovaná v kódu a automatizační vrstvě.
 
 - release lint je zapnutý (`checkReleaseBuilds = true`, `abortOnError = true`),
-- CI nově obsahuje `lintRelease` a `assembleRelease`,
-- workflow se spouští na stabilizační větvi, PR do `main` a push do `main`,
-- první release-hardening průchod se záměrně testuje bez R8; po zeleném výsledku následuje minifikovaný release,
-- dokumentace se synchronizuje se skutečným buildem a aktuální Google Play politikou.
+- neminifikovaný release + lint prošel v runu #170 (`34165302459`),
+- R8 je zapnutý (`isMinifyEnabled = true`),
+- izolovaný minifikovaný release + lint prošel build krokem runu #186 (`34165752970`),
+- CI ověřuje unit testy, release lint, debug/release build, `bundleRelease`, instrumentation APK a API 36 instrumentation,
+- workflow běží pro PR do `main`, push do `main` a ruční `workflow_dispatch`,
+- signing hesla už nejsou natvrdo v aktivní Gradle konfiguraci; čtou se z ignorovaného `app/keystore.properties` nebo environment proměnných,
+- dokumentace, Play checklist, store texty a privacy policy jsou synchronizované se skutečným buildem a aktuální politikou.
+
+> R8 runtime smoke na fyzickém zařízení zůstává release gate. Z úspěšného sestavení nelze odvodit, že minifikovaný TTS, receivery, Glance widget, backup/import a Maps/Play Services byly fyzicky vyzkoušené.
 
 ## CI
 
@@ -81,6 +86,7 @@ Kontroly:
 - `:app:lintRelease`
 - `:app:assembleDebug`
 - `:app:assembleRelease`
+- `:app:bundleRelease`
 - `:app:assembleDebugAndroidTest`
 - API 36 emulator instrumentation.
 
@@ -93,6 +99,7 @@ Kontroly:
 - Backup ZIP má limity velikosti/počtu entries a ochranu proti path traversal.
 - Podporované přílohy: JPEG, PNG a PDF.
 - Diagnostický export neobsahuje osobní názvy reminderů ani přesné souřadnice.
+- Keystore, `keystore.properties` a Maps API key zůstávají mimo Git.
 
 ## Android oprávnění
 
@@ -112,15 +119,18 @@ GeoReminder používá uživatelsky udělovaný `SCHEDULE_EXACT_ALARM`, nikoli o
 
 ## Co stále blokuje veřejný release
 
-- dokončit a zaznamenat release lint/build + R8 průchod,
 - dokončit reálnou device matrix, zejména Samsung/One UI a čistý Android,
-- ověřit minifikovaný build na zařízení: persistence/serialization, TTS, receivery, widget, backup/import, Maps/Play Services,
-- dokončit Google Play formuláře a closed testing podle aktuálních podmínek účtu,
-- ověřit store listing a privacy/Data safety deklarace proti skutečnému chování aplikace.
+- ověřit minifikovaný build na zařízení: persistence/serialization, TTS, receivery, widget, backup/import a Maps/Play Services,
+- pokud skutečný keystore stále používá historicky zveřejněné heslo, změnit jej lokálně nebo keystore považovat za kompromitovatelný při úniku souboru,
+- dokončit Google Play formuláře a closed testing podle aktuálních podmínek konkrétního developer účtu,
+- nahrát správně podepsaný release `.aab` s vhodným novým versionCode,
+- ověřit store listing a privacy/Data safety deklarace proti finálnímu release kandidátovi.
 
 ## Související dokumenty
 
-- `IMPLEMENTACNI-PLAN-OPRAV-2026-09.md` – aktuální stabilizační plán,
+- `IMPLEMENTACNI-PLAN-OPRAV-2026-09.md` – detailní specifikace stabilizačního plánu,
+- `IMPLEMENTACNI-PLAN-OPRAV-2026-09-COMPLETION.md` – autoritativní stav dokončení Etap 1–12,
+- `DOCUMENTATION-STATUS.md` – hierarchie a stav dokumentů,
 - `DEVICE-TEST-MATRIX.md` – manuální/device release gate,
 - `GOOGLE-PLAY-CHECKLIST.md` – Play policy/release checklist,
 - `PRIVACY.md` – privacy policy,
