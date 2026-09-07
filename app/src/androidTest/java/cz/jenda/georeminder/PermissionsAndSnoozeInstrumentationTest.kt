@@ -28,41 +28,34 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
     }
 
     fun testFineLocationGrantAndRevokeAreReflected() {
-        val automation = instrumentation.uiAutomation
-        val packageName = context.packageName
-
-        automation.grantRuntimePermission(packageName, Manifest.permission.ACCESS_FINE_LOCATION)
+        setRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION, granted = true)
         assertTrue(LocationHolder.hasFineLocation(context))
 
-        automation.revokeRuntimePermission(packageName, Manifest.permission.ACCESS_FINE_LOCATION)
+        setRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION, granted = false)
         assertFalse(LocationHolder.hasFineLocation(context))
     }
 
     fun testBackgroundLocationGrantAndRevokeAreReflected() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-        val automation = instrumentation.uiAutomation
-        val packageName = context.packageName
 
-        automation.grantRuntimePermission(packageName, Manifest.permission.ACCESS_FINE_LOCATION)
-        automation.grantRuntimePermission(packageName, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        setRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION, granted = true)
+        setRuntimePermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, granted = true)
         assertTrue(LocationHolder.hasBackgroundLocation(context))
 
-        automation.revokeRuntimePermission(packageName, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        setRuntimePermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, granted = false)
         assertFalse(LocationHolder.hasBackgroundLocation(context))
     }
 
     fun testNotificationPermissionGrantAndRevokeAreReflected() {
         if (Build.VERSION.SDK_INT < 33) return
-        val automation = instrumentation.uiAutomation
-        val packageName = context.packageName
 
-        automation.grantRuntimePermission(packageName, Manifest.permission.POST_NOTIFICATIONS)
+        setRuntimePermission(Manifest.permission.POST_NOTIFICATIONS, granted = true)
         assertEquals(
             PackageManager.PERMISSION_GRANTED,
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
         )
 
-        automation.revokeRuntimePermission(packageName, Manifest.permission.POST_NOTIFICATIONS)
+        setRuntimePermission(Manifest.permission.POST_NOTIFICATIONS, granted = false)
         assertEquals(
             PackageManager.PERMISSION_DENIED,
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
@@ -102,6 +95,14 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
         assertNotNull(snoozePendingIntent(reminder.id, state))
 
         scheduler.cancel(reminder.id)
+    }
+
+    private fun setRuntimePermission(permission: String, granted: Boolean) {
+        val command = if (granted) "grant" else "revoke"
+        instrumentation.uiAutomation
+            .executeShellCommand("pm $command ${context.packageName} $permission")
+            .close()
+        Thread.sleep(150)
     }
 
     private fun normalAlarmPendingIntent(
