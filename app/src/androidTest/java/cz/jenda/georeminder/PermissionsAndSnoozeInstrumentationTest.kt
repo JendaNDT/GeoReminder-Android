@@ -6,6 +6,8 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import cz.jenda.georeminder.data.LocationHolder
@@ -43,6 +45,8 @@ class PermissionsAndSnoozeInstrumentationTest {
     @Test
     fun test01FineLocationStartsDeniedAndCanBeGranted() {
         assertFalse(LocationHolder.hasFineLocation(context))
+        grantRuntimePermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+        assertFalse(LocationHolder.hasFineLocation(context))
         grantRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION)
         assertTrue(LocationHolder.hasFineLocation(context))
     }
@@ -52,6 +56,7 @@ class PermissionsAndSnoozeInstrumentationTest {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
 
         assertFalse(LocationHolder.hasBackgroundLocation(context))
+        grantRuntimePermission(Manifest.permission.ACCESS_COARSE_LOCATION)
         grantRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION)
         grantRuntimePermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         assertTrue(LocationHolder.hasBackgroundLocation(context))
@@ -132,10 +137,27 @@ class PermissionsAndSnoozeInstrumentationTest {
     }
 
     private fun grantRuntimePermission(permission: String) {
-        instrumentation.uiAutomation
-            .executeShellCommand("pm grant ${context.packageName} $permission")
-            .close()
-        Thread.sleep(150)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName, permission)
+        } else {
+            // Reading to EOF waits for pm; closing its pipe immediately races the grant.
+            val descriptor = instrumentation.uiAutomation
+                .executeShellCommand("pm grant ${context.packageName} $permission")
+            val output = ParcelFileDescriptor.AutoCloseInputStream(descriptor)
+                .bufferedReader().use { it.readText() }
+            assertTrue("pm grant failed: $output", output.isBlank())
+        }
+        val deadline = SystemClock.elapsedRealtime() + 5_000L
+        while (context.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED &&
+            SystemClock.elapsedRealtime() < deadline
+        ) {
+            SystemClock.sleep(50L)
+        }
+        assertEquals(
+            "Permission was not granted within 5 seconds: $permission",
+            PackageManager.PERMISSION_GRANTED,
+            context.checkSelfPermission(permission),
+        )
     }
 
     private fun normalAlarmPendingIntent(
