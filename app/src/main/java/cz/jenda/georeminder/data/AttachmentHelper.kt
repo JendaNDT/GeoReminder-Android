@@ -14,6 +14,9 @@ object AttachmentHelper {
 
     const val MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024L // 10 MB
 
+    internal fun isAllowedAttachmentSize(size: Long): Boolean =
+        size in 1..MAX_ATTACHMENT_SIZE_BYTES
+
     private fun attachmentsDir(context: Context): File =
         File(context.applicationContext.filesDir, DIR_ATTACHMENTS)
 
@@ -37,7 +40,7 @@ object AttachmentHelper {
     fun managedAttachmentForBackup(context: Context, path: String?): File? {
         if (path.isNullOrBlank()) return null
         return managedAttachmentFile(context, path)
-            ?.takeIf { it.exists() && it.isFile && it.length() in 1..MAX_ATTACHMENT_SIZE_BYTES }
+            ?.takeIf { it.exists() && it.isFile && isAllowedAttachmentSize(it.length()) }
     }
 
     fun normalizeRestoredAttachmentPath(context: Context, path: String?): String? {
@@ -69,7 +72,7 @@ object AttachmentHelper {
                     val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
                     if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
                         val size = cursor.getLong(sizeIndex)
-                        if (size <= 0L || size > MAX_ATTACHMENT_SIZE_BYTES) {
+                        if (!isAllowedAttachmentSize(size)) {
                             android.util.Log.w("AttachmentHelper", "Příloha má nepovolenou velikost ($size B)")
                             return null
                         }
@@ -100,10 +103,6 @@ object AttachmentHelper {
         }
     }
 
-    /**
-     * Bezpečně uloží jednu přílohu ze ZIP backupu. Vstupní stream nezavírá,
-     * protože může být sdíleným ZipInputStreamem pro další položky archivu.
-     */
     fun copyBackupEntryToInternal(
         context: Context,
         entryName: String,
@@ -123,7 +122,6 @@ object AttachmentHelper {
         }
     }
 
-    /** Kopíruje, ale nikdy nezavírá vstupní stream – jeho vlastníkem je volající. */
     private fun copyStreamToManagedFile(targetFile: File, input: InputStream): String? {
         var bytesCopied = 0L
         return try {
@@ -140,7 +138,7 @@ object AttachmentHelper {
                     output.write(buffer, 0, read)
                 }
             }
-            if (bytesCopied <= 0L) {
+            if (!isAllowedAttachmentSize(bytesCopied)) {
                 targetFile.delete()
                 null
             } else {
