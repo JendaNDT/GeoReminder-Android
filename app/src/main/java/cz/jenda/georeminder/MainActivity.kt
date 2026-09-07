@@ -29,6 +29,10 @@ class MainActivity : AppCompatActivity() {
         LanguageController.migrateLegacyPreferenceIfNeeded(this)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Při změně per-app locale AppCompat Activity znovu vytvoří, ale Application ne.
+        // Opětovná registrace zachová uživatelská nastavení kanálů a aktualizuje
+        // jejich lokalizované názvy/popisy v systémovém nastavení notifikací.
+        NotificationHelper.createChannel(this)
         ReminderStore.get(this) // zahřátí úložiště
         handleIntent(intent)
         setContent {
