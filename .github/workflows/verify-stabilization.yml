@@ -37,10 +37,30 @@ jobs:
       - name: Unit tests, debug build and instrumentation APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
+      - name: Prepare APK artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p ci-apks
+          APP_APK=$(find app/build/outputs/apk/debug -name '*debug.apk' ! -name '*androidTest*' | head -n 1)
+          TEST_APK=$(find app/build/outputs/apk/androidTest/debug -name '*.apk' | head -n 1)
+          test -n "$APP_APK"
+          test -n "$TEST_APK"
+          cp "$APP_APK" ci-apks/app-debug.apk
+          cp "$TEST_APK" ci-apks/app-debug-androidTest.apk
+          ls -lh ci-apks
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: georeminder-debug-apks
+          path: ci-apks/
+          if-no-files-found: error
+          retention-days: 3
+
   instrumentation-api36:
     needs: build-and-test
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
       ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
 
@@ -67,13 +87,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpulse0
 
-      - name: Gradle 8.13
-        uses: gradle/actions/setup-gradle@v4
+      - name: Download APK artifacts
+        uses: actions/download-artifact@v4
         with:
-          gradle-version: '8.13'
+          name: georeminder-debug-apks
+          path: ci-apks
 
-      - name: Build app and instrumentation APK
-        run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+      - name: Verify APK artifacts
+        run: |
+          set -euo pipefail
+          test -s ci-apks/app-debug.apk
+          test -s ci-apks/app-debug-androidTest.apk
+          ls -lh ci-apks
 
       - name: Start API 36 emulator
         timeout-minutes: 6
@@ -159,12 +184,8 @@ jobs:
         run: |
           set -euo pipefail
           serial=$(cat emulator-serial.txt)
-          APP_APK=$(find app/build/outputs/apk/debug -name '*debug.apk' ! -name '*androidTest*' | head -n 1)
-          TEST_APK=$(find app/build/outputs/apk/androidTest/debug -name '*.apk' | head -n 1)
-          test -n "$APP_APK"
-          test -n "$TEST_APK"
-          adb -s "$serial" install -r "$APP_APK"
-          adb -s "$serial" install -r "$TEST_APK"
+          adb -s "$serial" install -r ci-apks/app-debug.apk
+          adb -s "$serial" install -r ci-apks/app-debug-androidTest.apk
           output=$(adb -s "$serial" shell am instrument -w cz.jenda.georeminder.test/androidx.test.runner.AndroidJUnitRunner)
           echo "$output"
           echo "$output" | grep -q "OK ("
