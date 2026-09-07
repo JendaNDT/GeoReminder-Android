@@ -158,10 +158,14 @@ jobs:
               cat emulator.log || true
               exit 1
             fi
-            booted=$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
-            if [ "$booted" = "1" ]; then
-              echo "API 36 emulator boot completed"
-              break
+
+            state=$(adb -s "$serial" get-state 2>/dev/null || true)
+            if [ "$state" = "device" ]; then
+              booted=$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+              if [ "$booted" = "1" ]; then
+                echo "API 36 emulator boot completed"
+                break
+              fi
             fi
             sleep 2
           done
