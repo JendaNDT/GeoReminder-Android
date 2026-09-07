@@ -11,18 +11,25 @@ import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
+import cz.jenda.georeminder.notify.GeofenceRegistrationState
+import cz.jenda.georeminder.notify.ReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 class ReminderListViewModel(application: Application) : AndroidViewModel(application) {
     private val store = ReminderStore.get(application)
+    private val scheduler = ReminderScheduler.get(application)
 
     val reminders: StateFlow<List<Reminder>> = store.reminders
     val userLocation: StateFlow<Location?> = LocationHolder.location
-    val geofenceFailed: StateFlow<Boolean> = LocationHolder.geofenceFailed
+    val geofenceStates: StateFlow<Map<String, GeofenceRegistrationState>> = scheduler.geofenceStates
+    val geofenceFailed: StateFlow<Boolean> = geofenceStates
+        .map { states -> states.values.any { it.status.isFailure } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val pendingDeleteIds = MutableStateFlow<Set<String>>(emptySet())
     val searchQuery = MutableStateFlow("")
