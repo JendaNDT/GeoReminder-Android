@@ -3,13 +3,17 @@ name: Verify stabilization
 on:
   push:
     branches:
+      - main
       - fix/stabilizace-etapa-1
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout
@@ -34,8 +38,15 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Unit tests, debug build and instrumentation APK
-        run: gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+      - name: Unit tests, lint, debug and release build
+        run: >-
+          gradle
+          :app:testDebugUnitTest
+          :app:lintRelease
+          :app:assembleDebug
+          :app:assembleRelease
+          :app:assembleDebugAndroidTest
+          --stacktrace
 
       - name: Prepare APK artifacts
         run: |
