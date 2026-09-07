@@ -13,7 +13,6 @@ import java.net.URL
 import java.net.URLEncoder
 import java.net.UnknownHostException
 
-/** Výsledek hledání z Photon API. */
 data class PhotonItem(
     val title: String,
     val subtitle: String,
@@ -31,7 +30,6 @@ sealed interface PhotonSearchResult {
     data object ParseError : PhotonSearchResult
 }
 
-/** Izolovaná síťová vrstva pro vyhledávání míst přes Photon API (photon.komoot.io). */
 object PhotonLocationRepository {
 
     suspend fun search(
@@ -85,7 +83,6 @@ object PhotonLocationRepository {
                 val title = props.optString("name")
                     .ifBlank { street }
                     .ifBlank { props.optString("city") }
-                    .ifBlank { "Bez názvu" }
 
                 val subtitleParts = mutableListOf<String>()
                 if (street.isNotBlank() && street != title) subtitleParts += street
@@ -119,7 +116,7 @@ object PhotonLocationRepository {
         } catch (_: JSONException) {
             PhotonSearchResult.ParseError
         } catch (e: Exception) {
-            android.util.Log.w("PhotonRepo", "Neočekávaná chyba Photon API", e)
+            android.util.Log.w("PhotonRepo", "Unexpected Photon API error", e)
             PhotonSearchResult.ParseError
         } finally {
             connection.disconnect()
