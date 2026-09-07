@@ -59,7 +59,7 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
         assertEquals(alarmManager.canScheduleExactAlarms(), SystemAccess.canScheduleExactAlarms(context))
     }
 
-    fun testTimeSnoozePersistsAndCreatesSnoozePendingIntent() {
+    fun testTimeSnoozeCancelsOriginalAlarmAndPersistsSnooze() {
         val reminder = Reminder(
             id = "snooze-time",
             title = "Snooze test",
@@ -67,25 +67,45 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
             dueDate = System.currentTimeMillis() + 3_600_000L,
             timeRepeat = TimeRepeat.NEVER,
         )
-        val target = System.currentTimeMillis() + 120_000L
-        ReminderScheduler.get(context).snoozeAt(reminder, target)
-
+        val scheduler = ReminderScheduler.get(context)
         val state = SchedulerStateStore(context)
-        val stored = state.snoozeUntil(reminder.id)
+
+        scheduler.schedule(reminder)
+        assertNotNull(normalAlarmPendingIntent(reminder.id, state))
+
+        val target = System.currentTimeMillis() + 120_000L
+        scheduler.snoozeAt(reminder, target)
+
+        val stored = SchedulerStateStore(context).snoozeUntil(reminder.id)
         assertNotNull(stored)
         assertTrue(stored!! >= target)
+        assertNull(normalAlarmPendingIntent(reminder.id, state))
+        assertNotNull(snoozePendingIntent(reminder.id, state))
 
-        val snoozeIntent = PendingIntent.getBroadcast(
-            context,
-            state.requestCode(reminder.id, SchedulerStateStore.OFFSET_SNOOZE),
-            Intent(context, AlarmReceiver::class.java)
-                .setAction(ReminderScheduler.ACTION_SNOOZE_FIRE)
-                .putExtra(ReminderScheduler.EXTRA_REMINDER_ID, reminder.id),
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
-        )
-        assertNotNull(snoozeIntent)
-
-        ReminderScheduler.get(context).cancel(reminder.id)
-        snoozeIntent?.cancel()
+        scheduler.cancel(reminder.id)
     }
+
+    private fun normalAlarmPendingIntent(
+        reminderId: String,
+        state: SchedulerStateStore,
+    ): PendingIntent? = PendingIntent.getBroadcast(
+        context,
+        state.requestCode(reminderId, SchedulerStateStore.OFFSET_ALARM),
+        Intent(context, AlarmReceiver::class.java)
+            .setAction(ReminderScheduler.ACTION_ALARM_FIRE)
+            .putExtra(ReminderScheduler.EXTRA_REMINDER_ID, reminderId),
+        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    private fun snoozePendingIntent(
+        reminderId: String,
+        state: SchedulerStateStore,
+    ): PendingIntent? = PendingIntent.getBroadcast(
+        context,
+        state.requestCode(reminderId, SchedulerStateStore.OFFSET_SNOOZE),
+        Intent(context, AlarmReceiver::class.java)
+            .setAction(ReminderScheduler.ACTION_SNOOZE_FIRE)
+            .putExtra(ReminderScheduler.EXTRA_REMINDER_ID, reminderId),
+        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+    )
 }
