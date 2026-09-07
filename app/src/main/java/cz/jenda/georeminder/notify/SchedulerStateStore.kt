@@ -148,7 +148,7 @@ internal class SchedulerStateStore(context: Context) {
             .apply()
         _geofenceStates.value = _geofenceStates.value + (reminderId to state)
 
-        if (previous?.status != status || previous.errorCode != errorCode) {
+        if (previous?.status != status || previous?.errorCode != errorCode) {
             when {
                 status == GeofenceRegistrationStatus.ACTIVE ->
                     diagnostics.record(DiagnosticEventType.GEOFENCE_REGISTER_OK)
