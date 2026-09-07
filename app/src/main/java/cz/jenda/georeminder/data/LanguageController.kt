@@ -13,12 +13,14 @@ object LanguageController {
     const val LANG_CS = "CS"
     const val LANG_EN = "EN"
 
+    private const val KEY_LEGACY_APP_LANGUAGE = "appLanguage"
     private const val KEY_LOCALE_MIGRATED = "appLocaleMigratedToAppCompatV1"
 
     fun setAppLanguage(context: Context, langCode: String) {
-        // Starou preference ještě aktualizujeme kvůli jednorázové migraci ze starších verzí.
-        // Zdroj pravdy pro běžný provoz je už AppCompatDelegate.
-        FeatureSettings.setAppLanguage(context, langCode)
+        // Zdroj pravdy je AppCompatDelegate. Kontext je v API zachován kvůli
+        // stabilnímu call-site kontraktu a budoucím systémovým integracím.
+        @Suppress("UNUSED_VARIABLE")
+        val appContext = context.applicationContext
         AppCompatDelegate.setApplicationLocales(localeListFor(langCode))
     }
 
@@ -30,7 +32,7 @@ object LanguageController {
         val prefs = context.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
         if (prefs.getBoolean(KEY_LOCALE_MIGRATED, false)) return
 
-        val legacy = prefs.getString("appLanguage", LANG_SYSTEM) ?: LANG_SYSTEM
+        val legacy = prefs.getString(KEY_LEGACY_APP_LANGUAGE, LANG_SYSTEM) ?: LANG_SYSTEM
         if (AppCompatDelegate.getApplicationLocales().isEmpty && legacy != LANG_SYSTEM) {
             AppCompatDelegate.setApplicationLocales(localeListFor(legacy))
         }
