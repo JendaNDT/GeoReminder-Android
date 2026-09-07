@@ -23,10 +23,13 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class PermissionsAndSnoozeInstrumentationTest {
 
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
@@ -38,45 +41,39 @@ class PermissionsAndSnoozeInstrumentationTest {
     }
 
     @Test
-    fun fineLocationGrantAndRevokeAreReflected() {
-        setRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION, granted = true)
-        assertTrue(LocationHolder.hasFineLocation(context))
-
-        setRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION, granted = false)
+    fun test01FineLocationStartsDeniedAndCanBeGranted() {
         assertFalse(LocationHolder.hasFineLocation(context))
+        grantRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION)
+        assertTrue(LocationHolder.hasFineLocation(context))
     }
 
     @Test
-    fun backgroundLocationGrantAndRevokeAreReflected() {
+    fun test02BackgroundLocationStartsDeniedAndCanBeGranted() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
 
-        setRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION, granted = true)
-        setRuntimePermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, granted = true)
-        assertTrue(LocationHolder.hasBackgroundLocation(context))
-
-        setRuntimePermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION, granted = false)
         assertFalse(LocationHolder.hasBackgroundLocation(context))
+        grantRuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION)
+        grantRuntimePermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        assertTrue(LocationHolder.hasBackgroundLocation(context))
     }
 
     @Test
-    fun notificationPermissionGrantAndRevokeAreReflected() {
+    fun test03NotificationPermissionStartsDeniedAndCanBeGranted() {
         if (Build.VERSION.SDK_INT < 33) return
 
-        setRuntimePermission(Manifest.permission.POST_NOTIFICATIONS, granted = true)
-        assertEquals(
-            PackageManager.PERMISSION_GRANTED,
-            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
-        )
-
-        setRuntimePermission(Manifest.permission.POST_NOTIFICATIONS, granted = false)
         assertEquals(
             PackageManager.PERMISSION_DENIED,
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
         )
+        grantRuntimePermission(Manifest.permission.POST_NOTIFICATIONS)
+        assertEquals(
+            PackageManager.PERMISSION_GRANTED,
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
+        )
     }
 
     @Test
-    fun exactAlarmCapabilityMatchesPlatformAlarmManager() {
+    fun test04ExactAlarmCapabilityMatchesPlatformAlarmManager() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             assertTrue(SystemAccess.canScheduleExactAlarms(context))
             return
@@ -86,7 +83,7 @@ class PermissionsAndSnoozeInstrumentationTest {
     }
 
     @Test
-    fun timeSnoozeCancelsOriginalAlarmAndPersistsSnooze() {
+    fun test05TimeSnoozeCancelsOriginalAlarmAndPersistsSnooze() {
         val reminder = Reminder(
             id = "snooze-time",
             title = "Snooze test",
@@ -112,10 +109,9 @@ class PermissionsAndSnoozeInstrumentationTest {
         scheduler.cancel(reminder.id)
     }
 
-    private fun setRuntimePermission(permission: String, granted: Boolean) {
-        val command = if (granted) "grant" else "revoke"
+    private fun grantRuntimePermission(permission: String) {
         instrumentation.uiAutomation
-            .executeShellCommand("pm $command ${context.packageName} $permission")
+            .executeShellCommand("pm grant ${context.packageName} $permission")
             .close()
         Thread.sleep(150)
     }
