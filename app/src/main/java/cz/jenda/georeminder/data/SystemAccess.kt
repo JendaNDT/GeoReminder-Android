@@ -28,8 +28,11 @@ object SystemAccess {
             data = Uri.parse("package:${context.packageName}")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        runCatching { context.startActivity(intent) }
-            .recoverCatching { openAppDetails(context) }
+        try {
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            openAppDetails(context)
+        }
     }
 
     /** Lokalizovaný systémový název volby typu „Povolit vždy“. */
@@ -50,6 +53,10 @@ object SystemAccess {
             data = Uri.fromParts("package", context.packageName, null)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        runCatching { context.startActivity(intent) }
+        try {
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            // Bez dostupné systémové obrazovky není bezpečný automatický fallback.
+        }
     }
 }
