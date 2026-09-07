@@ -23,11 +23,6 @@ object AttachmentHelper {
         return dir.takeIf { it.mkdirs() }
     }
 
-    /**
-     * Vrátí soubor jen tehdy, pokud jeho kanonická cesta skutečně leží uvnitř
-     * interního adresáře attachments. Tím se importovaná nebo poškozená cesta
-     * nemůže použít k otevření/smazání jiného souboru aplikace.
-     */
     private fun managedAttachmentFile(context: Context, path: String): File? {
         return try {
             val base = attachmentsDir(context).canonicalFile
@@ -39,18 +34,12 @@ object AttachmentHelper {
         }
     }
 
-    /** Soubor vhodný pro export, pouze pokud opravdu existuje uvnitř attachments/. */
     fun managedAttachmentForBackup(context: Context, path: String?): File? {
         if (path.isNullOrBlank()) return null
         return managedAttachmentFile(context, path)
             ?.takeIf { it.exists() && it.isFile && it.length() in 1..MAX_ATTACHMENT_SIZE_BYTES }
     }
 
-    /**
-     * Po Android device-transferu může absolutní filesDir cesta obsahovat jiné
-     * user-id. Pokud původní cesta už není platná, zkusí bezpečně najít pouze
-     * stejný basename uvnitř obnoveného attachments/ adresáře.
-     */
     fun normalizeRestoredAttachmentPath(context: Context, path: String?): String? {
         if (path.isNullOrBlank()) return null
         val direct = managedAttachmentFile(context, path)
@@ -71,7 +60,6 @@ object AttachmentHelper {
         }
     }
 
-    /** Zkopíruje vybraný URI soubor do interního úložiště aplikace. Povoleno max 10 MB. */
     fun copyToInternal(context: Context, uri: Uri): String? {
         return try {
             val contentResolver = context.contentResolver
@@ -103,7 +91,9 @@ object AttachmentHelper {
 
             val targetFile = File(dir, "${UUID.randomUUID()}.$ext")
             val inputStream = contentResolver.openInputStream(uri) ?: return null
-            copyStreamToManagedFile(targetFile, inputStream)
+            inputStream.use { input ->
+                copyStreamToManagedFile(targetFile, input)
+            }
         } catch (e: Exception) {
             android.util.Log.e("AttachmentHelper", "Chyba při kopírování přílohy", e)
             null
@@ -111,8 +101,8 @@ object AttachmentHelper {
     }
 
     /**
-     * Bezpečně uloží jednu přílohu ze ZIP backupu. Název položky se nepoužívá
-     * jako cesta, pouze jako zdroj přípony; výsledný soubor dostane nové UUID.
+     * Bezpečně uloží jednu přílohu ze ZIP backupu. Vstupní stream nezavírá,
+     * protože může být sdíleným ZipInputStreamem pro další položky archivu.
      */
     fun copyBackupEntryToInternal(
         context: Context,
@@ -133,22 +123,21 @@ object AttachmentHelper {
         }
     }
 
+    /** Kopíruje, ale nikdy nezavírá vstupní stream – jeho vlastníkem je volající. */
     private fun copyStreamToManagedFile(targetFile: File, input: InputStream): String? {
         var bytesCopied = 0L
         return try {
-            input.use { source ->
-                targetFile.outputStream().use { output ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val read = source.read(buffer)
-                        if (read < 0) break
-                        if (read == 0) continue
-                        bytesCopied += read
-                        if (bytesCopied > MAX_ATTACHMENT_SIZE_BYTES) {
-                            throw AttachmentTooLargeException()
-                        }
-                        output.write(buffer, 0, read)
+            targetFile.outputStream().use { output ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    if (read == 0) continue
+                    bytesCopied += read
+                    if (bytesCopied > MAX_ATTACHMENT_SIZE_BYTES) {
+                        throw AttachmentTooLargeException()
                     }
+                    output.write(buffer, 0, read)
                 }
             }
             if (bytesCopied <= 0L) {
@@ -169,7 +158,6 @@ object AttachmentHelper {
 
     private class AttachmentTooLargeException : RuntimeException()
 
-    /** Smaže pouze soubor spravované přílohy z interního úložiště. */
     fun deleteAttachment(context: Context, path: String?) {
         if (path.isNullOrBlank()) return
         val file = managedAttachmentFile(context, path) ?: run {
@@ -183,17 +171,10 @@ object AttachmentHelper {
         } catch (_: Exception) {}
     }
 
-    /** Smaže více nově vytvořených příloh při neúspěšném importu. */
     fun deleteAttachments(context: Context, paths: Iterable<String>) {
         paths.forEach { deleteAttachment(context, it) }
     }
 
-    /**
-     * Úklid osiřelých příloh zůstává dostupný pro explicitní údržbu, ale po
-     * načtení částečně obnovených dat se nesmí spouštět automaticky. Jinak by
-     * mohl smazat přílohu patřící právě tomu poškozenému záznamu, který zůstal
-     * zachovaný v recovery kopii.
-     */
     fun cleanupOrphanedAttachments(context: Context, activeReminders: List<cz.jenda.georeminder.model.Reminder>) {
         try {
             val dir = attachmentsDir(context)
@@ -210,7 +191,6 @@ object AttachmentHelper {
         } catch (_: Exception) {}
     }
 
-    /** Otevře pouze spravovanou přílohu v systémové aplikaci přes FileProvider. */
     fun openAttachment(context: Context, path: String) {
         try {
             val file = managedAttachmentFile(context, path) ?: return
