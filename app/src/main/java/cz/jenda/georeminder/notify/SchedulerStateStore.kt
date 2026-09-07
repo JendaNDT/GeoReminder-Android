@@ -3,17 +3,24 @@ package cz.jenda.georeminder.notify
 import android.content.Context
 import android.content.SharedPreferences
 import cz.jenda.georeminder.data.SharedStorage
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Jediný perzistentní zdroj pravdy pro technický stav plánování reminderů.
  *
  * Uživatelská data patří do ReminderStore. Sem patří jen technické značky,
  * které musí přežít restart procesu/telefonu: jednorázové „už vystřeleno",
- * snooze timestamp a stabilní requestCode pro PendingIntent.
+ * snooze timestamp, stabilní requestCode pro PendingIntent a stav geofence.
  */
 internal class SchedulerStateStore(context: Context) {
     private val prefs: SharedPreferences = context.applicationContext
         .getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
+
+    private val _geofenceStates = MutableStateFlow(loadGeofenceStates())
+    val geofenceStates: StateFlow<Map<String, GeofenceRegistrationState>> =
+        _geofenceStates.asStateFlow()
 
     init {
         migrateLegacyFiredState()
@@ -26,6 +33,7 @@ internal class SchedulerStateStore(context: Context) {
         private const val KEY_SNOOZE_PREFIX = "snooze_"
         private const val KEY_REQUEST_CODE_PREFIX = "scheduler_request_code_"
         private const val KEY_NEXT_REQUEST_CODE = "scheduler_next_request_code"
+        private const val KEY_GEOFENCE_STATE_PREFIX = "scheduler_geofence_state_"
 
         private const val REQUEST_CODE_START = 10_000
         private const val REQUEST_CODE_STRIDE = 8
@@ -94,6 +102,45 @@ internal class SchedulerStateStore(context: Context) {
             .toMap()
     }
 
+    fun setGeofenceState(
+        reminderId: String,
+        status: GeofenceRegistrationStatus,
+        errorCode: Int? = null,
+    ) = synchronized(lock) {
+        val state = GeofenceRegistrationState(
+            status = status,
+            updatedAt = System.currentTimeMillis(),
+            errorCode = errorCode,
+        )
+        prefs.edit()
+            .putString(KEY_GEOFENCE_STATE_PREFIX + reminderId, encodeGeofenceState(state))
+            .apply()
+        _geofenceStates.value = _geofenceStates.value + (reminderId to state)
+    }
+
+    fun clearGeofenceState(reminderId: String) = synchronized(lock) {
+        if (reminderId !in _geofenceStates.value) return@synchronized
+        prefs.edit().remove(KEY_GEOFENCE_STATE_PREFIX + reminderId).apply()
+        _geofenceStates.value = _geofenceStates.value - reminderId
+    }
+
+    /** Odstraní diagnostické stavy reminderů, které už nejsou aktivní location remindery. */
+    fun retainGeofenceStates(reminderIds: Set<String>) = synchronized(lock) {
+        val staleIds = _geofenceStates.value.keys - reminderIds
+        if (staleIds.isEmpty()) return@synchronized
+
+        val editor = prefs.edit()
+        staleIds.forEach { editor.remove(KEY_GEOFENCE_STATE_PREFIX + it) }
+        editor.apply()
+        _geofenceStates.value = _geofenceStates.value.filterKeys { it in reminderIds }
+    }
+
+    fun activeGeofenceCount(excludingReminderId: String? = null): Int = synchronized(lock) {
+        _geofenceStates.value.count { (id, state) ->
+            id != excludingReminderId && state.status == GeofenceRegistrationStatus.ACTIVE
+        }
+    }
+
     /**
      * Vrací stabilní unikátní základ requestCode pro reminder. Každý reminder
      * dostane blok několika integerů (alarm/snooze/nag), takže jednotlivé typy
@@ -113,5 +160,37 @@ internal class SchedulerStateStore(context: Context) {
                 .apply()
         }
         base + offset
+    }
+
+    private fun loadGeofenceStates(): Map<String, GeofenceRegistrationState> {
+        return prefs.all
+            .asSequence()
+            .filter { (key, value) ->
+                key.startsWith(KEY_GEOFENCE_STATE_PREFIX) && value is String
+            }
+            .mapNotNull { (key, value) ->
+                val reminderId = key.removePrefix(KEY_GEOFENCE_STATE_PREFIX)
+                val raw = value as? String ?: return@mapNotNull null
+                if (reminderId.isBlank()) return@mapNotNull null
+                decodeGeofenceState(raw)?.let { reminderId to it }
+            }
+            .toMap()
+    }
+
+    private fun encodeGeofenceState(state: GeofenceRegistrationState): String =
+        listOf(
+            state.status.name,
+            state.errorCode?.toString().orEmpty(),
+            state.updatedAt.toString(),
+        ).joinToString("|")
+
+    private fun decodeGeofenceState(raw: String): GeofenceRegistrationState? {
+        val parts = raw.split('|')
+        val status = runCatching {
+            GeofenceRegistrationStatus.valueOf(parts.getOrNull(0).orEmpty())
+        }.getOrNull() ?: return null
+        val errorCode = parts.getOrNull(1)?.takeIf { it.isNotBlank() }?.toIntOrNull()
+        val updatedAt = parts.getOrNull(2)?.toLongOrNull() ?: 0L
+        return GeofenceRegistrationState(status, updatedAt, errorCode)
     }
 }
