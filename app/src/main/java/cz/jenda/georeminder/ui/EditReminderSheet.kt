@@ -122,7 +122,9 @@ fun EditReminderSheet(
     var trigger by remember { mutableStateOf(existing?.trigger ?: TriggerType.ARRIVE) }
     var repeats by remember { mutableStateOf(existing?.repeats ?: false) }
     var radius by remember { mutableStateOf(existing?.radius ?: DEFAULT_RADIUS) }
-    var placeName by remember { mutableStateOf(existing?.placeName ?: initialPlaceName) }
+    var placeName by remember {
+        mutableStateOf(existing?.placeName ?: initialPlaceName)
+    }
     var coordinate by remember {
         mutableStateOf(
             if (existing != null && existing.kind == ReminderKind.LOCATION) {
@@ -137,7 +139,11 @@ fun EditReminderSheet(
     var weekdaysSel by remember {
         mutableStateOf(
             existing?.weekdays?.takeIf { it.isNotEmpty() }?.toSet()
-                ?: setOf(ReminderScheduler.isoWeekday(existing?.dueDate ?: initialDueDate))
+                ?: setOf(
+                    ReminderScheduler.isoWeekday(
+                        existing?.dueDate ?: initialDueDate
+                    )
+                )
         )
     }
 
@@ -145,10 +151,14 @@ fun EditReminderSheet(
     var nagging by remember { mutableStateOf(existing?.nagging ?: false) }
     var attachmentPath by remember { mutableStateOf<String?>(existing?.attachmentPath) }
 
-    val attachmentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val attachmentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
         if (uri != null) {
             val copied = AttachmentHelper.copyToInternal(context, uri)
-            if (copied != null) attachmentPath = copied
+            if (copied != null) {
+                attachmentPath = copied
+            }
         }
     }
 
@@ -194,7 +204,9 @@ fun EditReminderSheet(
                     dueDate = dueDate,
                     timeRepeat = timeRepeat,
                     repeats = false,
-                    weekdays = if (timeRepeat == TimeRepeat.WEEKLY) weekdaysSel.sorted() else null,
+                    weekdays = if (timeRepeat == TimeRepeat.WEEKLY) {
+                        weekdaysSel.sorted()
+                    } else null,
                     alertStyle = alertStyle,
                     nagging = nagging,
                     attachmentPath = attachmentPath,
@@ -226,7 +238,9 @@ fun EditReminderSheet(
                         kind = ReminderKind.TIME,
                         dueDate = dueDate,
                         timeRepeat = timeRepeat,
-                        weekdays = if (timeRepeat == TimeRepeat.WEEKLY) weekdaysSel.sorted() else null,
+                        weekdays = if (timeRepeat == TimeRepeat.WEEKLY) {
+                            weekdaysSel.sorted()
+                        } else null,
                         alertStyle = alertStyle,
                         nagging = nagging,
                         attachmentPath = attachmentPath,
@@ -236,7 +250,6 @@ fun EditReminderSheet(
         }
         onClose()
     }
-
     val initialTitle = existing?.title ?: ""
     val initialKindVal = existing?.kind ?: initialKind
     val initialTriggerVal = existing?.trigger ?: TriggerType.ARRIVE
@@ -245,7 +258,9 @@ fun EditReminderSheet(
     val initialPlaceVal = existing?.placeName ?: initialPlaceName
     val initialCoordVal = if (existing != null && existing.kind == ReminderKind.LOCATION) {
         LatLng(existing.latitude, existing.longitude)
-    } else initialCoordinate
+    } else {
+        initialCoordinate
+    }
     val initialDueDateVal = initialDueDate
     val initialTimeRepeatVal = existing?.timeRepeat ?: TimeRepeat.NEVER
     val initialWeekdaysVal = existing?.weekdays?.takeIf { it.isNotEmpty() }?.toSet()
@@ -281,7 +296,9 @@ fun EditReminderSheet(
         }
     }
 
-    androidx.activity.compose.BackHandler(enabled = isDirty) { showDiscardDialog = true }
+    androidx.activity.compose.BackHandler(enabled = isDirty) {
+        showDiscardDialog = true
+    }
 
     if (showDiscardDialog) {
         IOSDiscardDialog(
@@ -296,7 +313,11 @@ fun EditReminderSheet(
         )
     }
 
-    Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+    ) {
         SheetHeader(
             title = if (existing == null) "Nová připomínka" else "Upravit připomínku",
             leftText = "Zrušit",
@@ -316,11 +337,18 @@ fun EditReminderSheet(
         }
 
         Column(
-            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 40.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 40.dp),
         ) {
             SectionHeader("Co ti mám připomenout", Modifier.padding(top = 8.dp))
             InsetCard {
-                FormTextField(value = title, onValueChange = { title = it }, placeholder = "Např. koupit mléko")
+                FormTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    placeholder = "Např. koupit mléko",
+                )
             }
 
             Spacer(Modifier.height(20.dp))
@@ -333,12 +361,16 @@ fun EditReminderSheet(
             }
 
             Spacer(Modifier.height(24.dp))
+
             if (kind == ReminderKind.LOCATION) {
                 SectionHeader("Kde")
                 InsetCard {
+                    // Čipy oblíbených míst
                     if (favorites.isNotEmpty()) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -353,12 +385,19 @@ fun EditReminderSheet(
                         CardDivider()
                     }
 
+                    // Výběr místa na mapě
                     Row(
-                        modifier = Modifier.fillMaxWidth().iosClickable { showPicker = true }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .iosClickable { showPicker = true }
                             .padding(horizontal = 16.dp, vertical = 15.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.Map, null, tint = colors.accent, modifier = Modifier.size(22.dp))
+                        Icon(
+                            Icons.Filled.Map, null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(22.dp),
+                        )
                         Spacer(Modifier.width(10.dp))
                         Text(
                             text = if (coordinate == null) "Vybrat místo na mapě" else placeName.ifEmpty { "Vybrané místo" },
@@ -368,7 +407,11 @@ fun EditReminderSheet(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        Icon(Icons.Filled.ChevronRight, null, tint = colors.secondaryLabel, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Filled.ChevronRight, null,
+                            tint = colors.secondaryLabel,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
 
                     if (coordinate != null) {
@@ -381,13 +424,22 @@ fun EditReminderSheet(
 
                         CardDivider()
                         Column(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Text("Poloměr: ${radius.toInt()} m", style = GeoType.subheadline, color = colors.label)
-                            RadiusSlider(radius = radius, onRadiusChange = { radius = it })
                             Text(
-                                "Doporučeno alespoň 100 m – menší kruhy systém hlídá hůř.",
+                                text = "Poloměr: ${radius.toInt()} m",
+                                style = GeoType.subheadline,
+                                color = colors.label,
+                            )
+                            RadiusSlider(
+                                radius = radius,
+                                onRadiusChange = { radius = it },
+                            )
+                            Text(
+                                text = "Doporučeno alespoň 100 m – menší kruhy systém hlídá hůř.",
                                 style = GeoType.caption2,
                                 color = colors.secondaryLabel,
                             )
@@ -395,10 +447,17 @@ fun EditReminderSheet(
 
                         CardDivider()
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(trigger.repeatLabel, style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                            Text(
+                                text = trigger.repeatLabel,
+                                style = GeoType.body,
+                                color = colors.label,
+                                modifier = Modifier.weight(1f),
+                            )
                             IOSSwitch(checked = repeats) { repeats = it }
                         }
                     }
@@ -406,11 +465,19 @@ fun EditReminderSheet(
             } else {
                 SectionHeader("Kdy")
                 InsetCard {
+                    // Datum a čas – kompaktní kapsle jako na iOS
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 11.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 11.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Datum a čas", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                        Text(
+                            text = "Datum a čas",
+                            style = GeoType.body,
+                            color = colors.label,
+                            modifier = Modifier.weight(1f),
+                        )
                         DateCapsule(CzechFormat.date(dueDate)) { showDateDialog = true }
                         Spacer(Modifier.width(8.dp))
                         DateCapsule(CzechFormat.time(dueDate)) { showTimeDialog = true }
@@ -418,60 +485,109 @@ fun EditReminderSheet(
 
                     CardDivider()
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 13.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Opakování", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                        Text(
+                            text = "Opakování",
+                            style = GeoType.body,
+                            color = colors.label,
+                            modifier = Modifier.weight(1f),
+                        )
                         Box {
-                            Row(modifier = Modifier.iosClickable { repeatMenuOpen = true }, verticalAlignment = Alignment.CenterVertically) {
-                                Text(timeRepeat.label, style = GeoType.body, color = colors.secondaryLabel)
+                            Row(
+                                modifier = Modifier.iosClickable { repeatMenuOpen = true },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = timeRepeat.label,
+                                    style = GeoType.body,
+                                    color = colors.secondaryLabel,
+                                )
                                 Spacer(Modifier.width(4.dp))
-                                Icon(Icons.Filled.UnfoldMore, null, tint = colors.secondaryLabel, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Filled.UnfoldMore, null,
+                                    tint = colors.secondaryLabel,
+                                    modifier = Modifier.size(16.dp),
+                                )
                             }
-                            DropdownMenu(expanded = repeatMenuOpen, onDismissRequest = { repeatMenuOpen = false }) {
+                            DropdownMenu(
+                                expanded = repeatMenuOpen,
+                                onDismissRequest = { repeatMenuOpen = false },
+                            ) {
                                 TimeRepeat.entries.forEach { option ->
                                     DropdownMenuItem(
                                         text = { Text(option.label, style = GeoType.body) },
                                         trailingIcon = {
-                                            if (option == timeRepeat) Icon(Icons.Filled.Check, null, tint = colors.accent, modifier = Modifier.size(18.dp))
+                                            if (option == timeRepeat) {
+                                                Icon(
+                                                    Icons.Filled.Check, null,
+                                                    tint = colors.accent,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                            }
                                         },
-                                        onClick = { timeRepeat = option; repeatMenuOpen = false },
+                                        onClick = {
+                                            timeRepeat = option
+                                            repeatMenuOpen = false
+                                        },
                                     )
                                 }
                             }
                         }
                     }
 
+                    // Výběr dnů pro týdenní opakování (rozšíření Android verze)
                     if (timeRepeat == TimeRepeat.WEEKLY) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 2.dp, bottom = 6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(top = 2.dp, bottom = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(5.dp),
                         ) {
                             val dayLabels = listOf("Po", "Út", "St", "Čt", "Pá", "So", "Ne")
-                            val dayFull = listOf("pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle")
+                            val dayFull = listOf(
+                                "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle",
+                            )
                             for (day in 1..7) {
                                 val selected = day in weekdaysSel
+                                // Plnovýšková, rovnoměrně široká dotyková buňka (≥44 dp),
+                                // uvnitř menší vizuální kolečko – lepší se trefí i TalkBack.
                                 Box(
-                                    modifier = Modifier.weight(1f).height(44.dp).toggleable(
-                                        value = selected,
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        role = Role.Checkbox,
-                                        onValueChange = {
-                                            weekdaysSel = if (selected) {
-                                                if (weekdaysSel.size > 1) weekdaysSel - day else weekdaysSel
-                                            } else weekdaysSel + day
-                                        },
-                                    ).semantics { contentDescription = dayFull[day - 1] },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(44.dp)
+                                        .toggleable(
+                                            value = selected,
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            role = Role.Checkbox,
+                                            onValueChange = {
+                                                weekdaysSel = if (selected) {
+                                                    // aspoň jeden den musí zůstat vybraný
+                                                    if (weekdaysSel.size > 1) weekdaysSel - day else weekdaysSel
+                                                } else {
+                                                    weekdaysSel + day
+                                                }
+                                            },
+                                        )
+                                        .semantics { contentDescription = dayFull[day - 1] },
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Box(
-                                        modifier = Modifier.size(34.dp).clip(CircleShape)
-                                            .background(if (selected) colors.accent else colors.segmentTrack),
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (selected) colors.accent else colors.segmentTrack
+                                            ),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
-                                            dayLabels[day - 1],
+                                            text = dayLabels[day - 1],
                                             style = GeoType.footnote,
                                             color = if (selected) Color.White else colors.label,
                                         )
@@ -490,34 +606,67 @@ fun EditReminderSheet(
                             },
                             style = GeoType.caption2,
                             color = colors.secondaryLabel,
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                            modifier = Modifier.padding(
+                                start = 16.dp, end = 16.dp, bottom = 12.dp,
+                            ),
                         )
                     }
                 }
             }
 
+            // Druh upozornění + dožadování (rozšíření Android verze)
             Spacer(Modifier.height(24.dp))
             SectionHeader("Upozornění")
             InsetCard {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 13.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Druh", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                    Text(
+                        text = "Druh",
+                        style = GeoType.body,
+                        color = colors.label,
+                        modifier = Modifier.weight(1f),
+                    )
                     Box {
-                        Row(modifier = Modifier.iosClickable { alertMenuOpen = true }, verticalAlignment = Alignment.CenterVertically) {
-                            Text(alertStyle.label, style = GeoType.body, color = colors.secondaryLabel)
+                        Row(
+                            modifier = Modifier.iosClickable { alertMenuOpen = true },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = alertStyle.label,
+                                style = GeoType.body,
+                                color = colors.secondaryLabel,
+                            )
                             Spacer(Modifier.width(4.dp))
-                            Icon(Icons.Filled.UnfoldMore, null, tint = colors.secondaryLabel, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Filled.UnfoldMore, null,
+                                tint = colors.secondaryLabel,
+                                modifier = Modifier.size(16.dp),
+                            )
                         }
-                        DropdownMenu(expanded = alertMenuOpen, onDismissRequest = { alertMenuOpen = false }) {
+                        DropdownMenu(
+                            expanded = alertMenuOpen,
+                            onDismissRequest = { alertMenuOpen = false },
+                        ) {
                             AlertStyle.entries.forEach { option ->
                                 DropdownMenuItem(
                                     text = { Text(option.label, style = GeoType.body) },
                                     trailingIcon = {
-                                        if (option == alertStyle) Icon(Icons.Filled.Check, null, tint = colors.accent, modifier = Modifier.size(18.dp))
+                                        if (option == alertStyle) {
+                                            Icon(
+                                                Icons.Filled.Check, null,
+                                                tint = colors.accent,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
                                     },
-                                    onClick = { alertStyle = option; alertMenuOpen = false },
+                                    onClick = {
+                                        alertStyle = option
+                                        alertMenuOpen = false
+                                    },
                                 )
                             }
                         }
@@ -526,17 +675,26 @@ fun EditReminderSheet(
 
                 CardDivider()
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Připomínat, dokud nepotvrdím", style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
+                    Text(
+                        text = "Připomínat, dokud nepotvrdím",
+                        style = GeoType.body,
+                        color = colors.label,
+                        modifier = Modifier.weight(1f),
+                    )
                     IOSSwitch(checked = nagging) { nagging = it }
                 }
 
                 if (alertStyle == AlertStyle.URGENT || nagging) {
                     Text(
                         text = buildString {
-                            if (alertStyle == AlertStyle.URGENT) append("Hlasitý budíkový zvuk hraje, dokud notifikaci nezavřeš.")
+                            if (alertStyle == AlertStyle.URGENT) {
+                                append("Hlasitý budíkový zvuk hraje, dokud notifikaci nezavřeš.")
+                            }
                             if (nagging) {
                                 if (isNotEmpty()) append(" ")
                                 append("Nepotvrzená připomínka se vrátí každých 5 minut.")
@@ -544,52 +702,89 @@ fun EditReminderSheet(
                         },
                         style = GeoType.caption2,
                         color = colors.secondaryLabel,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                        modifier = Modifier.padding(
+                            start = 16.dp, end = 16.dp, bottom = 12.dp,
+                        ),
                     )
                 }
             }
 
+            // Příloha (Fotka nebo PDF)
             Spacer(Modifier.height(24.dp))
             SectionHeader("Příloha (Fotka / PDF)")
             InsetCard {
                 if (attachmentPath == null) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().iosClickable { attachmentLauncher.launch("*/*") }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .iosClickable { attachmentLauncher.launch("*/*") }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.AttachFile, null, tint = colors.accent, modifier = Modifier.size(20.dp))
+                        Icon(
+                            imageVector = Icons.Filled.AttachFile,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(20.dp),
+                        )
                         Spacer(Modifier.width(10.dp))
-                        Text("Připojit fotku nebo PDF soubor", style = GeoType.body, color = colors.accent, modifier = Modifier.weight(1f))
-                        Icon(Icons.Filled.ChevronRight, null, tint = colors.tertiaryLabel, modifier = Modifier.size(20.dp))
+                        Text(
+                            text = "Připojit fotku nebo PDF soubor",
+                            style = GeoType.body,
+                            color = colors.accent,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.ChevronRight,
+                            contentDescription = null,
+                            tint = colors.tertiaryLabel,
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 } else {
                     val fileName = attachmentPath?.substringAfterLast('/') ?: "Příloha"
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.AttachFile, null, tint = colors.accent, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text(fileName, style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f), maxLines = 1)
                         Icon(
-                            Icons.Filled.OpenInNew,
+                            imageVector = Icons.Filled.AttachFile,
+                            contentDescription = null,
+                            tint = colors.accent,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = fileName,
+                            style = GeoType.body,
+                            color = colors.label,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                        )
+                        Icon(
+                            imageVector = Icons.Filled.OpenInNew,
                             contentDescription = "Otevřít přílohu",
                             tint = colors.accent,
-                            modifier = Modifier.size(22.dp).iosClickable { AttachmentHelper.openAttachment(context, attachmentPath!!) },
+                            modifier = Modifier
+                                .size(22.dp)
+                                .iosClickable { AttachmentHelper.openAttachment(context, attachmentPath!!) },
                         )
                         Spacer(Modifier.width(14.dp))
                         Icon(
-                            Icons.Filled.Delete,
+                            imageVector = Icons.Filled.Delete,
                             contentDescription = "Odstranit přílohu",
                             tint = colors.red,
-                            modifier = Modifier.size(22.dp).iosClickable {
-                                val toDelete = attachmentPath
-                                attachmentPath = null
-                                if (toDelete != null && toDelete != existing?.attachmentPath) {
-                                    AttachmentHelper.deleteAttachment(context, toDelete)
-                                }
-                            },
+                            modifier = Modifier
+                                .size(22.dp)
+                                .iosClickable {
+                                    val toDelete = attachmentPath
+                                    attachmentPath = null
+                                    if (toDelete != null && toDelete != existing?.attachmentPath) {
+                                        AttachmentHelper.deleteAttachment(context, toDelete)
+                                    }
+                                },
                         )
                     }
                 }
@@ -597,8 +792,17 @@ fun EditReminderSheet(
         }
     }
 
+    // Výběr místa na mapě – přes celý displej (Dialog): tahy po mapě se
+    // nepletou s gestem zavírání. Výšku spodní systémové lišty si okno
+    // nebere z Dialogu (na Androidu 15/Samsung ji nedostává), ale z hodnoty
+    // změřené v hlavním okně appky – viz ActivityInsets.
     if (showPicker) {
-        Dialog(onDismissRequest = { showPicker = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Dialog(
+            onDismissRequest = { showPicker = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+            ),
+        ) {
             LocationPickerSheet(
                 initialName = placeName,
                 initialCoordinate = coordinate,
@@ -614,34 +818,47 @@ fun EditReminderSheet(
         }
     }
 
+    // Kalendář
     if (showDateDialog) {
         val todayStartUtc = remember {
             Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
                 val local = Calendar.getInstance()
                 clear()
-                set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
+                set(
+                    local.get(Calendar.YEAR),
+                    local.get(Calendar.MONTH),
+                    local.get(Calendar.DAY_OF_MONTH),
+                )
             }.timeInMillis
         }
         val dateState = rememberDatePickerState(
+            // M3 kalendář interpretuje hodnotu jako UTC – posuneme o offset zóny,
+            // aby se u časů po půlnoci nepředvyplnil předchozí den
             initialSelectedDateMillis = dueDate + TimeZone.getDefault().getOffset(dueDate),
             selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis >= todayStartUtc
+                override fun isSelectableDate(utcTimeMillis: Long) =
+                    utcTimeMillis >= todayStartUtc
             },
         )
         DatePickerDialog(
             onDismissRequest = { showDateDialog = false },
             confirmButton = {
                 TextButton(onClick = {
-                    dateState.selectedDateMillis?.let { selected -> dueDate = mergeSelectedDate(dueDate, selected) }
+                    dateState.selectedDateMillis?.let { selected ->
+                        dueDate = mergeSelectedDate(dueDate, selected)
+                    }
                     showDateDialog = false
                 }) { Text("Hotovo") }
             },
-            dismissButton = { TextButton(onClick = { showDateDialog = false }) { Text("Zrušit") } },
+            dismissButton = {
+                TextButton(onClick = { showDateDialog = false }) { Text("Zrušit") }
+            },
         ) {
             DatePicker(state = dateState, showModeToggle = false)
         }
     }
 
+    // Kolečka času
     if (showTimeDialog) {
         val cal = Calendar.getInstance().apply { timeInMillis = dueDate }
         val timeState = rememberTimePickerState(
@@ -651,11 +868,17 @@ fun EditReminderSheet(
         )
         Dialog(onDismissRequest = { showTimeDialog = false }) {
             Column(
-                modifier = Modifier.clip(RoundedCornerShape(26.dp)).background(colors.card).padding(20.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(colors.card)
+                    .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 TimePicker(state = timeState)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
                     TextButton(onClick = { showTimeDialog = false }) { Text("Zrušit") }
                     TextButton(onClick = {
                         dueDate = mergeSelectedTime(dueDate, timeState.hour, timeState.minute)
@@ -670,36 +893,57 @@ fun EditReminderSheet(
 internal fun editorInitialDueDate(existing: Reminder?, now: Long): Long {
     val reminder = existing ?: return now + 3_600_000L
     val due = reminder.dueDate ?: return now + 3_600_000L
-    return if (reminder.timeRepeat == TimeRepeat.NEVER) due.coerceAtLeast(now) else due
+    return if (reminder.timeRepeat == TimeRepeat.NEVER) {
+        due.coerceAtLeast(now)
+    } else {
+        due
+    }
 }
 
+/** Kapsle s datem/časem (kompaktní DatePicker jako na iOS). */
 @Composable
 private fun DateCapsule(text: String, onClick: () -> Unit) {
     val colors = GeoTheme.colors
     Box(
-        modifier = Modifier.clip(RoundedCornerShape(9.dp)).background(colors.segmentTrack)
-            .iosClickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(9.dp))
+            .background(colors.segmentTrack)
+            .iosClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(text = text, style = GeoType.body, color = colors.label)
     }
 }
 
+/** Čip oblíbeného místa (hvězdička + název, modré 12% pozadí). */
 @Composable
 fun FavoriteChip(place: FavoritePlace, onClick: () -> Unit) {
     val colors = GeoTheme.colors
     Row(
-        modifier = Modifier.clip(CircleShape).background(colors.accent.copy(alpha = 0.12f))
-            .iosClickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(colors.accent.copy(alpha = 0.12f))
+            .iosClickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Star, null, tint = colors.yellow, modifier = Modifier.size(13.dp))
+        Icon(
+            Icons.Filled.Star, null,
+            tint = colors.yellow,
+            modifier = Modifier.size(13.dp),
+        )
         Spacer(Modifier.width(5.dp))
         Text(text = place.name, style = GeoType.footnote, color = colors.label)
     }
 }
 
+/** Textové pole uvnitř karty (bez orámování, jako iOS Form). */
 @Composable
-fun FormTextField(value: String, onValueChange: (String) -> Unit, placeholder: String) {
+fun FormTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+) {
     val colors = GeoTheme.colors
     BasicTextField(
         value = value,
@@ -707,18 +951,29 @@ fun FormTextField(value: String, onValueChange: (String) -> Unit, placeholder: S
         textStyle = GeoType.body.copy(color = colors.label),
         cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.accent),
         singleLine = true,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         decorationBox = { innerTextField ->
             Box {
-                if (value.isEmpty()) Text(text = placeholder, style = GeoType.body, color = colors.tertiaryLabel)
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = GeoType.body,
+                        color = colors.tertiaryLabel,
+                    )
+                }
                 innerTextField()
             }
         },
     )
 }
 
+/** Sloučí vybrané datum (UTC půlnoc z kalendáře) se stávajícím časem. */
 private fun mergeSelectedDate(currentMillis: Long, selectedUtcMillis: Long): Long {
-    val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = selectedUtcMillis }
+    val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+        timeInMillis = selectedUtcMillis
+    }
     return Calendar.getInstance().apply {
         timeInMillis = currentMillis
         set(Calendar.YEAR, utc.get(Calendar.YEAR))
@@ -729,6 +984,7 @@ private fun mergeSelectedDate(currentMillis: Long, selectedUtcMillis: Long): Lon
     }.timeInMillis
 }
 
+/** Sloučí vybraný čas se stávajícím datem. */
 private fun mergeSelectedTime(currentMillis: Long, hour: Int, minute: Int): Long {
     return Calendar.getInstance().apply {
         timeInMillis = currentMillis
