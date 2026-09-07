@@ -4,7 +4,7 @@
 **Výchozí stav:** `main`, aplikace v2.7 / versionCode 19  
 **Cíl:** zvýšit spolehlivost doručování připomínek, odstranit nalezené funkční chyby, zabezpečit data a připravit aplikaci na veřejné vydání a target API 36.
 
-> **Stav realizace k 7. 9. 2026:** Etapy 1–8 jsou implementované na stabilizační větvi a pokryté automatickým buildem/testy. PR zůstává draft do dokončení reálných device testů. Etapy 9–12 zbývají.
+> **Stav realizace k 7. 9. 2026:** Etapy 1–9 jsou implementované na stabilizační větvi a pokryté automatickým buildem/testy. PR zůstává draft do dokončení reálných device testů. Etapy 10–12 zbývají.
 
 ---
 
@@ -676,7 +676,7 @@ Minimální varianta: přejmenovat widget, pokud má zůstat řazení podle vytv
 
 ---
 
-# ETAPA 9 – Lokalizace a konzistence UI [P2]
+# ETAPA 9 – Lokalizace a konzistence UI [P2] ✅ IMPLEMENTOVÁNO
 
 ## 9.1 Přestat používat vlastní globální přepis Locale
 
@@ -739,6 +739,22 @@ Povolit pouze podporované MIME typy:
 - `application/pdf`
 
 Případně další obrazové formáty až po explicitní podpoře.
+
+### Stav implementace Etapy 9
+
+- `MainActivity` přešla na `AppCompatActivity` a jazyk se řídí `AppCompatDelegate.setApplicationLocales()`; starý globální `resources.updateConfiguration()` byl odstraněn,
+- `android:localeConfig` deklaruje `cs-CZ` a `en-US`; AppCompat automaticky ukládá locale na Androidu 12 a starším,
+- stará preference `SYSTEM/CS/EN` se jednorázově migruje, ale dál už není paralelním zdrojem pravdy,
+- `SYSTEM` je skutečný prázdný app-locale override; nepodporovaný systémový jazyk používá české default resources, anglický systém používá `values-en`,
+- pro receiver/widget/TTS se používá `ContextCompat.getContextForLanguage()`, takže ručně zvolený jazyk funguje i při cold-startu bez Activity,
+- vznikl centralizovaný `ReminderText`; model `Reminder` a enumy už neobsahují natvrdo české uživatelské labely/subtitle,
+- hlavní obrazovky, kalendář, picker míst, oblíbená místa, notifikace, TTS, widget, geofence stavy a accessibility texty používají CZ/EN resources,
+- názvy a popisy notification channelů se po změně jazyka znovu registrují v aktivním locale bez resetu uživatelských channel nastavení,
+- Nastavení čte `versionName` z nainstalovaného balíčku místo ručně napsané `v2.5`,
+- nový společný `ReminderEditorModal` sjednocuje Back / swipe-down / tap outside dismiss a při dirty formuláři vždy vyvolá stejný discard dialog; používá se ze seznamu i mapy,
+- picker příloh nabízí jen JPEG/PNG/PDF a `AttachmentHelper` stejné MIME typy znovu validuje v datové vrstvě,
+- přidán `AttachmentPolicyTest`, locale-aware regresní testy formátování a `LocalizationResourcesTest`, který vyžaduje shodnou množinu CZ/EN string klíčů,
+- aplikační head Etapy 9 `8c98a5695022755a752a1d70ea6a91384654864d` prošel GitHub Actions run #123 (`34137734616`): **unit testy zelené + debug APK sestavené na API 36**.
 
 ---
 
@@ -1052,8 +1068,8 @@ Veřejný release je připravený pouze pokud platí všechno:
 - [x] kliknutí na notifikaci otevře správný reminder
 - [x] calendar import neduplikuje stejné instance
 - [x] offline hledání místa nehlásí falešně „nic nenalezeno“
-- [ ] všechny podporované texty jsou v CZ/EN resources
-- [ ] číslo verze v UI se bere z buildu
+- [x] všechny podporované texty jsou v CZ/EN resources
+- [x] číslo verze v UI se bere z buildu
 - [ ] diagnostická obrazovka ukazuje stav kritických systémových oprávnění
 - [ ] `PROJECT_STATUS.md` odpovídá skutečnému buildu
 - [ ] closed-test verze byla ověřena minimálně na Samsung/One UI a čistém Androidu
@@ -1104,7 +1120,7 @@ GeoReminder už má funkcí dost. Prioritou je, aby existující funkce byly př
 - widget pořadí ✅
 - TTS lifecycle ✅
 - deep linking ✅
-- kompletní lokalizace
+- kompletní lokalizace ✅
 - dokumentační úklid
 
 ---
