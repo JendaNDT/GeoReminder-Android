@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.test.InstrumentationTestCase
 import cz.jenda.georeminder.data.LocationHolder
@@ -48,6 +49,24 @@ class PermissionsAndSnoozeInstrumentationTest : InstrumentationTestCase() {
 
         automation.revokeRuntimePermission(packageName, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         assertFalse(LocationHolder.hasBackgroundLocation(context))
+    }
+
+    fun testNotificationPermissionGrantAndRevokeAreReflected() {
+        if (Build.VERSION.SDK_INT < 33) return
+        val automation = instrumentation.uiAutomation
+        val packageName = context.packageName
+
+        automation.grantRuntimePermission(packageName, Manifest.permission.POST_NOTIFICATIONS)
+        assertEquals(
+            PackageManager.PERMISSION_GRANTED,
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
+        )
+
+        automation.revokeRuntimePermission(packageName, Manifest.permission.POST_NOTIFICATIONS)
+        assertEquals(
+            PackageManager.PERMISSION_DENIED,
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS),
+        )
     }
 
     fun testExactAlarmCapabilityMatchesPlatformAlarmManager() {
