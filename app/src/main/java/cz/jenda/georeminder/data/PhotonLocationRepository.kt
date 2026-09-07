@@ -12,6 +12,7 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
 import java.net.UnknownHostException
+import java.util.Locale
 
 data class PhotonItem(
     val title: String,
@@ -83,6 +84,7 @@ object PhotonLocationRepository {
                 val title = props.optString("name")
                     .ifBlank { street }
                     .ifBlank { props.optString("city") }
+                    .ifBlank { String.format(Locale.ROOT, "%.5f, %.5f", lat, lng) }
 
                 val subtitleParts = mutableListOf<String>()
                 if (street.isNotBlank() && street != title) subtitleParts += street
