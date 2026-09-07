@@ -6,7 +6,6 @@ import android.content.Intent
 import android.util.Log
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
-import com.google.android.gms.location.LocationServices
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TriggerType
@@ -23,11 +22,6 @@ import kotlinx.coroutines.launch
 class GeofenceReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val event = GeofencingEvent.fromIntent(intent) ?: return
-        if (event.hasError()) return
-
-        val transition = event.geofenceTransition
-        val ids = event.triggeringGeofences?.map { it.requestId } ?: return
-        if (ids.isEmpty()) return
 
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
@@ -38,8 +32,21 @@ class GeofenceReceiver : BroadcastReceiver() {
                     Log.w("GeofenceReceiver", "Událost přeskočena – data připomínek se nepodařilo načíst")
                     return@launch
                 }
+
                 val reminders = store.reminders.value
                 val scheduler = ReminderScheduler.get(context)
+
+                if (event.hasError()) {
+                    scheduler.handleGeofenceServiceError(event.errorCode, reminders)
+                    Log.w("GeofenceReceiver", "Geofence service oznámila chybu code=${event.errorCode}")
+                    return@launch
+                }
+
+                val transition = event.geofenceTransition
+                val ids = event.triggeringGeofences?.map { it.requestId }.orEmpty()
+                if (ids.isEmpty()) return@launch
+
+                var capacityChanged = false
 
                 for (id in ids) {
                     val reminder = reminders.firstOrNull { it.id == id } ?: continue
@@ -55,12 +62,15 @@ class GeofenceReceiver : BroadcastReceiver() {
                     NotificationHelper.show(context, reminder)
 
                     if (!reminder.repeats) {
-                        // Jednorázová: geofence už nehlídat (notifikace „vystřelila")
-                        // a zapamatovat si to, aby ji resync znovu nezaregistroval.
+                        // Jednorázová: zapamatovat „vystřeleno“. Následný reconcile
+                        // ji vynechá a případný 101. reminder může obsadit uvolněný slot.
                         scheduler.markGeofenceFired(id)
-                        LocationServices.getGeofencingClient(context)
-                            .removeGeofences(listOf(id))
+                        capacityChanged = true
                     }
+                }
+
+                if (capacityChanged) {
+                    scheduler.resyncGeofences(reminders)
                 }
             } catch (e: Exception) {
                 Log.w("GeofenceReceiver", "Chyba při zpracování geofence události", e)
