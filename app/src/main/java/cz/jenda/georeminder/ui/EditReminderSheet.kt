@@ -112,6 +112,11 @@ fun EditReminderSheet(
     val favoritesStore = remember { FavoritesStore.get(context) }
     val favorites by favoritesStore.favorites.collectAsStateWithLifecycle()
 
+    val editorNow = remember(existing?.id) { System.currentTimeMillis() }
+    val initialDueDate = remember(existing?.id, existing?.dueDate, existing?.timeRepeat, editorNow) {
+        editorInitialDueDate(existing, editorNow)
+    }
+
     var title by remember { mutableStateOf(existing?.title ?: "") }
     var kind by remember { mutableStateOf(existing?.kind ?: initialKind) }
     var trigger by remember { mutableStateOf(existing?.trigger ?: TriggerType.ARRIVE) }
@@ -129,20 +134,13 @@ fun EditReminderSheet(
             }
         )
     }
-    var dueDate by remember {
-        mutableStateOf(
-            existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
-                ?: (System.currentTimeMillis() + 3_600_000L)
-        )
-    }
+    var dueDate by remember { mutableStateOf(initialDueDate) }
     var timeRepeat by remember { mutableStateOf(existing?.timeRepeat ?: TimeRepeat.NEVER) }
     var weekdaysSel by remember {
         mutableStateOf(
             existing?.weekdays?.takeIf { it.isNotEmpty() }?.toSet()
                 ?: setOf(
-                    ReminderScheduler.isoWeekday(
-                        existing?.dueDate ?: (System.currentTimeMillis() + 3_600_000L)
-                    )
+                    ReminderScheduler.isoWeekday(existing?.dueDate ?: initialDueDate)
                 )
         )
     }
@@ -261,8 +259,7 @@ fun EditReminderSheet(
     } else {
         initialCoordinate
     }
-    val initialDueDateVal = existing?.dueDate?.coerceAtLeast(System.currentTimeMillis())
-        ?: (System.currentTimeMillis() + 3_600_000L)
+    val initialDueDateVal = initialDueDate
     val initialTimeRepeatVal = existing?.timeRepeat ?: TimeRepeat.NEVER
     val initialWeekdaysVal = existing?.weekdays?.takeIf { it.isNotEmpty() }?.toSet()
         ?: setOf(ReminderScheduler.isoWeekday(initialDueDateVal))
@@ -366,7 +363,6 @@ fun EditReminderSheet(
             if (kind == ReminderKind.LOCATION) {
                 SectionHeader("Kde")
                 InsetCard {
-                    // Čipy oblíbených míst
                     if (favorites.isNotEmpty()) {
                         Row(
                             modifier = Modifier
@@ -386,7 +382,6 @@ fun EditReminderSheet(
                         CardDivider()
                     }
 
-                    // Výběr místa na mapě
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -466,7 +461,6 @@ fun EditReminderSheet(
             } else {
                 SectionHeader("Kdy")
                 InsetCard {
-                    // Datum a čas – kompaktní kapsle jako na iOS
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -540,7 +534,6 @@ fun EditReminderSheet(
                         }
                     }
 
-                    // Výběr dnů pro týdenní opakování (rozšíření Android verze)
                     if (timeRepeat == TimeRepeat.WEEKLY) {
                         Row(
                             modifier = Modifier
@@ -555,8 +548,6 @@ fun EditReminderSheet(
                             )
                             for (day in 1..7) {
                                 val selected = day in weekdaysSel
-                                // Plnovýšková, rovnoměrně široká dotyková buňka (≥44 dp),
-                                // uvnitř menší vizuální kolečko – lepší se trefí i TalkBack.
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
@@ -568,7 +559,6 @@ fun EditReminderSheet(
                                             role = Role.Checkbox,
                                             onValueChange = {
                                                 weekdaysSel = if (selected) {
-                                                    // aspoň jeden den musí zůstat vybraný
                                                     if (weekdaysSel.size > 1) weekdaysSel - day else weekdaysSel
                                                 } else {
                                                     weekdaysSel + day
@@ -615,7 +605,6 @@ fun EditReminderSheet(
                 }
             }
 
-            // Druh upozornění + dožadování (rozšíření Android verze)
             Spacer(Modifier.height(24.dp))
             SectionHeader("Upozornění")
             InsetCard {
@@ -710,7 +699,6 @@ fun EditReminderSheet(
                 }
             }
 
-            // Příloha (Fotka nebo PDF)
             Spacer(Modifier.height(24.dp))
             SectionHeader("Příloha (Fotka / PDF)")
             InsetCard {
@@ -793,10 +781,6 @@ fun EditReminderSheet(
         }
     }
 
-    // Výběr místa na mapě – přes celý displej (Dialog): tahy po mapě se
-    // nepletou s gestem zavírání. Výšku spodní systémové lišty si okno
-    // nebere z Dialogu (na Androidu 15/Samsung ji nedostává), ale z hodnoty
-    // změřené v hlavním okně appky – viz ActivityInsets.
     if (showPicker) {
         Dialog(
             onDismissRequest = { showPicker = false },
@@ -819,7 +803,6 @@ fun EditReminderSheet(
         }
     }
 
-    // Kalendář
     if (showDateDialog) {
         val todayStartUtc = remember {
             Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
@@ -833,8 +816,6 @@ fun EditReminderSheet(
             }.timeInMillis
         }
         val dateState = rememberDatePickerState(
-            // M3 kalendář interpretuje hodnotu jako UTC – posuneme o offset zóny,
-            // aby se u časů po půlnoci nepředvyplnil předchozí den
             initialSelectedDateMillis = dueDate + TimeZone.getDefault().getOffset(dueDate),
             selectableDates = object : SelectableDates {
                 override fun isSelectableDate(utcTimeMillis: Long) =
@@ -859,7 +840,6 @@ fun EditReminderSheet(
         }
     }
 
-    // Kolečka času
     if (showTimeDialog) {
         val cal = Calendar.getInstance().apply { timeInMillis = dueDate }
         val timeState = rememberTimePickerState(
@@ -891,7 +871,15 @@ fun EditReminderSheet(
     }
 }
 
-/** Kapsle s datem/časem (kompaktní DatePicker jako na iOS). */
+internal fun editorInitialDueDate(existing: Reminder?, now: Long): Long {
+    val due = existing?.dueDate ?: return now + 3_600_000L
+    return if (existing.timeRepeat == TimeRepeat.NEVER) {
+        due.coerceAtLeast(now)
+    } else {
+        due
+    }
+}
+
 @Composable
 private fun DateCapsule(text: String, onClick: () -> Unit) {
     val colors = GeoTheme.colors
@@ -906,7 +894,6 @@ private fun DateCapsule(text: String, onClick: () -> Unit) {
     }
 }
 
-/** Čip oblíbeného místa (hvězdička + název, modré 12% pozadí). */
 @Composable
 fun FavoriteChip(place: FavoritePlace, onClick: () -> Unit) {
     val colors = GeoTheme.colors
@@ -928,7 +915,6 @@ fun FavoriteChip(place: FavoritePlace, onClick: () -> Unit) {
     }
 }
 
-/** Textové pole uvnitř karty (bez orámování, jako iOS Form). */
 @Composable
 fun FormTextField(
     value: String,
@@ -960,7 +946,6 @@ fun FormTextField(
     )
 }
 
-/** Sloučí vybrané datum (UTC půlnoc z kalendáře) se stávajícím časem. */
 private fun mergeSelectedDate(currentMillis: Long, selectedUtcMillis: Long): Long {
     val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
         timeInMillis = selectedUtcMillis
@@ -975,7 +960,6 @@ private fun mergeSelectedDate(currentMillis: Long, selectedUtcMillis: Long): Lon
     }.timeInMillis
 }
 
-/** Sloučí vybraný čas se stávajícím datem. */
 private fun mergeSelectedTime(currentMillis: Long, hour: Int, minute: Int): Long {
     return Calendar.getInstance().apply {
         timeInMillis = currentMillis
