@@ -1,7 +1,6 @@
 package cz.jenda.georeminder.data
 
 import android.content.Context
-import android.os.Looper
 import android.util.Log
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.notify.ReminderScheduler
@@ -12,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 
 /**
@@ -23,9 +23,10 @@ class ReminderStore private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val scheduler = ReminderScheduler(appContext)
 
-    // Zápisy na disk jdou na jedno IO vlákno (serializovaně), aby neblokovaly UI
-    // a zároveň se nepřekrývaly.
-    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+    // Čtení i zápisy používají stejnou sériovou IO frontu. Tím se zabrání tomu,
+    // aby receiver četl napůl probíhající změnu nebo resync předběhl načtení.
+    private val ioDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val ioScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     // true = poslední čtení dat selhalo → dočasně nepovolit zápis (ochrana proti
     // přepsání platného souboru prázdným seznamem).
@@ -37,6 +38,12 @@ class ReminderStore private constructor(context: Context) {
 
     init {
         reload()
+    }
+
+    enum class ReloadResult {
+        LOADED,
+        EMPTY,
+        ERROR,
     }
 
     companion object {
@@ -51,28 +58,45 @@ class ReminderStore private constructor(context: Context) {
             }
     }
 
-    /** Znovu načte data z disku (po akci na notifikaci, návratu do popředí…). */
+    /**
+     * Pohodlná asynchronní obnova pro UI. Pokud volající potřebuje s čerstvými
+     * daty hned pokračovat (receiver, boot, resync), musí použít reloadAndWait().
+     */
     fun reload() {
         ioScope.launch {
-            synchronized(this@ReminderStore) {
-                when (val res = SharedStorage.read(appContext, FILE)) {
-                    is SharedStorage.ReadResult.Ok -> {
-                        val loaded = SharedStorage.decodeReminders(res.text)
-                        _reminders.value = loaded
-                        loadFailed = false
-                        AttachmentHelper.cleanupOrphanedAttachments(appContext, loaded)
-                    }
-                    SharedStorage.ReadResult.Empty -> {
-                        // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
-                        _reminders.value = emptyList()
-                        loadFailed = false
-                    }
-                    SharedStorage.ReadResult.Error -> {
-                        // Čtení selhalo – NEPŘEPISOVAT paměť a zablokovat zápis, aby se
-                        // platný soubor nepřepsal prázdným seznamem.
-                        loadFailed = true
-                        Log.w("ReminderStore", "Čtení dat selhalo – uložení dočasně zablokováno")
-                    }
+            reloadAndWait()
+        }
+    }
+
+    /**
+     * Znovu načte data z disku a vrátí se až po dokončení čtení a aktualizaci
+     * StateFlow. Kritické systémové cesty tak nikdy nepokračují nad starým nebo
+     * prázdným seznamem pouze proto, že asynchronní IO ještě nedoběhlo.
+     */
+    suspend fun reloadAndWait(): ReloadResult = withContext(ioDispatcher) {
+        synchronized(this@ReminderStore) {
+            when (val res = SharedStorage.read(appContext, FILE)) {
+                is SharedStorage.ReadResult.Ok -> {
+                    val loaded = SharedStorage.decodeReminders(res.text)
+                    _reminders.value = loaded
+                    loadFailed = false
+                    AttachmentHelper.cleanupOrphanedAttachments(appContext, loaded)
+                    ReloadResult.LOADED
+                }
+
+                SharedStorage.ReadResult.Empty -> {
+                    // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
+                    _reminders.value = emptyList()
+                    loadFailed = false
+                    ReloadResult.EMPTY
+                }
+
+                SharedStorage.ReadResult.Error -> {
+                    // Čtení selhalo – NEPŘEPISOVAT paměť a zablokovat zápis, aby se
+                    // platný soubor nepřepsal prázdným seznamem.
+                    loadFailed = true
+                    Log.w("ReminderStore", "Čtení dat selhalo – uložení dočasně zablokováno")
+                    ReloadResult.ERROR
                 }
             }
         }
