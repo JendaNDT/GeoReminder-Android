@@ -33,6 +33,12 @@ class ReminderStore private constructor(context: Context) {
     @Volatile
     private var loadFailed = false
 
+    // Rozlišuje cold start bez jediného úspěšného načtení od přechodné chyby
+    // během běžícího procesu. V druhém případě lze bezpečně použít poslední
+    // známý stav v paměti pro doručení alarmu/geofence.
+    @Volatile
+    private var hasLoadedSuccessfully = false
+
     private val _reminders = MutableStateFlow<List<Reminder>>(emptyList())
     val reminders: StateFlow<List<Reminder>> = _reminders
 
@@ -43,6 +49,7 @@ class ReminderStore private constructor(context: Context) {
     enum class ReloadResult {
         LOADED,
         EMPTY,
+        CACHED,
         ERROR,
     }
 
@@ -72,6 +79,9 @@ class ReminderStore private constructor(context: Context) {
      * Znovu načte data z disku a vrátí se až po dokončení čtení a aktualizaci
      * StateFlow. Kritické systémové cesty tak nikdy nepokračují nad starým nebo
      * prázdným seznamem pouze proto, že asynchronní IO ještě nedoběhlo.
+     *
+     * Při přechodné chybě po předchozím úspěšném načtení vrací CACHED a ponechá
+     * poslední známá data v paměti. ERROR znamená cold start bez bezpečných dat.
      */
     suspend fun reloadAndWait(): ReloadResult = withContext(ioDispatcher) {
         synchronized(this@ReminderStore) {
@@ -80,6 +90,7 @@ class ReminderStore private constructor(context: Context) {
                     val loaded = SharedStorage.decodeReminders(res.text)
                     _reminders.value = loaded
                     loadFailed = false
+                    hasLoadedSuccessfully = true
                     AttachmentHelper.cleanupOrphanedAttachments(appContext, loaded)
                     ReloadResult.LOADED
                 }
@@ -88,15 +99,17 @@ class ReminderStore private constructor(context: Context) {
                     // Soubor ještě neexistuje = legitimní prázdno (první spuštění).
                     _reminders.value = emptyList()
                     loadFailed = false
+                    hasLoadedSuccessfully = true
                     ReloadResult.EMPTY
                 }
 
                 SharedStorage.ReadResult.Error -> {
                     // Čtení selhalo – NEPŘEPISOVAT paměť a zablokovat zápis, aby se
-                    // platný soubor nepřepsal prázdným seznamem.
+                    // platný soubor nepřepsal prázdným seznamem. Pokud už jsme v tomto
+                    // procesu dříve úspěšně načetli data, receivery mohou použít cache.
                     loadFailed = true
                     Log.w("ReminderStore", "Čtení dat selhalo – uložení dočasně zablokováno")
-                    ReloadResult.ERROR
+                    if (hasLoadedSuccessfully) ReloadResult.CACHED else ReloadResult.ERROR
                 }
             }
         }
