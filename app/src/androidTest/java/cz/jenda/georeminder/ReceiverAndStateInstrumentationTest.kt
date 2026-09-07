@@ -1,7 +1,8 @@
 package cz.jenda.georeminder
 
 import android.content.Intent
-import android.test.InstrumentationTestCase
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.model.Reminder
@@ -14,19 +15,28 @@ import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.notify.SchedulerStateStore
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.ListSerializer
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
 
-@Suppress("DEPRECATION")
-class ReceiverAndStateInstrumentationTest : InstrumentationTestCase() {
+@RunWith(AndroidJUnit4::class)
+class ReceiverAndStateInstrumentationTest {
 
+    private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
 
-    override fun setUp() {
-        super.setUp()
+    @Before
+    fun setUp() {
         context.getSharedPreferences(SharedStorage.PREFS, 0).edit().clear().commit()
         SharedStorage.file(context, ReminderStore.FILE).delete()
     }
 
-    fun testSchedulerStatePersistsSnoozeAndStableRequestCodes() {
+    @Test
+    fun schedulerStatePersistsSnoozeAndStableRequestCodes() {
         val first = SchedulerStateStore(context)
         first.setSnooze("R1", 1_900_000_000_000L)
         val alarmCode = first.requestCode("R1", SchedulerStateStore.OFFSET_ALARM)
@@ -38,14 +48,16 @@ class ReceiverAndStateInstrumentationTest : InstrumentationTestCase() {
         assertTrue(alarmCode != snoozeCode)
     }
 
-    fun testNotificationTokenCanBeConsumedOnlyOnce() {
+    @Test
+    fun notificationTokenCanBeConsumedOnlyOnce() {
         val state = SchedulerStateStore(context)
         state.setNotificationActionToken("R1", "token-1")
         assertTrue(state.consumeNotificationActionToken("R1", "token-1"))
         assertFalse(state.consumeNotificationActionToken("R1", "token-1"))
     }
 
-    fun testAlarmReceiverLoadsReminderFromDiskBeforeFiring() {
+    @Test
+    fun alarmReceiverLoadsReminderFromDiskBeforeFiring() {
         val reminder = Reminder(
             id = "alarm-cold-start",
             title = "Cold start alarm",
@@ -67,7 +79,8 @@ class ReceiverAndStateInstrumentationTest : InstrumentationTestCase() {
         assertTrue(SchedulerStateStore(context).isFired(reminder.id))
     }
 
-    fun testNotificationDoneActionLoadsFromDiskAndIsIdempotent() {
+    @Test
+    fun notificationDoneActionLoadsFromDiskAndIsIdempotent() {
         val reminder = Reminder(
             id = "done-cold-start",
             title = "Cold start done",
@@ -91,7 +104,6 @@ class ReceiverAndStateInstrumentationTest : InstrumentationTestCase() {
                 ReminderStore.get(context).reminders.value.firstOrNull { it.id == reminder.id }?.isDone == true
         }
 
-        // Stejný token podruhé nesmí změnu aplikovat znovu ani založit nový stav.
         context.sendBroadcast(action)
         Thread.sleep(300)
         runBlocking { ReminderStore.get(context).reloadAndWait() }
