@@ -174,13 +174,13 @@ object NotificationHelper {
 
         val wearableExtender = NotificationCompat.WearableExtender()
             .setHintHideIcon(false)
-        val body = body(strings, reminder)
+        val notificationBody = body(strings, reminder)
 
         val builder = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
             .setSmallIcon(R.drawable.ic_stat_pin)
             .setContentTitle(reminder.title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentText(notificationBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationBody))
             .setPriority(
                 if (reminder.alertStyle == AlertStyle.QUIET) {
                     NotificationCompat.PRIORITY_LOW
