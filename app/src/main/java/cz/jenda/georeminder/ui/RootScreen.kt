@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,7 +56,6 @@ import cz.jenda.georeminder.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.data.ActivityInsets
 import cz.jenda.georeminder.data.LocationHolder
@@ -82,6 +82,7 @@ fun RootScreen() {
         mutableStateOf(prefs.getBoolean("hasSeenOnboarding", false))
     }
     val store = remember { ReminderStore.get(context) }
+    val resumeScope = rememberCoroutineScope()
 
     // Změřit výšku spodní systémové lišty v okně aktivity (spolehlivé)
     // a zpřístupnit ji dialogovým oknům, která ji samy nedostávají.
@@ -145,7 +146,7 @@ fun RootScreen() {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                lifecycleOwner.lifecycleScope.launch {
+                resumeScope.launch {
                     val loadResult = store.reloadAndWait()
                     if (loadResult != ReminderStore.ReloadResult.ERROR) {
                         store.resyncAll()
