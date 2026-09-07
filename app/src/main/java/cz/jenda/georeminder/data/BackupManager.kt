@@ -43,10 +43,15 @@ object BackupManager {
         encodeDefaults = true
     }
 
-    fun exportBackup(context: Context, targetUri: Uri): Boolean {
+    suspend fun exportBackup(context: Context, targetUri: Uri): Boolean {
         return try {
+            val reminderStore = ReminderStore.get(context)
+            val favoritesStore = FavoritesStore.get(context)
+            val currentReminders = reminderStore.snapshotAfterPendingIo()
+            val favorites = favoritesStore.snapshotAfterPendingIo()
+
             val attachmentEntries = mutableListOf<Pair<String, File>>()
-            val remindersForBackup = ReminderStore.get(context).reminders.value.map { reminder ->
+            val remindersForBackup = currentReminders.map { reminder ->
                 val file = AttachmentHelper.managedAttachmentForBackup(context, reminder.attachmentPath)
                 if (file == null) {
                     reminder.copy(attachmentPath = null)
@@ -60,7 +65,6 @@ object BackupManager {
                     reminder.copy(attachmentPath = entryName)
                 }
             }
-            val favorites = FavoritesStore.get(context).favorites.value
             val backup = GeoReminderBackupData(
                 version = CURRENT_VERSION,
                 reminders = remindersForBackup,
@@ -178,9 +182,7 @@ object BackupManager {
                             if (totalAttachmentBytes > MAX_TOTAL_ATTACHMENT_BYTES) return null
                         }
 
-                        else -> {
-                            // Neznámé položky ignorujeme kvůli budoucí rozšiřitelnosti formátu.
-                        }
+                        else -> return null
                     }
                 }
                 zip.closeEntry()
@@ -286,8 +288,8 @@ object BackupManager {
     ): Boolean {
         val reminderStore = ReminderStore.get(context)
         val favoritesStore = FavoritesStore.get(context)
-        val oldReminders = reminderStore.reminders.value
-        val oldFavorites = favoritesStore.favorites.value
+        val oldReminders = reminderStore.snapshotAfterPendingIo()
+        val oldFavorites = favoritesStore.snapshotAfterPendingIo()
 
         val finalReminders = mergeById(oldReminders, imported.reminders) { it.id }
         val finalFavorites = mergeById(oldFavorites, imported.favorites) { it.id }
