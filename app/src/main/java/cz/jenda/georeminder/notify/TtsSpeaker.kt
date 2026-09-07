@@ -1,82 +1,209 @@
 package cz.jenda.georeminder.notify
 
 import android.content.Context
+import android.content.res.Resources
 import android.media.AudioManager
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import cz.jenda.georeminder.data.FeatureSettings
+import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.model.Reminder
+import java.util.ArrayDeque
 import java.util.Locale
 
-/** Hlasité čtení připomínek nahlas v češtině. */
+/** Hlasité čtení připomínek s restartovatelným TTS enginem a omezenou frontou. */
 object TtsSpeaker {
-    private var tts: TextToSpeech? = null
-    @Volatile
-    private var isInitialized = false
-    private val pendingQueue = mutableListOf<String>()
+    private const val TAG = "TtsSpeaker"
+    private const val MAX_PENDING_REQUESTS = 8
 
-    @Synchronized
-    fun init(context: Context) {
-        if (tts != null) return
-        val appContext = context.applicationContext
-        tts = TextToSpeech(appContext) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                val csLocale = Locale("cs", "CZ")
-                val res = tts?.setLanguage(csLocale)
-                if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    tts?.setLanguage(Locale.getDefault())
-                }
-                isInitialized = true
-                synchronized(pendingQueue) {
-                    for (text in pendingQueue) {
-                        tts?.speak(text, TextToSpeech.QUEUE_ADD, null, "queued_${System.currentTimeMillis()}")
-                    }
-                    pendingQueue.clear()
-                }
-            }
-        }
-    }
+    private data class SpeechRequest(
+        val text: String,
+        val utteranceId: String,
+    )
+
+    private val lock = Any()
+    private var tts: TextToSpeech? = null
+    private var isInitialized = false
+    private var engineGeneration = 0L
+    private val pendingQueue = ArrayDeque<SpeechRequest>()
 
     fun speakIfEnabled(context: Context, reminder: Reminder) {
-        init(context)
+        // Důležité: TTS službu vůbec neinicializovat, pokud je funkce vypnutá.
         if (!FeatureSettings.ttsEnabled.value) return
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         if (audioManager?.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
 
         val textToSpeak = if (FeatureSettings.ttsReadFullText.value) {
-            "${reminder.title}. ${reminder.subtitle}"
+            "${reminder.title}. ${NotificationHelper.body(reminder)}"
         } else {
             reminder.title
         }
 
-        synchronized(pendingQueue) {
-            if (isInitialized) {
-                tts?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, "reminder_${reminder.id}")
+        enqueueOrSpeak(
+            context = context,
+            request = SpeechRequest(textToSpeak, "reminder_${reminder.id}"),
+        )
+    }
+
+    /** Ukázka z Nastavení funguje i když je automatické TTS vypnuté. */
+    fun speakText(context: Context, text: String) {
+        val fallback = if (FeatureSettings.appLanguage.value == LanguageController.LANG_EN) {
+            "GeoReminder reminder"
+        } else {
+            "GeoReminder připomínka"
+        }
+        enqueueOrSpeak(
+            context = context,
+            request = SpeechRequest(text.ifBlank { fallback }, "sample_tts"),
+        )
+    }
+
+    private fun enqueueOrSpeak(context: Context, request: SpeechRequest) {
+        val appContext = context.applicationContext
+        var readyEngine: TextToSpeech? = null
+
+        synchronized(lock) {
+            if (isInitialized && tts != null) {
+                readyEngine = tts
             } else {
-                pendingQueue.add(textToSpeak)
+                enqueueBoundedLocked(request)
+                if (tts == null) {
+                    startEngineLocked(appContext)
+                }
+            }
+        }
+
+        readyEngine?.let { speakNow(appContext, it, request, TextToSpeech.QUEUE_FLUSH) }
+    }
+
+    private fun enqueueBoundedLocked(request: SpeechRequest) {
+        while (pendingQueue.size >= MAX_PENDING_REQUESTS) {
+            pendingQueue.removeFirst()
+        }
+        pendingQueue.addLast(request)
+    }
+
+    /** Volat pouze uvnitř locku. */
+    private fun startEngineLocked(context: Context) {
+        val generation = ++engineGeneration
+        tts = TextToSpeech(context) { status ->
+            handleInitResult(context, generation, status)
+        }
+    }
+
+    private fun handleInitResult(context: Context, generation: Long, status: Int) {
+        var failedEngine: TextToSpeech? = null
+        var readyEngine: TextToSpeech? = null
+        var queued = emptyList<SpeechRequest>()
+
+        synchronized(lock) {
+            // Callback starého enginu po shutdown/restartu nesmí změnit nový stav.
+            if (generation != engineGeneration) return
+            val engine = tts ?: return
+
+            if (status != TextToSpeech.SUCCESS) {
+                failedEngine = engine
+                tts = null
+                isInitialized = false
+                pendingQueue.clear()
+            } else {
+                isInitialized = true
+                engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) = Unit
+                    override fun onDone(utteranceId: String?) = Unit
+                    override fun onError(utteranceId: String?) {
+                        Log.w(TAG, "TTS syntéza selhala: $utteranceId")
+                    }
+                })
+                readyEngine = engine
+                queued = pendingQueue.toList()
+                pendingQueue.clear()
+            }
+        }
+
+        failedEngine?.let { engine ->
+            runCatching { engine.shutdown() }
+            Log.w(TAG, "Inicializace TTS enginu selhala; další požadavek může zkusit nový init")
+            return
+        }
+
+        readyEngine?.let { engine ->
+            configureLanguage(context, engine)
+            // Fronta vznikla během inicializace. První požadavek smaže případný
+            // starý speech, další se za něj přidají, takže se během startu neztratí.
+            queued.forEachIndexed { index, request ->
+                speakNow(
+                    context,
+                    engine,
+                    request,
+                    if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD,
+                )
             }
         }
     }
 
-    fun speakText(context: Context, text: String) {
-        init(context)
-        val textToSpeak = text.ifEmpty { "GeoReminder pripomínka" }
-        synchronized(pendingQueue) {
-            if (isInitialized) {
-                tts?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, "sample_tts")
-            } else {
-                pendingQueue.add(textToSpeak)
-            }
+    private fun speakNow(
+        context: Context,
+        engine: TextToSpeech,
+        request: SpeechRequest,
+        queueMode: Int,
+    ) {
+        runCatching {
+            configureLanguage(context, engine)
+            engine.speak(request.text, queueMode, null, request.utteranceId)
+        }.onFailure {
+            Log.w(TAG, "TTS speak selhal", it)
         }
     }
+
+    private fun configureLanguage(context: Context, engine: TextToSpeech) {
+        val systemLocale = systemLocale()
+        val preferred = resolvePreferredLocale(
+            FeatureSettings.appLanguage.value,
+            systemLocale,
+        )
+
+        val result = engine.setLanguage(preferred)
+        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            if (preferred != systemLocale) {
+                val fallback = engine.setLanguage(systemLocale)
+                if (fallback != TextToSpeech.LANG_MISSING_DATA &&
+                    fallback != TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    return
+                }
+            }
+            // Poslední konzervativní fallback. Text zůstane beze změny.
+            engine.setLanguage(Locale.US)
+        }
+    }
+
+    private fun systemLocale(): Locale {
+        val locales = Resources.getSystem().configuration.locales
+        return if (!locales.isEmpty) locales[0] else Locale.US
+    }
+
+    internal fun resolvePreferredLocale(appLanguage: String, systemLocale: Locale): Locale =
+        when (appLanguage) {
+            LanguageController.LANG_CS -> Locale.forLanguageTag("cs-CZ")
+            LanguageController.LANG_EN -> Locale.US
+            else -> systemLocale
+        }
 
     fun shutdown() {
-        tts?.stop()
-        tts?.shutdown()
-        tts = null
-        isInitialized = false
-        synchronized(pendingQueue) {
+        val engine = synchronized(lock) {
+            engineGeneration++
+            val current = tts
+            tts = null
+            isInitialized = false
             pendingQueue.clear()
+            current
+        }
+        if (engine != null) {
+            runCatching { engine.stop() }
+            runCatching { engine.shutdown() }
         }
     }
 }
