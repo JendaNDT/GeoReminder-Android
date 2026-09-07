@@ -3,6 +3,7 @@ package cz.jenda.georeminder.data
 import android.content.Context
 import android.util.Log
 import cz.jenda.georeminder.model.Reminder
+import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.widget.WidgetRefresher
 import kotlinx.coroutines.CoroutineScope
@@ -119,7 +120,11 @@ class ReminderStore private constructor(context: Context) {
     fun add(reminder: Reminder) {
         _reminders.value = _reminders.value + reminder
         persist()
-        scheduler.schedule(reminder)
+        if (reminder.kind == ReminderKind.LOCATION) {
+            scheduler.resyncGeofences(_reminders.value)
+        } else {
+            scheduler.schedule(reminder)
+        }
     }
 
     @Synchronized
@@ -135,8 +140,15 @@ class ReminderStore private constructor(context: Context) {
         _reminders.value = list
         persist()
         scheduler.cancel(reminder.id)
-        if (!reminder.isDone) {
+
+        val touchesGeofences =
+            oldReminder.kind == ReminderKind.LOCATION || reminder.kind == ReminderKind.LOCATION
+
+        if (!reminder.isDone && reminder.kind == ReminderKind.TIME) {
             scheduler.schedule(reminder)
+        }
+        if (touchesGeofences) {
+            scheduler.resyncGeofences(_reminders.value)
         }
     }
 
@@ -156,16 +168,25 @@ class ReminderStore private constructor(context: Context) {
         }
         scheduler.cancel(reminder.id)
         persist()
+        if (reminder.kind == ReminderKind.LOCATION) {
+            scheduler.resyncGeofences(_reminders.value)
+        }
     }
 
     /** Odloží připomínku – nová jednorázová notifikace za daný počet minut. */
     fun snooze(reminder: Reminder, minutes: Int) {
         scheduler.snooze(reminder, minutes)
+        if (reminder.kind == ReminderKind.LOCATION) {
+            scheduler.resyncGeofences(_reminders.value)
+        }
     }
 
     /** Odloží připomínku na konkrétní čas (např. zítra ráno). */
     fun snoozeAt(reminder: Reminder, atMillis: Long) {
         scheduler.snoozeAt(reminder, atMillis)
+        if (reminder.kind == ReminderKind.LOCATION) {
+            scheduler.resyncGeofences(_reminders.value)
+        }
     }
 
     /** Znovu zaregistruje geofence a budíky (start appky, po restartu telefonu). */
