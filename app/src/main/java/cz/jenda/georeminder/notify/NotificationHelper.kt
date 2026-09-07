@@ -93,6 +93,7 @@ object NotificationHelper {
 
     fun body(context: Context, reminder: Reminder): String {
         val strings = LanguageController.localizedContext(context)
+        val locale = LanguageController.localeForContext(strings)
         return when (reminder.kind) {
             ReminderKind.LOCATION -> if (reminder.trigger == TriggerType.ARRIVE) {
                 strings.getString(R.string.notification_arrive_body, reminder.placeName)
@@ -105,15 +106,15 @@ object NotificationHelper {
                 if (due == null) "" else when (reminder.timeRepeat) {
                     TimeRepeat.NEVER -> strings.getString(
                         R.string.notification_time_once_body,
-                        CzechFormat.dateTime(due),
+                        CzechFormat.dateTimeForLocale(due, locale),
                     )
                     TimeRepeat.DAILY -> strings.getString(
                         R.string.notification_time_daily_body,
-                        CzechFormat.time(due),
+                        CzechFormat.timeForLocale(due, locale),
                     )
                     TimeRepeat.WEEKLY -> strings.getString(
                         R.string.notification_time_weekly_body,
-                        CzechFormat.weeklyLabel(due, reminder.weekdays),
+                        CzechFormat.weeklyLabelForLocale(due, reminder.weekdays, locale),
                     )
                 }
             }
