@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import cz.jenda.georeminder.data.ReminderStore
+import cz.jenda.georeminder.notify.NotificationHelper
 import cz.jenda.georeminder.ui.RootScreen
 import cz.jenda.georeminder.ui.theme.GeoReminderTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,9 @@ class MainActivity : ComponentActivity() {
 
         /** Sdílený text s místem (z Map Google apod.) → předvyplnit připomínku. */
         val sharedPlaceText = MutableStateFlow<String?>(null)
+
+        /** Kliknutí na notifikaci → otevřít konkrétní existující připomínku. */
+        val notificationReminderRequest = MutableStateFlow<String?>(null)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,11 +38,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
+
+        if (intent.action == NotificationHelper.ACTION_OPEN_REMINDER) {
+            intent.getStringExtra(NotificationHelper.EXTRA_REMINDER_ID)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { notificationReminderRequest.value = it }
+            return
+        }
 
         intent.getStringExtra("shortcut_kind")?.let {
             shortcutRequest.value = it
