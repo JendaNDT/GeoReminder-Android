@@ -11,9 +11,7 @@ class PlaceLinkResolverTest {
 
     @Test
     fun testGeoUriParsingWithLabel() = runBlocking {
-        val geoUri = "geo:0,0?q=50.08,14.43(Albert)"
-        val resolved = PlaceLinkResolver.resolve(geoUri)
-
+        val resolved = PlaceLinkResolver.resolve("geo:0,0?q=50.08,14.43(Albert)")
         assertNotNull(resolved)
         assertEquals("Albert", resolved!!.first)
         assertEquals(50.08, resolved.second.latitude, 0.001)
@@ -22,9 +20,7 @@ class PlaceLinkResolverTest {
 
     @Test
     fun testGeoUriParsingPlainCoordinates() = runBlocking {
-        val geoUri = "geo:50.08,14.43"
-        val resolved = PlaceLinkResolver.resolve(geoUri)
-
+        val resolved = PlaceLinkResolver.resolve("geo:50.08,14.43")
         assertNotNull(resolved)
         assertEquals("", resolved!!.first)
         assertEquals(50.08, resolved.second.latitude, 0.001)
@@ -33,9 +29,13 @@ class PlaceLinkResolverTest {
 
     @Test
     fun testInvalidTextReturnsNull() = runBlocking {
-        val invalidText = "Toto není žádný platný odkaz ani geo URI."
-        val resolved = PlaceLinkResolver.resolve(invalidText)
+        assertNull(PlaceLinkResolver.resolve("Toto není žádný platný odkaz ani geo URI."))
+    }
 
-        assertNull(resolved)
+    @Test
+    fun testOutOfRangeGeoCoordinatesReturnNull() = runBlocking {
+        assertNull(PlaceLinkResolver.resolve("geo:95.0,14.4"))
+        assertNull(PlaceLinkResolver.resolve("geo:50.0,181.0"))
+        assertNull(PlaceLinkResolver.resolve("geo:0,0?q=-91.0,10.0(Mimo)"))
     }
 }
