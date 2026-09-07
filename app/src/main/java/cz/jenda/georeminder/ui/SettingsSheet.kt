@@ -82,6 +82,7 @@ fun SettingsSheet(onClose: () -> Unit) {
     }
 
     var showCalendarSheet by remember { mutableStateOf(false) }
+    var showDiagnosticsSheet by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip")
@@ -425,6 +426,10 @@ fun SettingsSheet(onClose: () -> Unit) {
             Column {
                 SectionHeader(stringResource(R.string.settings_reliability))
                 InsetCard {
+                    SettingsLinkRow(stringResource(R.string.diagnostics_title)) {
+                        showDiagnosticsSheet = true
+                    }
+                    CardDivider()
                     SettingsLinkRow(stringResource(R.string.settings_phone_notifications)) {
                         val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                             putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
@@ -503,6 +508,18 @@ fun SettingsSheet(onClose: () -> Unit) {
             dragHandle = null,
         ) {
             CalendarImportSheet(onClose = { showCalendarSheet = false })
+        }
+    }
+
+    if (showDiagnosticsSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showDiagnosticsSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = colors.background,
+            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+            dragHandle = null,
+        ) {
+            DiagnosticsScreen(onClose = { showDiagnosticsSheet = false })
         }
     }
 }
