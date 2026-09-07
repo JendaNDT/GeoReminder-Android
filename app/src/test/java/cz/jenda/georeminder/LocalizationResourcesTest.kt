@@ -15,23 +15,28 @@ class LocalizationResourcesTest {
         ).firstOrNull { it.isDirectory }
             ?: error("Nelze najít src/main/res pro kontrolu lokalizace")
 
-        val cs = stringNames(File(resDir, "values/strings.xml"))
-        val en = stringNames(File(resDir, "values-en/strings.xml"))
+        val cs = stringNames(File(resDir, "values"))
+        val en = stringNames(File(resDir, "values-en"))
 
         assertTrue("Výchozí CZ resources nesmí být prázdné", cs.isNotEmpty())
         assertEquals(
-            "CZ a EN strings.xml musí mít stejnou množinu klíčů. " +
+            "CZ a EN resource XML musí mít stejnou množinu string klíčů. " +
                 "Chybí v EN: ${cs - en}; chybí v CZ: ${en - cs}",
             cs,
             en,
         )
     }
 
-    private fun stringNames(file: File): Set<String> {
-        require(file.isFile) { "Chybí resource soubor: ${file.path}" }
+    private fun stringNames(directory: File): Set<String> {
+        require(directory.isDirectory) { "Chybí resource adresář: ${directory.path}" }
         val regex = Regex("<string\\s+name=\"([^\"]+)\"")
-        return regex.findAll(file.readText())
-            .map { it.groupValues[1] }
+        return directory.listFiles()
+            .orEmpty()
+            .asSequence()
+            .filter { it.isFile && it.extension == "xml" }
+            .flatMap { file ->
+                regex.findAll(file.readText()).map { it.groupValues[1] }
+            }
             .toSet()
     }
 }
