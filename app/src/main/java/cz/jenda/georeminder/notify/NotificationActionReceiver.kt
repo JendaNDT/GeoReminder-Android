@@ -25,7 +25,12 @@ class NotificationActionReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
+                val loadResult = store.reloadAndWait()
+                if (loadResult == ReminderStore.ReloadResult.ERROR) {
+                    Log.w("NotifActionReceiver", "Akce přeskočena – data připomínek se nepodařilo načíst")
+                    return@launch
+                }
+
                 val reminder = store.reminders.value.firstOrNull { it.id == id }
                     ?: return@launch
 
