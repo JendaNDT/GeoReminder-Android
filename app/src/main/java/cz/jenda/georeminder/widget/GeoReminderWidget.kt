@@ -38,6 +38,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
+import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
@@ -61,11 +62,12 @@ class GeoReminderWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val strings = LanguageController.localizedContext(context)
         val reminders = loadActive(context).map {
-            WidgetReminder(it, ReminderText.subtitle(context, it))
+            WidgetReminder(it, ReminderText.subtitle(strings, it))
         }
-        val allDoneText = context.getString(R.string.widget_all_done)
-        val addDescription = context.getString(R.string.widget_add_reminder)
+        val allDoneText = strings.getString(R.string.widget_all_done)
+        val addDescription = strings.getString(R.string.widget_add_reminder)
         val addIntent = Intent(context, MainActivity::class.java)
             .setAction(Intent.ACTION_VIEW)
             .putExtra("shortcut_kind", "location")
