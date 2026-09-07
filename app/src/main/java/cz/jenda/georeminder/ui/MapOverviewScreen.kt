@@ -1,5 +1,11 @@
 package cz.jenda.georeminder.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,13 +13,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,7 +35,6 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
-import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.Circle
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
@@ -44,22 +47,13 @@ import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import cz.jenda.georeminder.ui.components.EmptyState
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 import cz.jenda.georeminder.ui.theme.MapStyles
 import cz.jenda.georeminder.ui.theme.ThemeController
 
-/**
- * Druhá záložka: všechny aktivní geo-připomínky na jedné mapě.
- * Ťuknutím na špendlík se otevře úprava připomínky (DESIGN_SPEC §5.6).
- */
+/** Druhá záložka: všechny aktivní geo-připomínky na jedné mapě. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapOverviewScreen() {
@@ -85,8 +79,8 @@ fun MapOverviewScreen() {
             ) {
                 EmptyState(
                     icon = Icons.Filled.Map,
-                    title = "Žádná místa k zobrazení",
-                    text = "Aktivní připomínky na místa se ukážou tady na mapě.",
+                    title = stringResource(R.string.map_empty_title),
+                    text = stringResource(R.string.map_empty_text),
                 )
             }
         } else {
@@ -99,7 +93,6 @@ fun MapOverviewScreen() {
             }
             val hasFine = remember { LocationHolder.hasFineLocation(context) }
 
-            // Kamera tak, aby byly vidět všechny připomínky najednou
             LaunchedEffect(locationReminders.map { it.id }) {
                 runCatching {
                     if (locationReminders.size == 1) {
@@ -180,7 +173,6 @@ fun MapOverviewScreen() {
             }
         }
 
-        // Horní lišta s inline titulkem (poloprůhledný „materiál")
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -189,7 +181,7 @@ fun MapOverviewScreen() {
                 .statusBarsPadding(),
         ) {
             Text(
-                text = "Mapa připomínek",
+                text = stringResource(R.string.map_overview_title),
                 style = GeoType.headline,
                 color = colors.label,
                 textAlign = TextAlign.Center,
@@ -200,18 +192,10 @@ fun MapOverviewScreen() {
         }
     }
 
-    if (editingReminder != null) {
-        ModalBottomSheet(
-            onDismissRequest = { editingReminder = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = colors.background,
-            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
-            dragHandle = null,
-        ) {
-            EditReminderSheet(
-                existing = editingReminder,
-                onClose = { editingReminder = null },
-            )
-        }
+    editingReminder?.let { reminder ->
+        ReminderEditorModal(
+            existing = reminder,
+            onClose = { editingReminder = null },
+        )
     }
 }
