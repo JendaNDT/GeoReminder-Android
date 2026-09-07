@@ -59,7 +59,6 @@ class GeoReminderWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val reminders = loadActive(context)
-        // Plus v rohu widgetu → rovnou formulář nové připomínky
         val addIntent = Intent(context, MainActivity::class.java)
             .setAction(Intent.ACTION_VIEW)
             .putExtra("shortcut_kind", "location")
@@ -71,11 +70,21 @@ class GeoReminderWidget : GlanceAppWidget() {
 
     /** Načte nejnovější aktivní připomínky ze sdíleného JSON souboru. */
     private fun loadActive(context: Context): List<Reminder> {
-        val text = SharedStorage.readText(context, "reminders.json") ?: return emptyList()
-        return SharedStorage.decodeReminders(text)
+        val text = SharedStorage.readText(context, ReminderStoreFile.NAME) ?: return emptyList()
+        val decoded = when (val result = SharedStorage.decodeReminders(text)) {
+            is SharedStorage.DecodeRemindersResult.Success -> result.reminders
+            is SharedStorage.DecodeRemindersResult.Partial -> result.reminders
+            is SharedStorage.DecodeRemindersResult.Corrupted -> emptyList()
+        }
+        return decoded
             .filter { !it.isDone }
             .sortedByDescending { it.createdAt }
             .take(3)
+    }
+
+    /** Oddělená konstanta bez inicializace ReminderStore z procesu widgetu. */
+    private object ReminderStoreFile {
+        const val NAME = "reminders.json"
     }
 }
 
@@ -170,7 +179,6 @@ private fun WidgetContent(reminders: List<Reminder>, addIntent: Intent) {
             }
         }
 
-        // Plus v pravém horním rohu – nová připomínka na jeden ťuk
         Box(
             modifier = GlanceModifier.fillMaxSize(),
             contentAlignment = Alignment.TopEnd,
