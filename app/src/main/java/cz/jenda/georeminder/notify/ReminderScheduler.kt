@@ -8,7 +8,6 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import cz.jenda.georeminder.data.LocationHolder
-import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
@@ -19,16 +18,23 @@ import com.google.android.gms.location.LocationServices
 import java.util.Calendar
 
 /**
- * Plánování „spouštěčů" připomínek:
- *  - na místě → geofence (GeofencingClient, hlídá systém i při zavřené appce)
- *  - na čas → přesný budík (AlarmManager), opakování se přeplánovává po každém spuštění
- * Ekvivalent UNLocationNotificationTrigger + UNCalendarNotificationTrigger z iOS.
+ * Plánování systémových spouštěčů připomínek.
+ *
+ * - LOCATION → GeofencingClient
+ * - TIME → AlarmManager
+ * - technický stav (fired/snooze/requestCode) → SchedulerStateStore
+ *
+ * Scheduler je navržený tak, aby opakovaný resync byl bezpečný a aby stejné
+ * reminder ID vždy používalo stejné PendingIntent requestCode i po restartu.
  */
 class ReminderScheduler(context: Context) {
     private val appContext = context.applicationContext
     private val geofencing = LocationServices.getGeofencingClient(appContext)
     private val alarms = appContext.getSystemService(AlarmManager::class.java)
-    private val prefs = appContext.getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
+    private val stateStore = SchedulerStateStore(appContext)
+
+    private val resyncLock = Any()
+    private var resyncGeneration = 0L
 
     companion object {
         const val ACTION_ALARM_FIRE = "cz.jenda.georeminder.ALARM_FIRE"
@@ -37,12 +43,6 @@ class ReminderScheduler(context: Context) {
         const val EXTRA_REMINDER_ID = "reminder_id"
         const val NAG_INTERVAL_MINUTES = 5
         const val SNOOZE_MINUTES = 60
-        private const val KEY_FIRED_GEOFENCES = "firedGeofenceIds"
-        private const val KEY_FIRED_ALARMS = "firedAlarmIds"
-        private const val KEY_SNOOZE_PREFIX = "snooze_"
-
-        // Serializuje read-modify-write nad SharedPreferences (souběh událostí).
-        private val prefsLock = Any()
 
         @Volatile
         private var instance: ReminderScheduler? = null
@@ -51,7 +51,6 @@ class ReminderScheduler(context: Context) {
             instance ?: synchronized(this) {
                 instance ?: ReminderScheduler(context.applicationContext).also { instance = it }
             }
-
 
         /** Nejbližší budoucí výskyt stejné hodiny a minuty (denní opakování). */
         fun nextDaily(dueMillis: Long, now: Long = System.currentTimeMillis()): Long {
@@ -94,14 +93,10 @@ class ReminderScheduler(context: Context) {
                 set(Calendar.MILLISECOND, 0)
             }
             var safety = 0
-            while ((isoWeekday(next.timeInMillis) !in targetDays
-                        || next.timeInMillis <= now) && safety < 15
-            ) {
+            while ((isoWeekday(next.timeInMillis) !in targetDays || next.timeInMillis <= now) && safety < 15) {
                 next.add(Calendar.DAY_OF_YEAR, 1)
                 safety++
             }
-            // Pojistka pro poškozená data (žádný platný den): vrať aspoň
-            // nejbližší budoucí výskyt, ne termín v minulosti.
             if (next.timeInMillis <= now) next.add(Calendar.DAY_OF_YEAR, 7)
             return next.timeInMillis
         }
@@ -111,6 +106,11 @@ class ReminderScheduler(context: Context) {
 
     fun schedule(reminder: Reminder) {
         if (reminder.isDone) return
+
+        // Po upgradu z původní verze mohou v AlarmManageru ještě žít PendingIntenty
+        // založené na String.hashCode(). Před prvním novým plánováním je zrušíme.
+        cancelLegacyPendingIntents(reminder.id)
+
         when (reminder.kind) {
             ReminderKind.LOCATION -> addGeofence(reminder)
             ReminderKind.TIME -> scheduleAlarm(reminder)
@@ -122,23 +122,21 @@ class ReminderScheduler(context: Context) {
         alarms.cancel(alarmPendingIntent(reminderId, snooze = false))
         alarms.cancel(alarmPendingIntent(reminderId, snooze = true))
         cancelNag(reminderId)
+        cancelLegacyPendingIntents(reminderId)
         NotificationHelper.cancel(appContext, reminderId)
-        clearGeofenceFired(reminderId)
-        clearAlarmFired(reminderId)
-        clearSnooze(reminderId)
+        stateStore.clearFired(reminderId)
+        stateStore.clearSnooze(reminderId)
     }
 
-    // MARK: - Dožadování (opakované připomenutí do potvrzení)
+    // MARK: - Dožadování
 
-    /** Za 5 minut připomenout znovu (volá se po každém zobrazení notifikace). */
     fun scheduleNag(reminder: Reminder) {
         setExact(
             System.currentTimeMillis() + NAG_INTERVAL_MINUTES * 60_000L,
-            nagPendingIntent(reminder.id)
+            nagPendingIntent(reminder.id),
         )
     }
 
-    /** Zastaví dožadování (Hotovo, odložení, úprava, otevření appky). */
     fun cancelNag(reminderId: String) {
         alarms.cancel(nagPendingIntent(reminderId))
     }
@@ -146,82 +144,39 @@ class ReminderScheduler(context: Context) {
     private fun nagPendingIntent(reminderId: String): PendingIntent =
         PendingIntent.getBroadcast(
             appContext,
-            reminderId.hashCode() xor 0x0F0F0F,
+            stateStore.requestCode(reminderId, SchedulerStateStore.OFFSET_NAG),
             Intent(appContext, AlarmReceiver::class.java)
                 .setAction(ACTION_NAG_FIRE)
                 .putExtra(EXTRA_REMINDER_ID, reminderId),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-    // MARK: - Značka „už vystřeleno" pro jednorázové geofence
-    // Jednorázová geo-připomínka po spuštění zůstává v seznamu aktivní (jako na
-    // iOS), ale nesmí se při dalším startu appky znovu zaregistrovat a střílet
-    // opakovaně. Úprava/Vrátit/smazání jde přes cancel(), který značku smaže.
+    // MARK: - Jednorázové „už vystřeleno"
 
-    private fun firedGeofenceIds(): Set<String> = synchronized(prefsLock) {
-        prefs.getStringSet(KEY_FIRED_GEOFENCES, emptySet()) ?: emptySet()
+    fun markGeofenceFired(reminderId: String) {
+        stateStore.markFired(reminderId)
     }
 
-    fun markGeofenceFired(reminderId: String) = synchronized(prefsLock) {
-        prefs.edit()
-            .putStringSet(KEY_FIRED_GEOFENCES, HashSet(firedGeofenceIds()).apply { add(reminderId) })
-            .apply()
+    fun isAlarmFired(reminderId: String): Boolean = stateStore.isFired(reminderId)
+
+    fun markAlarmFired(reminderId: String) {
+        stateStore.markFired(reminderId)
     }
 
-    private fun clearGeofenceFired(reminderId: String) = synchronized(prefsLock) {
-        val current = firedGeofenceIds()
-        if (reminderId in current) {
-            prefs.edit()
-                .putStringSet(KEY_FIRED_GEOFENCES, HashSet(current).apply { remove(reminderId) })
-                .apply()
-        }
+    // MARK: - Snooze
+
+    fun clearSnooze(reminderId: String) {
+        stateStore.clearSnooze(reminderId)
     }
 
-    // Značka „už odpáleno" pro jednorázové časové budíky – aby je catch-up po
-    // restartu telefonu neposlal znovu, když se normálně doručily před restartem.
-    private fun firedAlarmIds(): Set<String> = synchronized(prefsLock) {
-        prefs.getStringSet(KEY_FIRED_ALARMS, emptySet()) ?: emptySet()
-    }
-
-    /** true = jednorázový budík už byl doručen (catch-up nebo AlarmReceiver). */
-    fun isAlarmFired(reminderId: String): Boolean = synchronized(prefsLock) {
-        reminderId in firedAlarmIds()
-    }
-
-    fun markAlarmFired(reminderId: String) = synchronized(prefsLock) {
-        prefs.edit()
-            .putStringSet(KEY_FIRED_ALARMS, HashSet(firedAlarmIds()).apply { add(reminderId) })
-            .apply()
-    }
-
-    private fun clearAlarmFired(reminderId: String) = synchronized(prefsLock) {
-        val current = firedAlarmIds()
-        if (reminderId in current) {
-            prefs.edit()
-                .putStringSet(KEY_FIRED_ALARMS, HashSet(current).apply { remove(reminderId) })
-                .apply()
-        }
-    }
-
-    private fun rememberSnooze(reminderId: String, atMillis: Long) = synchronized(prefsLock) {
-        prefs.edit().putLong(KEY_SNOOZE_PREFIX + reminderId, atMillis).apply()
-    }
-
-    fun clearSnooze(reminderId: String) = synchronized(prefsLock) {
-        prefs.edit().remove(KEY_SNOOZE_PREFIX + reminderId).apply()
-    }
-
-    /** Odložení: jednorázový budík za daný počet minut (i pro geo-připomínky). */
     fun snooze(reminder: Reminder, minutes: Int) {
         snoozeAt(reminder, System.currentTimeMillis() + minutes * 60_000L)
     }
 
-    /** Odložení na konkrétní čas (např. zítra ráno). Pozastaví i dožadování. */
     fun snoozeAt(reminder: Reminder, atMillis: Long) {
         cancelNag(reminder.id)
         setExact(atMillis, alarmPendingIntent(reminder.id, snooze = true))
-        // Zapamatovat odložení, ať ho jde obnovit po restartu telefonu.
-        rememberSnooze(reminder.id, atMillis)
+        stateStore.setSnooze(reminder.id, atMillis)
     }
 
     /** Po spuštění opakovaného budíku naplánuje další výskyt. */
@@ -236,41 +191,65 @@ class ReminderScheduler(context: Context) {
     }
 
     /**
-     * Znovu zaregistruje všechno aktivní (start appky, restart telefonu).
-     * Otevření appky zároveň zastaví běžící dožadování – uživatel appku vidí.
+     * Znovu nastaví celý systémový stav podle seznamu reminderů.
+     *
+     * AlarmManager je idempotentní díky stabilním PendingIntentům. U geofence
+     * nejdřív odstraníme všechny geofence patřící našemu sdílenému PendingIntentu
+     * a až po dokončení odstranění přidáme aktuální snapshot. Generační číslo
+     * zabrání tomu, aby starší paralelní resync přepsal novější stav.
      */
     fun resync(all: List<Reminder>) {
-        all.forEach { cancelNag(it.id) }
-        // Optimisticky vyčistit chybový příznak geofence; když registrace zase
-        // selže, failure listener ho nastaví zpět na true (jinak by banner
-        // „zamrzl" i po smazání problémové připomínky).
+        all.forEach {
+            cancelNag(it.id)
+            cancelLegacyPendingIntents(it.id)
+        }
+
         LocationHolder.geofenceFailed.value = false
         val active = all.filter { !it.isDone }
-        active.forEach { schedule(it) }
+
+        // Časové remindery lze bezpečně přeplánovat hned: stejný PendingIntent
+        // nahradí předchozí alarm místo vytvoření duplicity.
+        active.filter { it.kind == ReminderKind.TIME }.forEach { scheduleAlarm(it) }
         restoreSnoozes(active)
+
+        val locationSnapshot = active.filter { it.kind == ReminderKind.LOCATION }
+        val generation = synchronized(resyncLock) {
+            resyncGeneration += 1
+            resyncGeneration
+        }
+
+        try {
+            geofencing.removeGeofences(geofencePendingIntent())
+                .addOnCompleteListener {
+                    val stillLatest = synchronized(resyncLock) { generation == resyncGeneration }
+                    if (!stillLatest) return@addOnCompleteListener
+                    locationSnapshot.forEach { addGeofence(it) }
+                }
+        } catch (e: Exception) {
+            Log.w("ReminderScheduler", "Hromadný reset geofence selhal", e)
+            val stillLatest = synchronized(resyncLock) { generation == resyncGeneration }
+            if (stillLatest) {
+                locationSnapshot.forEach { addGeofence(it) }
+            }
+        }
     }
 
-    /**
-     * Obnoví odložené (snooze) budíky po restartu telefonu. Pokud odložený čas
-     * mezitím uplynul (telefon byl vypnutý), připomínku doručí hned.
-     */
+    /** Obnoví snooze po restartu telefonu. */
     private fun restoreSnoozes(active: List<Reminder>) {
         val byId = active.associateBy { it.id }
         val now = System.currentTimeMillis()
-        val snoozeKeys = prefs.all.keys.filter { it.startsWith(KEY_SNOOZE_PREFIX) }
-        for (key in snoozeKeys) {
-            val id = key.removePrefix(KEY_SNOOZE_PREFIX)
-            val at = prefs.getLong(key, 0L)
+
+        for ((id, at) in stateStore.allSnoozes()) {
             val reminder = byId[id]
-            if (reminder == null || at == 0L) {
-                clearSnooze(id)
+            if (reminder == null) {
+                stateStore.clearSnooze(id)
                 continue
             }
             if (at > now) {
                 setExact(at, alarmPendingIntent(id, snooze = true))
             } else {
                 NotificationHelper.show(appContext, reminder)
-                clearSnooze(id)
+                stateStore.clearSnooze(id)
             }
         }
     }
@@ -280,8 +259,7 @@ class ReminderScheduler(context: Context) {
     @SuppressLint("MissingPermission")
     private fun addGeofence(reminder: Reminder) {
         if (!LocationHolder.hasFineLocation(appContext)) return
-        // Jednorázová připomínka, která už vystřelila, se znovu neregistruje
-        if (!reminder.repeats && reminder.id in firedGeofenceIds()) return
+        if (!reminder.repeats && stateStore.isFired(reminder.id)) return
 
         val transition = if (reminder.trigger == TriggerType.ARRIVE) {
             Geofence.GEOFENCE_TRANSITION_ENTER
@@ -294,14 +272,12 @@ class ReminderScheduler(context: Context) {
             .setCircularRegion(
                 reminder.latitude,
                 reminder.longitude,
-                reminder.radius.toFloat()
+                reminder.radius.toFloat(),
             )
             .setExpirationDuration(Geofence.NEVER_EXPIRE)
             .setTransitionTypes(transition)
             .build()
 
-        // initialTrigger = 0: notifikace jen při skutečném překročení hranice,
-        // ne hned při vytvoření připomínky na místě, kde zrovna stojíš.
         val request = GeofencingRequest.Builder()
             .setInitialTrigger(0)
             .addGeofence(geofence)
@@ -311,18 +287,14 @@ class ReminderScheduler(context: Context) {
             geofencing.addGeofences(request, geofencePendingIntent())
                 .addOnSuccessListener { LocationHolder.geofenceFailed.value = false }
                 .addOnFailureListener { e ->
-                    // Např. systémový limit 100 geofence nebo vypnuté služby polohy –
-                    // dřív to selhalo úplně potichu, teď to appka ukáže bannerem.
                     Log.w("ReminderScheduler", "Registrace geofence selhala", e)
                     LocationHolder.geofenceFailed.value = true
                 }
         } catch (_: SecurityException) {
-            // Bez oprávnění „Povolit vždy" – registrace selhala, zobrazíme banner.
             LocationHolder.geofenceFailed.value = true
         }
     }
 
-    /** Jeden sdílený PendingIntent pro všechny geofence (systém do něj vkládá data). */
     private fun geofencePendingIntent(): PendingIntent {
         val flags = if (Build.VERSION.SDK_INT >= 31) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
@@ -333,11 +305,11 @@ class ReminderScheduler(context: Context) {
             appContext,
             1000,
             Intent(appContext, GeofenceReceiver::class.java),
-            flags
+            flags,
         )
     }
 
-    // MARK: - Budíky
+    // MARK: - AlarmManager
 
     private fun scheduleAlarm(reminder: Reminder) {
         val due = reminder.dueDate ?: return
@@ -345,19 +317,16 @@ class ReminderScheduler(context: Context) {
         val triggerAt = when (reminder.timeRepeat) {
             TimeRepeat.NEVER -> {
                 if (due <= now) {
-                    // Termín už uplynul – typicky zmeškaný, když byl telefon
-                    // vypnutý. Doručit jednou, pokud se budík ještě neodpálil.
-                    if (reminder.id !in firedAlarmIds()) {
+                    if (!stateStore.isFired(reminder.id)) {
                         NotificationHelper.show(appContext, reminder)
-                        markAlarmFired(reminder.id)
+                        stateStore.markFired(reminder.id)
                     }
-                    // Zrušit případný dosud čekající (nepřesný/Doze) budík, ať
-                    // tutéž připomínku nedoručí podruhé.
                     alarms.cancel(alarmPendingIntent(reminder.id, snooze = false))
                     return
                 }
                 due
             }
+
             TimeRepeat.DAILY -> nextDaily(due, now)
             TimeRepeat.WEEKLY -> nextWeekly(due, reminder.weekdays, now)
         }
@@ -367,7 +336,6 @@ class ReminderScheduler(context: Context) {
     private fun setExact(triggerAtMillis: Long, pi: PendingIntent) {
         try {
             if (Build.VERSION.SDK_INT >= 31 && !alarms.canScheduleExactAlarms()) {
-                // Bez povolení přesných budíků: nepřesný budík (může přijít o pár minut později)
                 alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
             } else {
                 alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pi)
@@ -379,6 +347,27 @@ class ReminderScheduler(context: Context) {
 
     private fun alarmPendingIntent(reminderId: String, snooze: Boolean): PendingIntent {
         val action = if (snooze) ACTION_SNOOZE_FIRE else ACTION_ALARM_FIRE
+        val offset = if (snooze) SchedulerStateStore.OFFSET_SNOOZE else SchedulerStateStore.OFFSET_ALARM
+        return PendingIntent.getBroadcast(
+            appContext,
+            stateStore.requestCode(reminderId, offset),
+            Intent(appContext, AlarmReceiver::class.java)
+                .setAction(action)
+                .putExtra(EXTRA_REMINDER_ID, reminderId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    // MARK: - Migrace PendingIntentů z v2.7 a starších
+
+    private fun cancelLegacyPendingIntents(reminderId: String) {
+        alarms.cancel(legacyAlarmPendingIntent(reminderId, snooze = false))
+        alarms.cancel(legacyAlarmPendingIntent(reminderId, snooze = true))
+        alarms.cancel(legacyNagPendingIntent(reminderId))
+    }
+
+    private fun legacyAlarmPendingIntent(reminderId: String, snooze: Boolean): PendingIntent {
+        val action = if (snooze) ACTION_SNOOZE_FIRE else ACTION_ALARM_FIRE
         val requestCode = reminderId.hashCode() xor (if (snooze) 0x5A5A5A else 0)
         return PendingIntent.getBroadcast(
             appContext,
@@ -386,7 +375,17 @@ class ReminderScheduler(context: Context) {
             Intent(appContext, AlarmReceiver::class.java)
                 .setAction(action)
                 .putExtra(EXTRA_REMINDER_ID, reminderId),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
+
+    private fun legacyNagPendingIntent(reminderId: String): PendingIntent =
+        PendingIntent.getBroadcast(
+            appContext,
+            reminderId.hashCode() xor 0x0F0F0F,
+            Intent(appContext, AlarmReceiver::class.java)
+                .setAction(ACTION_NAG_FIRE)
+                .putExtra(EXTRA_REMINDER_ID, reminderId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 }
