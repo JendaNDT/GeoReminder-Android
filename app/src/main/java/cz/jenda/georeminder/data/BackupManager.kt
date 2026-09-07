@@ -43,10 +43,6 @@ object BackupManager {
         encodeDefaults = true
     }
 
-    /**
-     * Export v2: ZIP obsahující backup.json a fyzické přílohy. V JSONu nejsou
-     * absolutní interní cesty telefonu, ale pouze relativní jména ZIP položek.
-     */
     fun exportBackup(context: Context, targetUri: Uri): Boolean {
         return try {
             val attachmentEntries = mutableListOf<Pair<String, File>>()
@@ -95,12 +91,7 @@ object BackupManager {
         }
     }
 
-    /**
-     * Import automaticky rozezná nový ZIP v2 a starý JSON v1. Import je dávkový:
-     * validace + deduplikace proběhne nejdřív v paměti, potom následuje jeden
-     * zápis favorites a jeden zápis reminders + jediný scheduler resync.
-     */
-    fun importBackup(context: Context, sourceUri: Uri): Boolean {
+    suspend fun importBackup(context: Context, sourceUri: Uri): Boolean {
         val createdAttachmentPaths = mutableListOf<String>()
         return try {
             val raw = context.contentResolver.openInputStream(sourceUri) ?: return false
@@ -188,7 +179,7 @@ object BackupManager {
                         }
 
                         else -> {
-                            // Neznámé položky ignorovat kvůli budoucí rozšiřitelnosti formátu.
+                            // Neznámé položky ignorujeme kvůli budoucí rozšiřitelnosti formátu.
                         }
                     }
                 }
@@ -275,7 +266,6 @@ object BackupManager {
         return place.copy(radius = place.radius.coerceIn(50.0, 1000.0))
     }
 
-    /** Poslední výskyt stejného ID vyhrává, pořadí unikátních ID zůstává stabilní. */
     internal fun <T> dedupeById(items: List<T>, idOf: (T) -> String): List<T> {
         val map = linkedMapOf<String, T>()
         items.forEach { item -> map[idOf(item)] = item }
@@ -289,7 +279,7 @@ object BackupManager {
         return map.values.toList()
     }
 
-    private fun applyImportedBackup(
+    private suspend fun applyImportedBackup(
         context: Context,
         imported: ImportedBackup,
         createdAttachmentPaths: MutableList<String>,
@@ -302,14 +292,12 @@ object BackupManager {
         val finalReminders = mergeById(oldReminders, imported.reminders) { it.id }
         val finalFavorites = mergeById(oldFavorites, imported.favorites) { it.id }
 
-        // Favorites první: pokud selže, reminders ani scheduler zůstávají nedotčené.
         if (!favoritesStore.replaceAllFromImport(finalFavorites)) {
             AttachmentHelper.deleteAttachments(context, createdAttachmentPaths)
             return false
         }
 
         if (!reminderStore.replaceAllFromImport(finalReminders)) {
-            // Best-effort rollback první části transakce.
             favoritesStore.replaceAllFromImport(oldFavorites)
             AttachmentHelper.deleteAttachments(context, createdAttachmentPaths)
             return false
@@ -321,7 +309,6 @@ object BackupManager {
             createdAttachmentPaths.filterNot { it in referencedNewPaths },
         )
 
-        // Přílohy nahrazených reminderů mažeme až po úspěšném zápisu obou datasetů.
         val finalPaths = finalReminders.mapNotNull { it.attachmentPath }.toSet()
         oldReminders.mapNotNull { it.attachmentPath }
             .filterNot { it in finalPaths }
@@ -338,7 +325,7 @@ object BackupManager {
 
     internal fun isSafeZipEntryName(name: String?): Boolean {
         if (name.isNullOrBlank()) return false
-        if (name.startsWith('/') || name.startsWith('\\')) return false
+        if (name.startsWith("/") || name.startsWith("\\")) return false
         if ('\\' in name) return false
         val segments = name.split('/')
         if (segments.any { it == ".." }) return false
