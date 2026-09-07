@@ -5,13 +5,15 @@ import cz.jenda.georeminder.model.FavoritePlace
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 
 /** Úložiště oblíbených míst – JSON soubor, stejný princip jako ReminderStore. */
 class FavoritesStore private constructor(context: Context) {
     private val appContext = context.applicationContext
+    private val ioDispatcher = kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
     private val ioScope = kotlinx.coroutines.CoroutineScope(
-        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
+        kotlinx.coroutines.SupervisorJob() + ioDispatcher
     )
 
     @Volatile
@@ -87,23 +89,28 @@ class FavoritesStore private constructor(context: Context) {
         persist()
     }
 
-    /** Jeden atomický zápis pro celý výsledný snapshot importu. */
-    @Synchronized
-    fun replaceAllFromImport(snapshot: List<FavoritePlace>): Boolean {
-        return try {
-            val text = SharedStorage.json.encodeToString(
-                ListSerializer(FavoritePlace.serializer()),
-                snapshot,
-            )
-            if (!SharedStorage.writeText(appContext, FILE, text)) return false
-            _favorites.value = snapshot
-            loadFailed = false
-            true
-        } catch (e: Exception) {
-            android.util.Log.w("FavoritesStore", "Dávkový import oblíbených selhal", e)
-            false
+    /**
+     * Jeden atomický zápis pro celý výsledný snapshot importu, zařazený do
+     * stejné jednovláknové IO fronty jako běžné zápisy.
+     */
+    suspend fun replaceAllFromImport(snapshot: List<FavoritePlace>): Boolean =
+        withContext(ioDispatcher) {
+            try {
+                val text = SharedStorage.json.encodeToString(
+                    ListSerializer(FavoritePlace.serializer()),
+                    snapshot,
+                )
+                if (!SharedStorage.writeText(appContext, FILE, text)) return@withContext false
+                synchronized(this@FavoritesStore) {
+                    _favorites.value = snapshot
+                    loadFailed = false
+                }
+                true
+            } catch (e: Exception) {
+                android.util.Log.w("FavoritesStore", "Dávkový import oblíbených selhal", e)
+                false
+            }
         }
-    }
 
     private fun persist() {
         if (loadFailed) {
