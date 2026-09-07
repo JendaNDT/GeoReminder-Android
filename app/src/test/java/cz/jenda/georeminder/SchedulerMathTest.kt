@@ -57,9 +57,17 @@ class SchedulerMathTest {
         assertEquals(2026, local.year)
         assertEquals(3, local.monthValue)
         assertEquals(29, local.dayOfMonth)
-        // 02:30 v den přechodu neexistuje, Calendar ho normalizuje na 03:30.
+        // 02:30 v den přechodu neexistuje; java.time posune lokální čas vpřed na 03:30.
         assertEquals(3, local.hour)
         assertEquals(30, local.minute)
+    }
+
+    @Test
+    fun nextDailyReturnsToOriginalWallClockAfterSpringDstDay() {
+        val due = localMillis(2026, 3, 28, 2, 30)
+        val now = localMillis(2026, 3, 29, 12, 0)
+        val actual = ReminderScheduler.nextDaily(due, now)
+        assertEquals(localMillis(2026, 3, 30, 2, 30), actual)
     }
 
     @Test
