@@ -1,7 +1,6 @@
 package cz.jenda.georeminder.notify
 
 import android.content.Context
-import android.content.res.Resources
 import android.media.AudioManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -153,11 +152,7 @@ object TtsSpeaker {
     }
 
     private fun configureLanguage(context: Context, engine: TextToSpeech) {
-        val preferred = resolvePreferredLocale(
-            LanguageController.currentLanguageCode(),
-            systemLocale(),
-        )
-
+        val preferred = LanguageController.localeForContext(context)
         val result = engine.setLanguage(preferred)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
             val fallback = if (preferred.language == "en") {
@@ -169,12 +164,7 @@ object TtsSpeaker {
         }
     }
 
-    private fun systemLocale(): Locale {
-        val locales = Resources.getSystem().configuration.locales
-        return if (!locales.isEmpty) locales[0] else Locale.US
-    }
-
-    /** SYSTEM používá angličtinu jen pro anglický systém, jinak český fallback. */
+    /** Čistá politika fallbacku ponechaná pro regresní unit testy. */
     internal fun resolvePreferredLocale(appLanguage: String, systemLocale: Locale): Locale =
         when (appLanguage) {
             LanguageController.LANG_CS -> Locale.forLanguageTag("cs-CZ")
