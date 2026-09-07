@@ -5,3 +5,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21" apply false
 }
+
+// Android instrumentation testy přidáváme centrálně, aby app/build.gradle.kts
+// nemusel být přepisován jen kvůli testovacím závislostem.
+subprojects {
+    pluginManager.withPlugin("com.android.application") {
+        dependencies.add("androidTestImplementation", "androidx.test.ext:junit:1.2.1")
+        dependencies.add("androidTestImplementation", "androidx.test:core-ktx:1.6.1")
+        dependencies.add("androidTestImplementation", "androidx.test:runner:1.6.2")
+    }
+}
