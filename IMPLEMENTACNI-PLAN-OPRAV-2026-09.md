@@ -4,7 +4,7 @@
 **Výchozí stav:** `main`, aplikace v2.7 / versionCode 19  
 **Cíl:** zvýšit spolehlivost doručování připomínek, odstranit nalezené funkční chyby, zabezpečit data a připravit aplikaci na veřejné vydání a target API 36.
 
-> **Stav realizace k 7. 9. 2026:** Etapy 1–6 jsou implementované na stabilizační větvi a pokryté automatickým buildem/testy. PR zůstává draft do dokončení reálných device testů. Etapy 7–12 zbývají.
+> **Stav realizace k 7. 9. 2026:** Etapy 1–8 jsou implementované na stabilizační větvi a pokryté automatickým buildem/testy. PR zůstává draft do dokončení reálných device testů. Etapy 9–12 zbývají.
 
 ---
 
@@ -543,7 +543,7 @@ Pokud `openOutputStream()` vrátí `null`, export musí vrátit `false`.
 
 ---
 
-# ETAPA 7 – Notifikace, TTS a deep-linking [P1/P2]
+# ETAPA 7 – Notifikace, TTS a deep-linking [P1/P2] ✅ IMPLEMENTOVÁNO
 
 ## 7.1 Kliknutí na notifikaci otevře konkrétní reminder
 
@@ -594,7 +594,7 @@ Použít aktivní jazyk aplikace / vhodný locale fallback.
 
 ---
 
-# ETAPA 8 – Kalendář, vyhledávání míst a widget [P2]
+# ETAPA 8 – Kalendář, vyhledávání míst a widget [P2] ✅ IMPLEMENTOVÁNO
 
 ## 8.1 Kalendář na IO
 
@@ -658,6 +658,21 @@ Navržené pořadí:
 3. jinak podle vytvoření.
 
 Minimální varianta: přejmenovat widget, pokud má zůstat řazení podle vytvoření.
+
+### Stav implementace Etapy 8
+
+- kalendář používá `CalendarContract.Instances` a dotaz běží na `Dispatchers.IO`,
+- UI rozlišuje loading / content / empty / permission denied / error,
+- `null` cursor provideru je chyba, ne falešně prázdný kalendář,
+- každý konkrétní výskyt dostává stabilní `calendarSourceKey = eventId:beginMillis`,
+- již importované instance jsou označené a nelze je znovu vybrat,
+- import vybraných instancí proběhne dávkově jedním atomickým snapshotem,
+- Photon vrací `Success / NoResults / NetworkError / ServerError / ParseError`,
+- Android Geocoder zůstává fallback, ale neúspěch už nemaskuje skutečný Photon stav,
+- souřadnice z Photon, Geocoderu i sdílených mapových odkazů procházejí validačním rozsahem,
+- widget řadí časové remindery podle příštího výskytu a geo podle čerstvé polohy; starou polohu ignoruje,
+- přidány/rozšířeny `CalendarImporterTest`, `PlaceLinkResolverTest` a `WidgetOrderingTest`,
+- finální head Etapy 8 `8f8916785065eace7f0fbca351917d9cf66d567a` prošel GitHub Actions run #66 (`34127677696`): unit testy zelené + debug APK sestavené na API 36.
 
 ---
 
@@ -1034,9 +1049,9 @@ Veřejný release je připravený pouze pokud platí všechno:
 - [x] poškozený JSON se automaticky nepřepíše bez recovery kopie
 - [x] attachment path je sandboxovaná
 - [x] backup má definované chování příloh
-- [ ] kliknutí na notifikaci otevře správný reminder
-- [ ] calendar import neduplikuje stejné instance
-- [ ] offline hledání místa nehlásí falešně „nic nenalezeno“
+- [x] kliknutí na notifikaci otevře správný reminder
+- [x] calendar import neduplikuje stejné instance
+- [x] offline hledání místa nehlásí falešně „nic nenalezeno“
 - [ ] všechny podporované texty jsou v CZ/EN resources
 - [ ] číslo verze v UI se bere z buildu
 - [ ] diagnostická obrazovka ukazuje stav kritických systémových oprávnění
@@ -1084,11 +1099,11 @@ GeoReminder už má funkcí dost. Prioritou je, aby existující funkce byly př
 ### P2 – po stabilizaci jádra
 
 - diagnostika
-- calendar Instances + dedup
-- Photon error states
-- widget pořadí
-- TTS lifecycle
-- deep linking
+- calendar Instances + dedup ✅
+- Photon error states ✅
+- widget pořadí ✅
+- TTS lifecycle ✅
+- deep linking ✅
 - kompletní lokalizace
 - dokumentační úklid
 
