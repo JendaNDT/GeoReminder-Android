@@ -44,6 +44,7 @@ jobs:
           :app:lintRelease
           :app:assembleDebug
           :app:assembleRelease
+          :app:bundleRelease
           :app:assembleDebugAndroidTest
           --stacktrace
 
