@@ -167,9 +167,11 @@ class ReminderScheduler(context: Context) {
     fun snoozeAt(reminder: Reminder, atMillis: Long) {
         val target = atMillis.coerceAtLeast(System.currentTimeMillis() + 1_000L)
         cancelNag(reminder.id)
-        cancelOriginalTrigger(reminder)
         alarms.cancel(alarmPendingIntent(reminder.id, snooze = true))
+        // Nejdřív zapsat stav snooze. Případný souběžný hromadný geofence resync
+        // pak reminder vyfiltruje ještě před tím, než odregistrujeme původní trigger.
         stateStore.setSnooze(reminder.id, target)
+        cancelOriginalTrigger(reminder)
         setExact(target, alarmPendingIntent(reminder.id, snooze = true))
     }
 
