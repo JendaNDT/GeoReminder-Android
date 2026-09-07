@@ -29,14 +29,13 @@ object TtsSpeaker {
     private val pendingQueue = ArrayDeque<SpeechRequest>()
 
     fun speakIfEnabled(context: Context, reminder: Reminder) {
-        // Důležité: TTS službu vůbec neinicializovat, pokud je funkce vypnutá.
         if (!FeatureSettings.ttsEnabled.value) return
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         if (audioManager?.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
 
         val textToSpeak = if (FeatureSettings.ttsReadFullText.value) {
-            "${reminder.title}. ${NotificationHelper.body(reminder)}"
+            "${reminder.title}. ${NotificationHelper.body(context, reminder)}"
         } else {
             reminder.title
         }
@@ -49,7 +48,7 @@ object TtsSpeaker {
 
     /** Ukázka z Nastavení funguje i když je automatické TTS vypnuté. */
     fun speakText(context: Context, text: String) {
-        val fallback = if (FeatureSettings.appLanguage.value == LanguageController.LANG_EN) {
+        val fallback = if (LanguageController.effectiveLanguageCode() == LanguageController.LANG_EN) {
             "GeoReminder reminder"
         } else {
             "GeoReminder připomínka"
@@ -99,7 +98,6 @@ object TtsSpeaker {
         var queued = emptyList<SpeechRequest>()
 
         synchronized(lock) {
-            // Callback starého enginu po shutdown/restartu nesmí změnit nový stav.
             if (generation != engineGeneration) return
             val engine = tts ?: return
 
@@ -131,8 +129,6 @@ object TtsSpeaker {
 
         readyEngine?.let { engine ->
             configureLanguage(context, engine)
-            // Fronta vznikla během inicializace. První požadavek smaže případný
-            // starý speech, další se za něj přidají, takže se během startu neztratí.
             queued.forEachIndexed { index, request ->
                 speakNow(
                     context,
@@ -159,10 +155,9 @@ object TtsSpeaker {
     }
 
     private fun configureLanguage(context: Context, engine: TextToSpeech) {
-        val systemLocale = systemLocale()
         val preferred = resolvePreferredLocale(
-            FeatureSettings.appLanguage.value,
-            systemLocale,
+            LanguageController.currentLanguageCode(),
+            systemLocale(),
         )
 
         val result = engine.setLanguage(preferred)
@@ -181,11 +176,7 @@ object TtsSpeaker {
         return if (!locales.isEmpty) locales[0] else Locale.US
     }
 
-    /**
-     * Aplikace má v této verzi jen české výchozí resources a values-en.
-     * SYSTEM tedy znamená anglický hlas pro anglický systém, jinak český
-     * fallback, aby např. německý hlas nečetl české texty.
-     */
+    /** SYSTEM používá angličtinu jen pro anglický systém, jinak český fallback. */
     internal fun resolvePreferredLocale(appLanguage: String, systemLocale: Locale): Locale =
         when (appLanguage) {
             LanguageController.LANG_CS -> Locale.forLanguageTag("cs-CZ")
