@@ -100,12 +100,7 @@ fun DiagnosticsScreen(onClose: () -> Unit) {
                     }
                     CardDivider()
                     DiagnosticActionRow(stringResource(R.string.diagnostics_resync)) {
-                        try {
-                            ReminderStore.get(context).resyncAll()
-                            diagnostics.markResyncSuccess()
-                        } catch (error: Exception) {
-                            diagnostics.markResyncFailure(error)
-                        }
+                        runCatching { ReminderStore.get(context).resyncAll() }
                         refresh()
                     }
                     CardDivider()
@@ -118,7 +113,6 @@ fun DiagnosticsScreen(onClose: () -> Unit) {
                                 timeRepeat = TimeRepeat.NEVER,
                             ),
                         )
-                        diagnostics.record(DiagnosticEventType.ALARM_SCHEDULED, "test+60s")
                         Toast.makeText(
                             context,
                             R.string.diagnostics_test_created,
