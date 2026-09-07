@@ -40,7 +40,7 @@ jobs:
   instrumentation-api36:
     needs: build-and-test
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -69,37 +69,88 @@ jobs:
         run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Start API 36 emulator
+        timeout-minutes: 6
         run: |
+          set -euo pipefail
           echo "no" | avdmanager create avd --force --name georeminder-api36 --package "system-images;android-36;google_apis;x86_64" --device "pixel_6"
-          sudo chmod 666 /dev/kvm || true
-          nohup emulator -avd georeminder-api36 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > emulator.log 2>&1 &
-          adb wait-for-device
-          booted=""
-          for i in $(seq 1 90); do
-            booted=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
-            if [ "$booted" = "1" ]; then
+          sudo chmod 666 /dev/kvm 2>/dev/null || true
+          adb kill-server || true
+          adb start-server
+
+          nohup emulator \
+            -avd georeminder-api36 \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -no-metrics \
+            -gpu swiftshader_indirect \
+            > emulator.log 2>&1 &
+          EMULATOR_PID=$!
+          echo "Emulator PID: $EMULATOR_PID"
+
+          serial=""
+          for i in $(seq 1 60); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Emulator process exited before ADB became available"
+              cat emulator.log || true
+              exit 1
+            fi
+            serial=$(adb devices | awk '/^emulator-[0-9]+[[:space:]]+(device|offline)$/ {print $1; exit}')
+            if [ -n "$serial" ]; then
+              echo "ADB device detected: $serial"
               break
             fi
             sleep 2
           done
-          if [ "$booted" != "1" ]; then
-            cat emulator.log
+
+          if [ -z "$serial" ]; then
+            echo "Emulator never appeared in adb devices"
+            adb devices || true
+            cat emulator.log || true
             exit 1
           fi
-          adb shell input keyevent 82 || true
-          adb shell settings put global window_animation_scale 0
-          adb shell settings put global transition_animation_scale 0
-          adb shell settings put global animator_duration_scale 0
+
+          booted=""
+          for i in $(seq 1 90); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then
+              echo "Emulator process exited during boot"
+              cat emulator.log || true
+              exit 1
+            fi
+            booted=$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            if [ "$booted" = "1" ]; then
+              echo "API 36 emulator boot completed"
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$booted" != "1" ]; then
+            echo "Emulator did not finish booting in time"
+            adb devices || true
+            cat emulator.log || true
+            exit 1
+          fi
+
+          echo "$serial" > emulator-serial.txt
+          adb -s "$serial" shell input keyevent 82 || true
+          adb -s "$serial" shell settings put global window_animation_scale 0
+          adb -s "$serial" shell settings put global transition_animation_scale 0
+          adb -s "$serial" shell settings put global animator_duration_scale 0
 
       - name: Run Android instrumentation tests
+        timeout-minutes: 8
         run: |
+          set -euo pipefail
+          serial=$(cat emulator-serial.txt)
           APP_APK=$(find app/build/outputs/apk/debug -name '*debug.apk' ! -name '*androidTest*' | head -n 1)
           TEST_APK=$(find app/build/outputs/apk/androidTest/debug -name '*.apk' | head -n 1)
           test -n "$APP_APK"
           test -n "$TEST_APK"
-          adb install -r "$APP_APK"
-          adb install -r "$TEST_APK"
-          output=$(adb shell am instrument -w cz.jenda.georeminder.test/androidx.test.runner.AndroidJUnitRunner)
+          adb -s "$serial" install -r "$APP_APK"
+          adb -s "$serial" install -r "$TEST_APK"
+          output=$(adb -s "$serial" shell am instrument -w cz.jenda.georeminder.test/androidx.test.runner.AndroidJUnitRunner)
           echo "$output"
           echo "$output" | grep -q "OK ("
 
@@ -107,5 +158,8 @@ jobs:
         if: failure()
         run: |
           adb devices || true
-          adb logcat -d -t 500 || true
+          serial=$(cat emulator-serial.txt 2>/dev/null || true)
+          if [ -n "$serial" ]; then
+            adb -s "$serial" logcat -d -t 500 || true
+          fi
           cat emulator.log 2>/dev/null || true
