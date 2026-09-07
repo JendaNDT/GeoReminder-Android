@@ -33,12 +33,15 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -54,6 +57,7 @@ import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
 import cz.jenda.georeminder.notify.GeofenceRegistrationState
 import cz.jenda.georeminder.notify.GeofenceRegistrationStatus
+import cz.jenda.georeminder.notify.ReminderScheduler
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 import java.util.Calendar
@@ -83,7 +87,6 @@ fun QuickActionSheet(
 
         SectionHeader(stringResource(R.string.action_sheet_title), Modifier.padding(top = 8.dp))
         InsetCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-            // 1. Odložit na zítra ráno
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -99,7 +102,6 @@ fun QuickActionSheet(
                 Text(stringResource(R.string.action_snooze_tomorrow), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
-            // 2. Navigovat (pokud je připomínka na místo)
             if (reminder.kind == ReminderKind.LOCATION && onNavigate != null) {
                 CardDivider()
                 Row(
@@ -118,7 +120,6 @@ fun QuickActionSheet(
                 }
             }
 
-            // 3. Sdílet
             CardDivider()
             Row(
                 modifier = Modifier
@@ -135,7 +136,6 @@ fun QuickActionSheet(
                 Text(stringResource(R.string.action_share), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
-            // 4. Upravit
             CardDivider()
             Row(
                 modifier = Modifier
@@ -152,7 +152,6 @@ fun QuickActionSheet(
                 Text(stringResource(R.string.action_edit), style = GeoType.body, color = colors.label, modifier = Modifier.weight(1f))
             }
 
-            // 5. Smazat
             CardDivider()
             Row(
                 modifier = Modifier
@@ -183,7 +182,6 @@ fun nextMorningMillis(): Long {
     return cal.timeInMillis
 }
 
-/** Určení barevné kategorie, ikony a barvy pro řádek dle Vytříbený. */
 @Composable
 fun rememberCategoryStyle(reminder: Reminder): Triple<ImageVector, Color, String?> {
     val colors = GeoTheme.colors
@@ -224,7 +222,6 @@ fun rememberCategoryStyle(reminder: Reminder): Triple<ImageVector, Color, String
     }
 }
 
-/** Řádek se swipe akcemi: doprava Hotovo/Vrátit (zelená), doleva Smazat (červená). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeReminderRow(
@@ -315,7 +312,6 @@ fun SwipeReminderRow(
     }
 }
 
-/** Jeden řádek seznamu: 36×36 dlaždice typu, titulek, podtitulek a pravý barevný čip. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ReminderRow(
@@ -328,10 +324,13 @@ fun ReminderRow(
 ) {
     val colors = GeoTheme.colors
     val haptics = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val liveGeofenceStates by ReminderScheduler.get(context).geofenceStates.collectAsState()
+    val effectiveGeofenceState = geofenceState ?: liveGeofenceStates[reminder.id]
     val (icon, categoryColor, defaultBadge) = rememberCategoryStyle(reminder)
     val chipText = distance ?: defaultBadge
     val geofenceStatusText = if (reminder.kind == ReminderKind.LOCATION && !reminder.isDone) {
-        when (geofenceState?.status) {
+        when (effectiveGeofenceState?.status) {
             GeofenceRegistrationStatus.FAILED_PERMISSION -> "Hlídání neaktivní: chybí poloha „Vždy“"
             GeofenceRegistrationStatus.FAILED_LOCATION_DISABLED -> "Hlídání neaktivní: poloha v telefonu je vypnutá"
             GeofenceRegistrationStatus.FAILED_TOO_MANY -> "Hlídání neaktivní: limit 100 míst"
@@ -358,7 +357,6 @@ fun ReminderRow(
             .padding(horizontal = 15.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Barevná dlaždice typu (36×36, radius 11px)
         Box(
             modifier = Modifier
                 .size(36.dp)
@@ -412,13 +410,12 @@ fun ReminderRow(
                 Text(
                     text = geofenceStatusText,
                     style = GeoType.caption2,
-                    color = if (geofenceState?.status?.isFailure == true) colors.orange else colors.secondaryLabel,
+                    color = if (effectiveGeofenceState?.status?.isFailure == true) colors.orange else colors.secondaryLabel,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        // Vpravo čip laděný k typu (320 m, odjezd, hotovo apod.)
         if (!chipText.isNullOrEmpty()) {
             Spacer(Modifier.width(8.dp))
             Box(
