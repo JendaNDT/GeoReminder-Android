@@ -2,6 +2,8 @@ package cz.jenda.georeminder.notify
 
 import android.content.Context
 import android.content.SharedPreferences
+import cz.jenda.georeminder.data.DiagnosticEventType
+import cz.jenda.georeminder.data.DiagnosticStore
 import cz.jenda.georeminder.data.SharedStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,8 +18,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * notifikace pro idempotentní zpracování jejích akcí.
  */
 internal class SchedulerStateStore(context: Context) {
-    private val prefs: SharedPreferences = context.applicationContext
+    private val appContext = context.applicationContext
+    private val prefs: SharedPreferences = appContext
         .getSharedPreferences(SharedStorage.PREFS, Context.MODE_PRIVATE)
+    private val diagnostics by lazy { DiagnosticStore.get(appContext) }
 
     private val _geofenceStates = MutableStateFlow(loadGeofenceStates())
     val geofenceStates: StateFlow<Map<String, GeofenceRegistrationState>> =
@@ -86,6 +90,7 @@ internal class SchedulerStateStore(context: Context) {
 
     fun setSnooze(reminderId: String, atMillis: Long) = synchronized(lock) {
         prefs.edit().putLong(KEY_SNOOZE_PREFIX + reminderId, atMillis).apply()
+        diagnostics.record(DiagnosticEventType.SNOOZE_SET, detail = "until=$atMillis")
     }
 
     fun snoozeUntil(reminderId: String): Long? = synchronized(lock) {
@@ -108,10 +113,6 @@ internal class SchedulerStateStore(context: Context) {
             .toMap()
     }
 
-    /**
-     * Uloží token právě zobrazené notifikace. Každá další notifikace stejného
-     * reminderu token nahradí, takže akce ze starší notifikace už nejsou platné.
-     */
     fun setNotificationActionToken(reminderId: String, token: String) = synchronized(lock) {
         require(token.isNotBlank())
         prefs.edit()
@@ -119,12 +120,6 @@ internal class SchedulerStateStore(context: Context) {
             .commit()
     }
 
-    /**
-     * Atomicky spotřebuje token notifikace. První tlačítko (Hotovo/Snooze/...)
-     * vyhraje; dvojité klepnutí nebo jiná souběžná akce se stejným tokenem už
-     * vrátí false. Používá synchronní commit, aby výsledek přežil i okamžité
-     * ukončení procesu po BroadcastReceiveru.
-     */
     fun consumeNotificationActionToken(reminderId: String, token: String): Boolean =
         synchronized(lock) {
             if (token.isBlank()) return@synchronized false
@@ -142,6 +137,7 @@ internal class SchedulerStateStore(context: Context) {
         status: GeofenceRegistrationStatus,
         errorCode: Int? = null,
     ) = synchronized(lock) {
+        val previous = _geofenceStates.value[reminderId]
         val state = GeofenceRegistrationState(
             status = status,
             updatedAt = System.currentTimeMillis(),
@@ -151,6 +147,20 @@ internal class SchedulerStateStore(context: Context) {
             .putString(KEY_GEOFENCE_STATE_PREFIX + reminderId, encodeGeofenceState(state))
             .apply()
         _geofenceStates.value = _geofenceStates.value + (reminderId to state)
+
+        if (previous?.status != status || previous.errorCode != errorCode) {
+            when {
+                status == GeofenceRegistrationStatus.ACTIVE ->
+                    diagnostics.record(DiagnosticEventType.GEOFENCE_REGISTER_OK)
+                status.isFailure -> diagnostics.record(
+                    DiagnosticEventType.GEOFENCE_REGISTER_FAIL,
+                    buildString {
+                        append(status.name)
+                        errorCode?.let { append(" code=").append(it) }
+                    },
+                )
+            }
+        }
     }
 
     fun clearGeofenceState(reminderId: String) = synchronized(lock) {
@@ -159,7 +169,6 @@ internal class SchedulerStateStore(context: Context) {
         _geofenceStates.value = _geofenceStates.value - reminderId
     }
 
-    /** Odstraní diagnostické stavy reminderů, které už nejsou aktivní location remindery. */
     fun retainGeofenceStates(reminderIds: Set<String>) = synchronized(lock) {
         val staleIds = _geofenceStates.value.keys - reminderIds
         if (staleIds.isEmpty()) return@synchronized
@@ -176,11 +185,6 @@ internal class SchedulerStateStore(context: Context) {
         }
     }
 
-    /**
-     * Vrací stabilní unikátní základ requestCode pro reminder. Každý reminder
-     * dostane blok několika integerů, takže jednotlivé typy PendingIntentů
-     * nemohou kolidovat ani při shodě String.hashCode(). Čítač je perzistentní.
-     */
     fun requestCode(reminderId: String, offset: Int): Int = synchronized(lock) {
         require(offset in 0 until REQUEST_CODE_STRIDE)
         val key = KEY_REQUEST_CODE_PREFIX + reminderId
