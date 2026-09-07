@@ -30,7 +30,8 @@ class AlarmReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
-                val reminder = store.reminders.value.firstOrNull { it.id == id }
+                val reminders = store.reminders.value
+                val reminder = reminders.firstOrNull { it.id == id }
                     ?: return@launch
                 if (reminder.isDone) return@launch
 
@@ -45,9 +46,9 @@ class AlarmReceiver : BroadcastReceiver() {
 
                 when {
                     isSnooze -> {
-                        // Snooze skončil. Scheduler smaže odložení a obnoví pouze
-                        // původní opakovaný trigger; jednorázový reminder neoživí.
-                        scheduler.resumeAfterSnooze(reminder)
+                        // Snooze skončil. U location reminderu se zároveň přepočítá
+                        // limit 100, aby se deterministicky obnovily správné geofence.
+                        scheduler.resumeAfterSnooze(reminder, reminders)
                     }
                     isNag -> {
                         // Dožadování: show() si další připomenutí naplánovalo samo.
