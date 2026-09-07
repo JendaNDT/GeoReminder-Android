@@ -13,7 +13,6 @@ import androidx.core.app.NotificationManagerCompat
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.FeatureSettings
-import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.model.AlertStyle
 import cz.jenda.georeminder.model.CzechFormat
 import cz.jenda.georeminder.model.Reminder
@@ -45,20 +44,20 @@ object NotificationHelper {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "Připomínky",
+                context.getString(R.string.notification_channel_default),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Připomínky na místa a časy"
+                description = context.getString(R.string.notification_channel_default_desc)
             }
         )
 
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_QUIET_ID,
-                "Tiché připomínky",
+                context.getString(R.string.notification_channel_quiet),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Připomínky bez zvuku"
+                description = context.getString(R.string.notification_channel_quiet_desc)
                 setSound(null, null)
                 enableVibration(false)
             }
@@ -67,10 +66,10 @@ object NotificationHelper {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_URGENT_ID,
-                "Naléhavé připomínky",
+                context.getString(R.string.notification_channel_urgent),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Důležité připomínky s hlasitým zvukem"
+                description = context.getString(R.string.notification_channel_urgent_desc)
                 setSound(
                     RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
                     AudioAttributes.Builder()
@@ -90,22 +89,28 @@ object NotificationHelper {
         AlertStyle.URGENT -> CHANNEL_URGENT_ID
     }
 
-    fun body(reminder: Reminder): String {
-        val isEn = FeatureSettings.appLanguage.value == LanguageController.LANG_EN
-        return when (reminder.kind) {
-            ReminderKind.LOCATION ->
-                if (reminder.trigger == TriggerType.ARRIVE) {
-                    if (isEn) "Arriving at: ${reminder.placeName}" else "Jsi u místa: ${reminder.placeName}"
-                } else {
-                    if (isEn) "Leaving location: ${reminder.placeName}" else "Odjíždíš od místa: ${reminder.placeName}"
-                }
-            ReminderKind.TIME -> {
-                val due = reminder.dueDate
-                if (due == null) "" else when (reminder.timeRepeat) {
-                    TimeRepeat.NEVER -> (if (isEn) "Reminder for " else "Připomínka na ") + CzechFormat.dateTime(due)
-                    TimeRepeat.DAILY -> (if (isEn) "Repeats every day at " else "Opakuje se každý den v ") + CzechFormat.time(due)
-                    TimeRepeat.WEEKLY -> (if (isEn) "Repeats every week: " else "Opakuje se každý týden: ") + CzechFormat.weeklyLabel(due, reminder.weekdays)
-                }
+    fun body(context: Context, reminder: Reminder): String = when (reminder.kind) {
+        ReminderKind.LOCATION -> if (reminder.trigger == TriggerType.ARRIVE) {
+            context.getString(R.string.notification_arrive_body, reminder.placeName)
+        } else {
+            context.getString(R.string.notification_leave_body, reminder.placeName)
+        }
+
+        ReminderKind.TIME -> {
+            val due = reminder.dueDate
+            if (due == null) "" else when (reminder.timeRepeat) {
+                TimeRepeat.NEVER -> context.getString(
+                    R.string.notification_time_once_body,
+                    CzechFormat.dateTime(due),
+                )
+                TimeRepeat.DAILY -> context.getString(
+                    R.string.notification_time_daily_body,
+                    CzechFormat.time(due),
+                )
+                TimeRepeat.WEEKLY -> context.getString(
+                    R.string.notification_time_weekly_body,
+                    CzechFormat.weeklyLabel(due, reminder.weekdays),
+                )
             }
         }
     }
@@ -162,12 +167,13 @@ object NotificationHelper {
 
         val wearableExtender = NotificationCompat.WearableExtender()
             .setHintHideIcon(false)
+        val body = body(context, reminder)
 
         val builder = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
             .setSmallIcon(R.drawable.ic_stat_pin)
             .setContentTitle(reminder.title)
-            .setContentText(body(reminder))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body(reminder)))
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(
                 if (reminder.alertStyle == AlertStyle.QUIET) {
                     NotificationCompat.PRIORITY_LOW
