@@ -55,6 +55,7 @@ import cz.jenda.georeminder.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import cz.jenda.georeminder.MainActivity
 import cz.jenda.georeminder.data.ActivityInsets
 import cz.jenda.georeminder.data.LocationHolder
@@ -63,6 +64,7 @@ import cz.jenda.georeminder.data.SharedStorage
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import kotlinx.coroutines.launch
 
 /**
  * Kořen aplikace: uvítací průvodce (jen poprvé), pak záložky Připomínky + Mapa
@@ -137,15 +139,19 @@ fun RootScreen() {
         }
     }
 
-    // Návrat do popředí: znovu načíst data z disku a zaregistrovat spouštěče
-    // (změny z tlačítek na notifikaci, widgetu…) – ekvivalent iOS scenePhase.
+    // Návrat do popředí: nejdřív počkat na čerstvá data z disku a teprve
+    // potom zaregistrovat spouštěče. Původní reload()+resyncAll() závodil.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                store.reload()
-                store.resyncAll()
-                LocationHolder.refresh(context)
+                lifecycleOwner.lifecycleScope.launch {
+                    val loadResult = store.reloadAndWait()
+                    if (loadResult != ReminderStore.ReloadResult.ERROR) {
+                        store.resyncAll()
+                    }
+                    LocationHolder.refresh(context)
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
