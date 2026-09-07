@@ -25,7 +25,7 @@ class FavoritesStore private constructor(context: Context) {
     }
 
     companion object {
-        private const val FILE = "favorites.json"
+        const val FILE = "favorites.json"
 
         @Volatile
         private var instance: FavoritesStore? = null
@@ -85,6 +85,24 @@ class FavoritesStore private constructor(context: Context) {
     fun delete(place: FavoritePlace) {
         _favorites.value = _favorites.value.filterNot { it.id == place.id }
         persist()
+    }
+
+    /** Jeden atomický zápis pro celý výsledný snapshot importu. */
+    @Synchronized
+    fun replaceAllFromImport(snapshot: List<FavoritePlace>): Boolean {
+        return try {
+            val text = SharedStorage.json.encodeToString(
+                ListSerializer(FavoritePlace.serializer()),
+                snapshot,
+            )
+            if (!SharedStorage.writeText(appContext, FILE, text)) return false
+            _favorites.value = snapshot
+            loadFailed = false
+            true
+        } catch (e: Exception) {
+            android.util.Log.w("FavoritesStore", "Dávkový import oblíbených selhal", e)
+            false
+        }
     }
 
     private fun persist() {
