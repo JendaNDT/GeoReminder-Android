@@ -262,6 +262,12 @@ fun RootScreen() {
                     if (text != null) selectedTab = 0
                 }
             }
+            // Kliknutí na notifikaci → připomínky, kde se otevře konkrétní záznam.
+            LaunchedEffect(Unit) {
+                MainActivity.notificationReminderRequest.collect { reminderId ->
+                    if (reminderId != null) selectedTab = 0
+                }
+            }
 
             when (selectedTab) {
                 0 -> ReminderListScreen()
