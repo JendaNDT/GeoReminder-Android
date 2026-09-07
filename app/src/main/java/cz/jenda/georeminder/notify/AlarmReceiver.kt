@@ -34,7 +34,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     ?: return@launch
                 if (reminder.isDone) return@launch
 
-                val scheduler = ReminderScheduler(context)
+                val scheduler = ReminderScheduler.get(context)
                 val isOneTime = !isSnooze && !isNag && reminder.timeRepeat == TimeRepeat.NEVER
                 // Jednorázovou připomínku už mohl doručit catch-up (po rebootu /
                 // otevření appky) – pak ji přes budík nedoručovat podruhé.
