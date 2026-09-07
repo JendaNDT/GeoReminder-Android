@@ -20,21 +20,24 @@ import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
+import java.util.UUID
 
 /**
- * Stavba a zobrazování notifikací s tlačítky „Hotovo" a „Odložit o hodinu".
- * Kanál má IMPORTANCE_HIGH, takže se banner ukáže i při běžící appce
- * (ekvivalent iOS zobrazení v popředí).
+ * Stavba a zobrazování notifikací s tlačítky „Hotovo" a „Odložit".
+ * Každé zobrazení dostává vlastní akční token, takže první tlačítko atomicky
+ * vyhraje a dvojité/souběžné akce ze stejné notifikace se ignorují.
  */
 object NotificationHelper {
     const val CHANNEL_ID = "reminders"
     const val CHANNEL_QUIET_ID = "reminders_quiet"
     const val CHANNEL_URGENT_ID = "reminders_urgent"
 
+    const val ACTION_OPEN_REMINDER = "cz.jenda.georeminder.ACTION_OPEN_REMINDER"
     const val ACTION_DONE = "cz.jenda.georeminder.ACTION_DONE"
     const val ACTION_SNOOZE = "cz.jenda.georeminder.ACTION_SNOOZE"
     const val ACTION_SNOOZE_MORNING = "cz.jenda.georeminder.ACTION_SNOOZE_MORNING"
     const val EXTRA_REMINDER_ID = ReminderScheduler.EXTRA_REMINDER_ID
+    const val EXTRA_NOTIFICATION_TOKEN = "notification_action_token"
 
     fun createChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -108,40 +111,51 @@ object NotificationHelper {
     }
 
     fun show(context: Context, reminder: Reminder) {
-        val notifId = reminder.id.hashCode()
+        val stateStore = SchedulerStateStore(context)
+        val notifId = stateStore.requestCode(
+            reminder.id,
+            SchedulerStateStore.OFFSET_NOTIFICATION_CONTENT,
+        )
+        val actionToken = UUID.randomUUID().toString()
+        stateStore.setNotificationActionToken(reminder.id, actionToken)
 
         val contentIntent = PendingIntent.getActivity(
             context,
             notifId,
             Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                .setAction(ACTION_OPEN_REMINDER)
+                .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val doneIntent = PendingIntent.getBroadcast(
             context,
-            notifId + 1,
+            stateStore.requestCode(reminder.id, SchedulerStateStore.OFFSET_NOTIFICATION_DONE),
             Intent(context, NotificationActionReceiver::class.java)
                 .setAction(ACTION_DONE)
-                .putExtra(EXTRA_REMINDER_ID, reminder.id),
+                .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .putExtra(EXTRA_NOTIFICATION_TOKEN, actionToken),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val snoozeIntent = PendingIntent.getBroadcast(
             context,
-            notifId + 2,
+            stateStore.requestCode(reminder.id, SchedulerStateStore.OFFSET_NOTIFICATION_SNOOZE),
             Intent(context, NotificationActionReceiver::class.java)
                 .setAction(ACTION_SNOOZE)
-                .putExtra(EXTRA_REMINDER_ID, reminder.id),
+                .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .putExtra(EXTRA_NOTIFICATION_TOKEN, actionToken),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val morningIntent = PendingIntent.getBroadcast(
             context,
-            notifId + 3,
+            stateStore.requestCode(reminder.id, SchedulerStateStore.OFFSET_NOTIFICATION_MORNING),
             Intent(context, NotificationActionReceiver::class.java)
                 .setAction(ACTION_SNOOZE_MORNING)
-                .putExtra(EXTRA_REMINDER_ID, reminder.id),
+                .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .putExtra(EXTRA_NOTIFICATION_TOKEN, actionToken),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -198,6 +212,13 @@ object NotificationHelper {
     }
 
     fun cancel(context: Context, reminderId: String) {
-        NotificationManagerCompat.from(context).cancel(reminderId.hashCode())
+        val stateStore = SchedulerStateStore(context)
+        val manager = NotificationManagerCompat.from(context)
+        manager.cancel(
+            stateStore.requestCode(reminderId, SchedulerStateStore.OFFSET_NOTIFICATION_CONTENT)
+        )
+        // Zrušit i notifikaci vytvořenou verzí <= 2.7, která používala hash ID.
+        manager.cancel(reminderId.hashCode())
+        stateStore.clearNotificationActionToken(reminderId)
     }
 }
