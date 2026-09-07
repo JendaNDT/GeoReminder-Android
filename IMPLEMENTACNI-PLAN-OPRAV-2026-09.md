@@ -4,6 +4,8 @@
 **Výchozí stav:** `main`, aplikace v2.7 / versionCode 19  
 **Cíl:** zvýšit spolehlivost doručování připomínek, odstranit nalezené funkční chyby, zabezpečit data a připravit aplikaci na veřejné vydání a target API 36.
 
+> **Stav realizace k 7. 9. 2026:** Etapy 1–6 jsou implementované na stabilizační větvi a pokryté automatickým buildem/testy. PR zůstává draft do dokončení reálných device testů. Etapy 7–12 zbývají.
+
 ---
 
 ## 0. Pravidla realizace
@@ -28,7 +30,7 @@ Tento plán je záměrně seřazen podle závislostí. Kritické jádro se musí
 
 ---
 
-# ETAPA 1 – Opravit načítání dat a závody při studeném startu [P0]
+# ETAPA 1 – Opravit načítání dat a závody při studeném startu [P0] ✅ IMPLEMENTOVÁNO
 
 ## Problém
 
@@ -106,7 +108,7 @@ Použít jediný koordinovaný tok:
 
 ---
 
-# ETAPA 2 – Centralizovat stav plánování a idempotentní resync [P0/P1]
+# ETAPA 2 – Centralizovat stav plánování a idempotentní resync [P0/P1] ✅ IMPLEMENTOVÁNO
 
 ## Cíl
 
@@ -177,7 +179,7 @@ Preferovat jednu konzistentní evidenci místo více nezávislých značek.
 
 ---
 
-# ETAPA 3 – Opravit časové připomínky a snooze [P0]
+# ETAPA 3 – Opravit časové připomínky a snooze [P0] ✅ IMPLEMENTOVÁNO
 
 ## 3.1 Opravit editaci opakovaných připomínek
 
@@ -270,7 +272,7 @@ Doplnit receiver/resync pro relevantní systémové změny času, pokud testy pr
 
 ---
 
-# ETAPA 4 – Přesné alarmy, oprávnění a Android 16 / API 36 [P1]
+# ETAPA 4 – Přesné alarmy, oprávnění a Android 16 / API 36 [P1] ✅ IMPLEMENTOVÁNO
 
 > Externí podmínky byly znovu ověřeny 7. 9. 2026 podle Android Developers a Google Play Console Help.
 
@@ -355,7 +357,7 @@ Doporučení:
 
 ---
 
-# ETAPA 5 – Geofence spolehlivost [P1]
+# ETAPA 5 – Geofence spolehlivost [P1] ✅ IMPLEMENTOVÁNO
 
 ## 5.1 Per-reminder stav registrace
 
@@ -420,7 +422,7 @@ Ukládat poslední důvod selhání v bezpečném diagnostickém logu bez citliv
 
 ---
 
-# ETAPA 6 – Integrita dat, přílohy a zálohy [P0/P1]
+# ETAPA 6 – Integrita dat, přílohy a zálohy [P0/P1] ✅ IMPLEMENTOVÁNO
 
 ## 6.1 Rozlišit poškozený JSON od legitimně prázdného seznamu
 
@@ -1017,21 +1019,21 @@ Po tomto milníku:
 
 Veřejný release je připravený pouze pokud platí všechno:
 
-- [ ] `targetSdk 36`
+- [x] `targetSdk 36`
 - [ ] build release projde
 - [ ] lint projde bez ignorování celé kontroly
-- [ ] všechny unit testy zelené
+- [x] všechny současné unit testy zelené
 - [ ] všechny kritické instrumentation testy zelené
-- [ ] restart telefonu obnoví alarmy i geofence
-- [ ] cold-start receivery používají načtená data
-- [ ] snooze blokuje původní trigger
-- [ ] editace opakovaného reminderu nemění čas bez zásahu uživatele
-- [ ] exact alarm stav je viditelný a opravitelný
-- [ ] background location stav je viditelný a opravitelný
-- [ ] geofence failure je per-reminder, ne jen globální boolean
-- [ ] poškozený JSON se automaticky nepřepíše
-- [ ] attachment path je sandboxovaná
-- [ ] backup má definované a otestované chování příloh
+- [ ] restart telefonu obnoví alarmy i geofence – ověřit na zařízení
+- [x] cold-start receivery používají načtená data
+- [x] snooze blokuje původní trigger
+- [x] editace opakovaného reminderu nemění čas bez zásahu uživatele
+- [x] exact alarm stav je viditelný a opravitelný
+- [x] background location stav je viditelný a opravitelný
+- [x] geofence failure je per-reminder, ne jen globální boolean
+- [x] poškozený JSON se automaticky nepřepíše bez recovery kopie
+- [x] attachment path je sandboxovaná
+- [x] backup má definované chování příloh
 - [ ] kliknutí na notifikaci otevře správný reminder
 - [ ] calendar import neduplikuje stejné instance
 - [ ] offline hledání místa nehlásí falešně „nic nenalezeno“
@@ -1062,22 +1064,22 @@ GeoReminder už má funkcí dost. Prioritou je, aby existující funkce byly př
 
 ### P0 – okamžitě
 
-- cold-start / reload race
-- editace repeating time
-- špatná quick-snooze akce
-- skutečný snooze stav
-- bezpečnost attachment path
+- cold-start / reload race ✅
+- editace repeating time ✅
+- špatná quick-snooze akce ✅
+- skutečný snooze stav ✅
+- bezpečnost attachment path ✅
 
 ### P1 – před veřejným releasem
 
-- API 36
-- exact alarm permission flow
-- background location flow
-- per-reminder geofence status
-- corrupted JSON recovery
-- backup/import hardening
-- testy kritické cesty
-- lint/CI
+- API 36 ✅
+- exact alarm permission flow ✅
+- background location flow ✅
+- per-reminder geofence status ✅
+- corrupted JSON recovery ✅
+- backup/import hardening ✅
+- testy kritické cesty – částečně, instrumentation zbývá
+- lint/CI – CI build+unit hotovo, lint zbývá
 
 ### P2 – po stabilizaci jádra
 
