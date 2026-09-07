@@ -1,17 +1,16 @@
 package cz.jenda.georeminder.model
 
-import cz.jenda.georeminder.data.FeatureSettings
 import cz.jenda.georeminder.data.LanguageController
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Formátování datumů a vzdáleností podle vybraného jazyka aplikace.
- */
+/** Formátování datumů a vzdáleností podle skutečně aktivního jazyka aplikace. */
 object CzechFormat {
 
-    private fun getLocale(): Locale = LanguageController.getLocale(FeatureSettings.appLanguage.value)
+    private fun getLocale(): Locale = LanguageController.effectiveLocale()
+    private fun isEnglish(): Boolean =
+        LanguageController.effectiveLanguageCode() == LanguageController.LANG_EN
 
     private val csShortDays = arrayOf("po", "út", "st", "čt", "pá", "so", "ne")
     private val csFullDays = arrayOf("pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle")
@@ -39,9 +38,8 @@ object CzechFormat {
 
     /** „pondělí 18:30" (jeden den) / „po, st, pá 18:30" (více vybraných dnů) */
     fun weeklyLabel(millis: Long, weekdays: List<Int>?): String {
-        val isEn = FeatureSettings.appLanguage.value == LanguageController.LANG_EN
-        val fullDays = if (isEn) enFullDays else csFullDays
-        val shortDays = if (isEn) enShortDays else csShortDays
+        val fullDays = if (isEnglish()) enFullDays else csFullDays
+        val shortDays = if (isEnglish()) enShortDays else csShortDays
 
         return when {
             weekdays.isNullOrEmpty() -> weekdayTime(millis)
@@ -61,8 +59,7 @@ object CzechFormat {
 
     /** „850 m odsud" / „850 m away" */
     fun distance(meters: Float): String {
-        val isEn = FeatureSettings.appLanguage.value == LanguageController.LANG_EN
-        val suffix = if (isEn) "away" else "odsud"
+        val suffix = if (isEnglish()) "away" else "odsud"
         return if (meters < 1000) {
             "${meters.toInt()} m $suffix"
         } else {
