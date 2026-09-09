@@ -19,45 +19,67 @@ val mapsKey: String = run {
 
 android {
     namespace = "cz.jenda.georeminder"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "cz.jenda.georeminder"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 19
         versionName = "2.7"
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 
-    // Podpisový keystore není v git repozitáři (bezpečnost) – žije v Jendově
-    // lokální kopii projektu. Bez něj se použije běžný debug podpis.
+    // Release/upload keystore ani hesla nejsou v Git repozitáři.
+    // Lokálně lze vytvořit app/keystore.properties podle .example, případně
+    // dodat hesla přes environment proměnné v bezpečném CI.
     val keystoreFile = file("georeminder.keystore")
+    val keystorePropertiesFile = file("keystore.properties")
+    val keystoreProperties = Properties().apply {
+        if (keystorePropertiesFile.exists()) {
+            keystorePropertiesFile.inputStream().use { load(it) }
+        }
+    }
+    val signingStorePassword =
+        keystoreProperties.getProperty("storePassword") ?: System.getenv("GEOREMINDER_STORE_PASSWORD")
+    val signingKeyAlias =
+        keystoreProperties.getProperty("keyAlias") ?: System.getenv("GEOREMINDER_KEY_ALIAS")
+    val signingKeyPassword =
+        keystoreProperties.getProperty("keyPassword") ?: System.getenv("GEOREMINDER_KEY_PASSWORD")
+    val hasReleaseSigning = keystoreFile.exists() &&
+        !signingStorePassword.isNullOrBlank() &&
+        !signingKeyAlias.isNullOrBlank() &&
+        !signingKeyPassword.isNullOrBlank()
 
     signingConfigs {
-        create("georeminder") {
-            storeFile = keystoreFile
-            storePassword = "georeminder"
-            keyAlias = "georeminder"
-            keyPassword = "georeminder"
+        if (hasReleaseSigning) {
+            create("georeminder") {
+                storeFile = keystoreFile
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
         }
     }
 
     buildTypes {
         release {
-            // Minifikace/R8 zatím VYPNUTÁ – zapnout až po úspěšném testu na zařízení
-            // (proguard-rules.pro chrání JSON modely kompatibilní s iOS).
-            isMinifyEnabled = false
+            // R8 zapnutý až po úspěšném neminifikovaném release + lint průchodu.
+            // proguard-rules.pro chrání serializovatelné modely a knihovny si
+            // vlastní consumer rules dodávají samy.
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            if (keystoreFile.exists()) {
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("georeminder")
             }
         }
         debug {
-            if (keystoreFile.exists()) {
+            // Lokální debug build lze podepsat stejným klíčem kvůli instalaci
+            // přes starší interní build, ale pouze když jsou tajnosti dostupné.
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("georeminder")
             }
         }
@@ -74,8 +96,8 @@ android {
         compose = true
     }
     lint {
-        checkReleaseBuilds = false
-        abortOnError = false
+        checkReleaseBuilds = true
+        abortOnError = true
     }
 }
 
@@ -85,7 +107,8 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
@@ -99,4 +122,3 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
-

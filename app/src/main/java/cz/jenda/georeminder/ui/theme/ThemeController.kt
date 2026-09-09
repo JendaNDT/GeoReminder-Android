@@ -4,18 +4,9 @@ import android.content.Context
 import cz.jenda.georeminder.data.SharedStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** Režim vzhledu aplikace (rozšíření Android verze – iOS se řídí jen systémem). */
+/** Režim vzhledu aplikace. Uživatelské názvy jsou v lokalizovaných resources. */
 enum class ThemeMode {
-    SYSTEM, LIGHT, DARK, NEUTRAL, GLASS;
-
-    val label: String
-        get() = when (this) {
-            SYSTEM -> "Podle systému"
-            LIGHT -> "Světlý"
-            DARK -> "Tmavý"
-            NEUTRAL -> "Neutrální (teplý)"
-            GLASS -> "Glass (Vlajkový)"
-        }
+    SYSTEM, LIGHT, DARK, NEUTRAL, GLASS,
 }
 
 /** Drží zvolený vzhled a ukládá ho mezi spuštěními. */
@@ -51,4 +42,3 @@ object ThemeController {
             .apply()
     }
 }
-

@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import cz.jenda.georeminder.ui.components.*
-import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
@@ -45,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -54,12 +53,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.FavoritesStore
 import cz.jenda.georeminder.model.DEFAULT_RADIUS
 import cz.jenda.georeminder.model.FavoritePlace
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.EmptyState
 import cz.jenda.georeminder.ui.components.GlassCircleButton
+import cz.jenda.georeminder.ui.components.IOSConfirmDialog
+import cz.jenda.georeminder.ui.components.IOSDiscardDialog
 import cz.jenda.georeminder.ui.components.InsetCard
 import cz.jenda.georeminder.ui.components.RadiusSlider
 import cz.jenda.georeminder.ui.components.SectionHeader
@@ -68,9 +70,7 @@ import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 
-/**
- * Správa oblíbených míst: seznam, přidání, úprava, mazání (DESIGN_SPEC §5.5).
- */
+/** Správa oblíbených míst: seznam, přidání, úprava a mazání. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesSheet(onClose: () -> Unit) {
@@ -88,13 +88,13 @@ fun FavoritesSheet(onClose: () -> Unit) {
             .fillMaxHeight()
     ) {
         SheetHeader(
-            title = "Oblíbená místa",
-            leftText = "Hotovo",
+            title = stringResource(R.string.favorites_title),
+            leftText = stringResource(R.string.action_done),
             onLeft = onClose,
             rightContent = {
                 GlassCircleButton(
                     icon = Icons.Filled.Add,
-                    contentDescription = "Nové oblíbené místo",
+                    contentDescription = stringResource(R.string.favorites_add),
                 ) { addingNew = true }
             },
         )
@@ -108,8 +108,8 @@ fun FavoritesSheet(onClose: () -> Unit) {
             ) {
                 EmptyState(
                     icon = Icons.Filled.StarBorder,
-                    title = "Žádná oblíbená místa",
-                    text = "Ťukni na + a ulož si třeba Domov nebo Práci. Připomínky pak zadáš na dva ťuky.",
+                    title = stringResource(R.string.favorites_title),
+                    text = stringResource(R.string.favorites_empty),
                 )
             }
         } else {
@@ -166,6 +166,7 @@ private fun SwipeFavoriteRow(
 ) {
     val colors = GeoTheme.colors
     var showConfirmDialog by remember { mutableStateOf(false) }
+    val deleteText = stringResource(R.string.action_delete)
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
@@ -178,9 +179,9 @@ private fun SwipeFavoriteRow(
 
     if (showConfirmDialog) {
         IOSConfirmDialog(
-            title = stringResource(cz.jenda.georeminder.R.string.favorites_delete_title),
-            message = stringResource(cz.jenda.georeminder.R.string.favorites_delete_message, place.name),
-            confirmText = stringResource(cz.jenda.georeminder.R.string.action_delete),
+            title = stringResource(R.string.favorites_delete_title),
+            message = stringResource(R.string.favorites_delete_message, place.name),
+            confirmText = deleteText,
             isDestructive = true,
             onConfirm = {
                 showConfirmDialog = false
@@ -204,7 +205,7 @@ private fun SwipeFavoriteRow(
             ) {
                 Icon(Icons.Filled.Delete, null, tint = Color.White)
                 Spacer(Modifier.width(6.dp))
-                Text("Smazat", style = GeoType.footnoteBold, color = Color.White)
+                Text(deleteText, style = GeoType.footnoteBold, color = Color.White)
             }
         },
     ) {
@@ -215,7 +216,10 @@ private fun SwipeFavoriteRow(
                 .iosClickable(onClick = onTap)
                 .semantics {
                     customActions = listOf(
-                        CustomAccessibilityAction("Smazat") { showConfirmDialog = true; true }
+                        CustomAccessibilityAction(deleteText) {
+                            showConfirmDialog = true
+                            true
+                        }
                     )
                 }
                 .defaultMinSize(minHeight = 58.dp)
@@ -223,7 +227,8 @@ private fun SwipeFavoriteRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Filled.Star, null,
+                Icons.Filled.Star,
+                null,
                 tint = colors.yellow,
                 modifier = Modifier.size(22.dp),
             )
@@ -237,7 +242,7 @@ private fun SwipeFavoriteRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "výchozí poloměr ${place.radius.toInt()} m",
+                    text = stringResource(R.string.edit_radius_format, place.radius.toInt()),
                     style = GeoType.caption,
                     color = colors.secondaryLabel,
                 )
@@ -274,11 +279,7 @@ fun EditFavoriteSheet(
     val canSave = name.trim().isNotEmpty() && coordinate != null
 
     fun handleClose() {
-        if (isDirty) {
-            showDiscardDialog = true
-        } else {
-            onClose()
-        }
+        if (isDirty) showDiscardDialog = true else onClose()
     }
 
     androidx.activity.compose.BackHandler(enabled = true) {
@@ -317,10 +318,12 @@ fun EditFavoriteSheet(
             .statusBarsPadding()
     ) {
         SheetHeader(
-            title = if (existing == null) stringResource(cz.jenda.georeminder.R.string.favorite_new_title) else stringResource(cz.jenda.georeminder.R.string.favorite_edit_title),
-            leftText = stringResource(cz.jenda.georeminder.R.string.action_cancel),
+            title = stringResource(
+                if (existing == null) R.string.favorite_new_title else R.string.favorite_edit_title
+            ),
+            leftText = stringResource(R.string.action_cancel),
             onLeft = { handleClose() },
-            rightText = stringResource(cz.jenda.georeminder.R.string.action_save),
+            rightText = stringResource(R.string.action_save),
             rightEnabled = canSave,
             onRight = { save() },
         )
@@ -331,17 +334,17 @@ fun EditFavoriteSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 40.dp),
         ) {
-            SectionHeader(stringResource(cz.jenda.georeminder.R.string.favorite_name_label), Modifier.padding(top = 8.dp))
+            SectionHeader(stringResource(R.string.favorite_name_label), Modifier.padding(top = 8.dp))
             InsetCard {
                 FormTextField(
                     value = name,
                     onValueChange = { name = it },
-                    placeholder = stringResource(cz.jenda.georeminder.R.string.favorite_name_hint),
+                    placeholder = stringResource(R.string.favorite_name_hint),
                 )
             }
 
             Spacer(Modifier.height(24.dp))
-            SectionHeader(stringResource(cz.jenda.georeminder.R.string.kind_location))
+            SectionHeader(stringResource(R.string.kind_location))
             InsetCard {
                 Row(
                     modifier = Modifier
@@ -351,16 +354,17 @@ fun EditFavoriteSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        Icons.Filled.Map, null,
+                        Icons.Filled.Map,
+                        null,
                         tint = colors.accent,
                         modifier = Modifier.size(22.dp),
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = when {
-                            coordinate == null -> stringResource(cz.jenda.georeminder.R.string.location_picker_title)
+                            coordinate == null -> stringResource(R.string.location_picker_title)
                             placeName.isNotEmpty() -> placeName
-                            else -> "Místo vybráno"
+                            else -> stringResource(R.string.location_selected_place)
                         },
                         style = GeoType.body,
                         color = colors.accent,
@@ -369,7 +373,8 @@ fun EditFavoriteSheet(
                         modifier = Modifier.weight(1f),
                     )
                     Icon(
-                        Icons.Filled.ChevronRight, null,
+                        Icons.Filled.ChevronRight,
+                        null,
                         tint = colors.secondaryLabel,
                         modifier = Modifier.size(18.dp),
                     )
@@ -384,7 +389,7 @@ fun EditFavoriteSheet(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            text = "Výchozí poloměr: ${radius.toInt()} m",
+                            text = stringResource(R.string.edit_radius_format, radius.toInt()),
                             style = GeoType.subheadline,
                             color = colors.label,
                         )
@@ -409,12 +414,9 @@ fun EditFavoriteSheet(
     }
 
     if (showPicker) {
-        // Přes celý displej (Dialog) – stejné řešení jako ve formuláři připomínky
         Dialog(
             onDismissRequest = { showPicker = false },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-            ),
+            properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
             LocationPickerSheet(
                 initialName = placeName,

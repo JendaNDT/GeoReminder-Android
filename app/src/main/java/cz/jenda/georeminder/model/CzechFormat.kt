@@ -1,83 +1,73 @@
 package cz.jenda.georeminder.model
 
-import cz.jenda.georeminder.data.FeatureSettings
 import cz.jenda.georeminder.data.LanguageController
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Formátování datumů a vzdáleností podle vybraného jazyka aplikace.
- */
+/** Formátování datumů a vzdáleností podle skutečně aktivního jazyka aplikace. */
 object CzechFormat {
-
-    private fun getLocale(): Locale = LanguageController.getLocale(FeatureSettings.appLanguage.value)
 
     private val csShortDays = arrayOf("po", "út", "st", "čt", "pá", "so", "ne")
     private val csFullDays = arrayOf("pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle")
-
     private val enShortDays = arrayOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
     private val enFullDays = arrayOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
-    /** „20. 7. 2026 18:30" */
-    fun dateTime(millis: Long): String {
-        val fmt = SimpleDateFormat("d. M. yyyy H:mm", getLocale())
-        return fmt.format(Date(millis))
-    }
+    fun dateTime(millis: Long): String = dateTimeForLocale(millis, LanguageController.effectiveLocale())
+    fun time(millis: Long): String = timeForLocale(millis, LanguageController.effectiveLocale())
+    fun weekdayTime(millis: Long): String = weekdayTimeForLocale(millis, LanguageController.effectiveLocale())
+    fun weeklyLabel(millis: Long, weekdays: List<Int>?): String =
+        weeklyLabelForLocale(millis, weekdays, LanguageController.effectiveLocale())
+    fun date(millis: Long): String = dateForLocale(millis, LanguageController.effectiveLocale())
+    fun distance(meters: Float): String = distanceForLocale(meters, LanguageController.effectiveLocale())
+    fun distanceShort(meters: Float): String = distanceShortForLocale(meters, LanguageController.effectiveLocale())
 
-    /** „18:30" */
-    fun time(millis: Long): String {
-        val fmt = SimpleDateFormat("H:mm", getLocale())
-        return fmt.format(Date(millis))
-    }
+    internal fun dateTimeForLocale(millis: Long, locale: Locale): String =
+        SimpleDateFormat("d. M. yyyy H:mm", locale).format(Date(millis))
 
-    /** „pondělí 18:30" / „Monday 18:30" */
-    fun weekdayTime(millis: Long): String {
-        val fmt = SimpleDateFormat("EEEE H:mm", getLocale())
-        return fmt.format(Date(millis))
-    }
+    internal fun timeForLocale(millis: Long, locale: Locale): String =
+        SimpleDateFormat("H:mm", locale).format(Date(millis))
 
-    /** „pondělí 18:30" (jeden den) / „po, st, pá 18:30" (více vybraných dnů) */
-    fun weeklyLabel(millis: Long, weekdays: List<Int>?): String {
-        val isEn = FeatureSettings.appLanguage.value == LanguageController.LANG_EN
-        val fullDays = if (isEn) enFullDays else csFullDays
-        val shortDays = if (isEn) enShortDays else csShortDays
+    internal fun weekdayTimeForLocale(millis: Long, locale: Locale): String =
+        SimpleDateFormat("EEEE H:mm", locale).format(Date(millis))
 
+    internal fun weeklyLabelForLocale(
+        millis: Long,
+        weekdays: List<Int>?,
+        locale: Locale,
+    ): String {
+        val english = locale.language.equals("en", ignoreCase = true)
+        val fullDays = if (english) enFullDays else csFullDays
+        val shortDays = if (english) enShortDays else csShortDays
         return when {
-            weekdays.isNullOrEmpty() -> weekdayTime(millis)
+            weekdays.isNullOrEmpty() -> weekdayTimeForLocale(millis, locale)
             weekdays.size == 1 ->
-                fullDays[(weekdays[0] - 1).coerceIn(0, 6)] + " " + time(millis)
+                fullDays[(weekdays[0] - 1).coerceIn(0, 6)] + " " + timeForLocale(millis, locale)
             else ->
                 weekdays.sorted().joinToString(", ") { shortDays[(it - 1).coerceIn(0, 6)] } +
-                        " " + time(millis)
+                    " " + timeForLocale(millis, locale)
         }
     }
 
-    /** „21. 7. 2026" – pro kapsli s datem ve formuláři */
-    fun date(millis: Long): String {
-        val fmt = SimpleDateFormat("d. M. yyyy", getLocale())
-        return fmt.format(Date(millis))
-    }
+    internal fun dateForLocale(millis: Long, locale: Locale): String =
+        SimpleDateFormat("d. M. yyyy", locale).format(Date(millis))
 
-    /** „850 m odsud" / „850 m away" */
-    fun distance(meters: Float): String {
-        val isEn = FeatureSettings.appLanguage.value == LanguageController.LANG_EN
-        val suffix = if (isEn) "away" else "odsud"
+    internal fun distanceForLocale(meters: Float, locale: Locale): String {
+        val suffix = if (locale.language.equals("en", ignoreCase = true)) "away" else "odsud"
         return if (meters < 1000) {
             "${meters.toInt()} m $suffix"
         } else {
             val km = Math.round(meters / 100.0) / 10.0
-            String.format(getLocale(), "%.1f km %s", km, suffix)
+            String.format(locale, "%.1f km %s", km, suffix)
         }
     }
 
-    /** „850 m" / „1.2 km" – krátká varianta pro výsledky hledání */
-    fun distanceShort(meters: Float): String {
+    internal fun distanceShortForLocale(meters: Float, locale: Locale): String {
         return if (meters < 1000) {
             "${meters.toInt()} m"
         } else {
             val km = Math.round(meters / 100.0) / 10.0
-            String.format(getLocale(), "%.1f km", km)
+            String.format(locale, "%.1f km", km)
         }
     }
 }

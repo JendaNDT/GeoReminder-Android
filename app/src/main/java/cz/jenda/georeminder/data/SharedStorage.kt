@@ -5,8 +5,9 @@ import android.util.Log
 import cz.jenda.georeminder.model.Reminder
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonArray
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * Společné úložiště pro appku a widget – prosté JSON soubory v interním
@@ -19,43 +20,58 @@ object SharedStorage {
         encodeDefaults = true
     }
 
-    /** Jeden název SharedPreferences pro celou appku (nastavení, značky…). */
     const val PREFS = "georeminder"
 
-    /**
-     * Odolné dekódování seznamu připomínek: zkusí celý list a při chybě přejde
-     * na čtení po jednom záznamu (vadný přeskočí). Sdílí appka i widget.
-     */
-    fun decodeReminders(text: String): List<Reminder> {
-        if (text.isBlank()) return emptyList()
-        return try {
-            json.decodeFromString(ListSerializer(Reminder.serializer()), text)
-        } catch (_: Exception) {
-            val out = mutableListOf<Reminder>()
-            try {
-                val element = json.parseToJsonElement(text)
-                if (element is kotlinx.serialization.json.JsonArray) {
-                    for (el in element) {
-                        try {
-                            out.add(json.decodeFromJsonElement(Reminder.serializer(), el))
-                        } catch (e: Exception) {
-                            Log.w("SharedStorage", "Přeskakuji vadný záznam připomínky", e)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("SharedStorage", "Data nejsou platné pole – vracím prázdný výsledek", e)
-            }
-            out
-        }
+    sealed class DecodeRemindersResult {
+        data class Success(val reminders: List<Reminder>) : DecodeRemindersResult()
+        data class Partial(
+            val reminders: List<Reminder>,
+            val skippedCount: Int,
+        ) : DecodeRemindersResult()
+        data class Corrupted(val reason: String) : DecodeRemindersResult()
     }
 
     /**
-     * Výsledek čtení. Záměrně rozlišuje „prázdno" (soubor ještě neexistuje –
-     * legitimní stav při prvním spuštění) od skutečné chyby čtení. Bez tohoto
-     * rozlišení by se přechodná chyba tvářila jako prázdný seznam a další
-     * uložení by přepsalo platná data.
+     * Čistá parsovací část bez Android runtime závislostí, aby šla spolehlivě
+     * testovat jako obyčejný JVM unit test.
      */
+    fun decodeReminders(text: String): DecodeRemindersResult {
+        if (text.isBlank()) {
+            return DecodeRemindersResult.Corrupted("empty_file")
+        }
+
+        try {
+            return DecodeRemindersResult.Success(
+                json.decodeFromString(ListSerializer(Reminder.serializer()), text)
+            )
+        } catch (_: Exception) {
+            // Pokračujeme obnovou po jednotlivých záznamech.
+        }
+
+        val array = try {
+            json.parseToJsonElement(text) as? JsonArray
+                ?: return DecodeRemindersResult.Corrupted("root_is_not_array")
+        } catch (_: Exception) {
+            return DecodeRemindersResult.Corrupted("invalid_json")
+        }
+
+        val recovered = mutableListOf<Reminder>()
+        var skipped = 0
+        for (element in array) {
+            try {
+                recovered += json.decodeFromJsonElement(Reminder.serializer(), element)
+            } catch (_: Exception) {
+                skipped++
+            }
+        }
+
+        return when {
+            skipped == 0 -> DecodeRemindersResult.Success(recovered)
+            recovered.isEmpty() -> DecodeRemindersResult.Corrupted("all_records_invalid")
+            else -> DecodeRemindersResult.Partial(recovered, skipped)
+        }
+    }
+
     sealed class ReadResult {
         data class Ok(val text: String) : ReadResult()
         object Empty : ReadResult()
@@ -78,28 +94,41 @@ object SharedStorage {
         }
     }
 
-    /** Kompatibilní čtení pro widget (jen zobrazuje): null = prázdno i chyba. */
     fun readText(context: Context, filename: String): String? =
         (read(context, filename) as? ReadResult.Ok)?.text
 
-    /**
-     * Atomický zápis přes android.util.AtomicFile: zapisuje přes dočasný soubor,
-     * při selhání zachovává původní obsah. Zápisy jsou serializované
-     * (@Synchronized), aby se souběžné zápisy z UI a z receiveru nepraly.
-     */
     @Synchronized
-    fun writeText(context: Context, filename: String, content: String) {
+    fun writeText(context: Context, filename: String, content: String): Boolean {
         val atomicFile = android.util.AtomicFile(file(context, filename))
         var stream: java.io.FileOutputStream? = null
-        try {
+        return try {
             stream = atomicFile.startWrite()
             stream.write(content.toByteArray(Charsets.UTF_8))
             atomicFile.finishWrite(stream)
+            true
         } catch (e: Exception) {
             if (stream != null) {
                 atomicFile.failWrite(stream)
             }
-            Log.w("SharedStorage", "Zápis $filename selhal – změna zůstala jen v paměti", e)
+            Log.w("SharedStorage", "Zápis $filename selhal – původní soubor zůstává zachovaný", e)
+            false
+        }
+    }
+
+    fun preserveCorruptCopy(context: Context, filename: String, content: String): File? {
+        return try {
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(content.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+                .take(16)
+            val baseName = filename.substringBeforeLast('.', filename)
+            val backupName = "$baseName.corrupt-$digest.json"
+            val target = file(context, backupName)
+            if (target.exists()) return target
+            if (writeText(context, backupName, content)) target else null
+        } catch (e: Exception) {
+            Log.w("SharedStorage", "Vytvoření záchranné kopie $filename selhalo", e)
+            null
         }
     }
 }

@@ -4,6 +4,8 @@
 **Výchozí stav:** `main`, aplikace v2.7 / versionCode 19  
 **Cíl:** zvýšit spolehlivost doručování připomínek, odstranit nalezené funkční chyby, zabezpečit data a připravit aplikaci na veřejné vydání a target API 36.
 
+> **Stav realizace k 7. 9. 2026:** Etapy 1–9 jsou implementované na stabilizační větvi a pokryté automatickým buildem/testy. PR zůstává draft do dokončení reálných device testů. Etapy 10–12 zbývají.
+
 ---
 
 ## 0. Pravidla realizace
@@ -28,7 +30,7 @@ Tento plán je záměrně seřazen podle závislostí. Kritické jádro se musí
 
 ---
 
-# ETAPA 1 – Opravit načítání dat a závody při studeném startu [P0]
+# ETAPA 1 – Opravit načítání dat a závody při studeném startu [P0] ✅ IMPLEMENTOVÁNO
 
 ## Problém
 
@@ -106,7 +108,7 @@ Použít jediný koordinovaný tok:
 
 ---
 
-# ETAPA 2 – Centralizovat stav plánování a idempotentní resync [P0/P1]
+# ETAPA 2 – Centralizovat stav plánování a idempotentní resync [P0/P1] ✅ IMPLEMENTOVÁNO
 
 ## Cíl
 
@@ -177,7 +179,7 @@ Preferovat jednu konzistentní evidenci místo více nezávislých značek.
 
 ---
 
-# ETAPA 3 – Opravit časové připomínky a snooze [P0]
+# ETAPA 3 – Opravit časové připomínky a snooze [P0] ✅ IMPLEMENTOVÁNO
 
 ## 3.1 Opravit editaci opakovaných připomínek
 
@@ -270,7 +272,7 @@ Doplnit receiver/resync pro relevantní systémové změny času, pokud testy pr
 
 ---
 
-# ETAPA 4 – Přesné alarmy, oprávnění a Android 16 / API 36 [P1]
+# ETAPA 4 – Přesné alarmy, oprávnění a Android 16 / API 36 [P1] ✅ IMPLEMENTOVÁNO
 
 > Externí podmínky byly znovu ověřeny 7. 9. 2026 podle Android Developers a Google Play Console Help.
 
@@ -355,7 +357,7 @@ Doporučení:
 
 ---
 
-# ETAPA 5 – Geofence spolehlivost [P1]
+# ETAPA 5 – Geofence spolehlivost [P1] ✅ IMPLEMENTOVÁNO
 
 ## 5.1 Per-reminder stav registrace
 
@@ -420,7 +422,7 @@ Ukládat poslední důvod selhání v bezpečném diagnostickém logu bez citliv
 
 ---
 
-# ETAPA 6 – Integrita dat, přílohy a zálohy [P0/P1]
+# ETAPA 6 – Integrita dat, přílohy a zálohy [P0/P1] ✅ IMPLEMENTOVÁNO
 
 ## 6.1 Rozlišit poškozený JSON od legitimně prázdného seznamu
 
@@ -541,7 +543,7 @@ Pokud `openOutputStream()` vrátí `null`, export musí vrátit `false`.
 
 ---
 
-# ETAPA 7 – Notifikace, TTS a deep-linking [P1/P2]
+# ETAPA 7 – Notifikace, TTS a deep-linking [P1/P2] ✅ IMPLEMENTOVÁNO
 
 ## 7.1 Kliknutí na notifikaci otevře konkrétní reminder
 
@@ -592,7 +594,7 @@ Použít aktivní jazyk aplikace / vhodný locale fallback.
 
 ---
 
-# ETAPA 8 – Kalendář, vyhledávání míst a widget [P2]
+# ETAPA 8 – Kalendář, vyhledávání míst a widget [P2] ✅ IMPLEMENTOVÁNO
 
 ## 8.1 Kalendář na IO
 
@@ -657,9 +659,24 @@ Navržené pořadí:
 
 Minimální varianta: přejmenovat widget, pokud má zůstat řazení podle vytvoření.
 
+### Stav implementace Etapy 8
+
+- kalendář používá `CalendarContract.Instances` a dotaz běží na `Dispatchers.IO`,
+- UI rozlišuje loading / content / empty / permission denied / error,
+- `null` cursor provideru je chyba, ne falešně prázdný kalendář,
+- každý konkrétní výskyt dostává stabilní `calendarSourceKey = eventId:beginMillis`,
+- již importované instance jsou označené a nelze je znovu vybrat,
+- import vybraných instancí proběhne dávkově jedním atomickým snapshotem,
+- Photon vrací `Success / NoResults / NetworkError / ServerError / ParseError`,
+- Android Geocoder zůstává fallback, ale neúspěch už nemaskuje skutečný Photon stav,
+- souřadnice z Photon, Geocoderu i sdílených mapových odkazů procházejí validačním rozsahem,
+- widget řadí časové remindery podle příštího výskytu a geo podle čerstvé polohy; starou polohu ignoruje,
+- přidány/rozšířeny `CalendarImporterTest`, `PlaceLinkResolverTest` a `WidgetOrderingTest`,
+- aplikační head Etapy 8 `267d581eb3c064c25cb63f012405da2727db6dc0` prošel GitHub Actions run #68 (`34128384063`): unit testy zelené + debug APK sestavené na API 36.
+
 ---
 
-# ETAPA 9 – Lokalizace a konzistence UI [P2]
+# ETAPA 9 – Lokalizace a konzistence UI [P2] ✅ IMPLEMENTOVÁNO
 
 ## 9.1 Přestat používat vlastní globální přepis Locale
 
@@ -722,6 +739,22 @@ Povolit pouze podporované MIME typy:
 - `application/pdf`
 
 Případně další obrazové formáty až po explicitní podpoře.
+
+### Stav implementace Etapy 9
+
+- `MainActivity` přešla na `AppCompatActivity` a jazyk se řídí `AppCompatDelegate.setApplicationLocales()`; starý globální `resources.updateConfiguration()` byl odstraněn,
+- `android:localeConfig` deklaruje `cs-CZ` a `en-US`; AppCompat automaticky ukládá locale na Androidu 12 a starším,
+- stará preference `SYSTEM/CS/EN` se jednorázově migruje, ale dál už není paralelním zdrojem pravdy,
+- `SYSTEM` je skutečný prázdný app-locale override; nepodporovaný systémový jazyk používá české default resources, anglický systém používá `values-en`,
+- pro receiver/widget/TTS se používá `ContextCompat.getContextForLanguage()`, takže ručně zvolený jazyk funguje i při cold-startu bez Activity,
+- vznikl centralizovaný `ReminderText`; model `Reminder` a enumy už neobsahují natvrdo české uživatelské labely/subtitle,
+- hlavní obrazovky, kalendář, picker míst, oblíbená místa, notifikace, TTS, widget, geofence stavy a accessibility texty používají CZ/EN resources,
+- názvy a popisy notification channelů se po změně jazyka znovu registrují v aktivním locale bez resetu uživatelských channel nastavení,
+- Nastavení čte `versionName` z nainstalovaného balíčku místo ručně napsané `v2.5`,
+- nový společný `ReminderEditorModal` sjednocuje Back / swipe-down / tap outside dismiss a při dirty formuláři vždy vyvolá stejný discard dialog; používá se ze seznamu i mapy,
+- picker příloh nabízí jen JPEG/PNG/PDF a `AttachmentHelper` stejné MIME typy znovu validuje v datové vrstvě,
+- přidán `AttachmentPolicyTest`, locale-aware regresní testy formátování a `LocalizationResourcesTest`, který vyžaduje shodnou množinu CZ/EN string klíčů,
+- aplikační head Etapy 9 `8c98a5695022755a752a1d70ea6a91384654864d` prošel GitHub Actions run #123 (`34137734616`): **unit testy zelené + debug APK sestavené na API 36**.
 
 ---
 
@@ -1017,26 +1050,26 @@ Po tomto milníku:
 
 Veřejný release je připravený pouze pokud platí všechno:
 
-- [ ] `targetSdk 36`
+- [x] `targetSdk 36`
 - [ ] build release projde
 - [ ] lint projde bez ignorování celé kontroly
-- [ ] všechny unit testy zelené
+- [x] všechny současné unit testy zelené
 - [ ] všechny kritické instrumentation testy zelené
-- [ ] restart telefonu obnoví alarmy i geofence
-- [ ] cold-start receivery používají načtená data
-- [ ] snooze blokuje původní trigger
-- [ ] editace opakovaného reminderu nemění čas bez zásahu uživatele
-- [ ] exact alarm stav je viditelný a opravitelný
-- [ ] background location stav je viditelný a opravitelný
-- [ ] geofence failure je per-reminder, ne jen globální boolean
-- [ ] poškozený JSON se automaticky nepřepíše
-- [ ] attachment path je sandboxovaná
-- [ ] backup má definované a otestované chování příloh
-- [ ] kliknutí na notifikaci otevře správný reminder
-- [ ] calendar import neduplikuje stejné instance
-- [ ] offline hledání místa nehlásí falešně „nic nenalezeno“
-- [ ] všechny podporované texty jsou v CZ/EN resources
-- [ ] číslo verze v UI se bere z buildu
+- [ ] restart telefonu obnoví alarmy i geofence – ověřit na zařízení
+- [x] cold-start receivery používají načtená data
+- [x] snooze blokuje původní trigger
+- [x] editace opakovaného reminderu nemění čas bez zásahu uživatele
+- [x] exact alarm stav je viditelný a opravitelný
+- [x] background location stav je viditelný a opravitelný
+- [x] geofence failure je per-reminder, ne jen globální boolean
+- [x] poškozený JSON se automaticky nepřepíše bez recovery kopie
+- [x] attachment path je sandboxovaná
+- [x] backup má definované chování příloh
+- [x] kliknutí na notifikaci otevře správný reminder
+- [x] calendar import neduplikuje stejné instance
+- [x] offline hledání místa nehlásí falešně „nic nenalezeno“
+- [x] všechny podporované texty jsou v CZ/EN resources
+- [x] číslo verze v UI se bere z buildu
 - [ ] diagnostická obrazovka ukazuje stav kritických systémových oprávnění
 - [ ] `PROJECT_STATUS.md` odpovídá skutečnému buildu
 - [ ] closed-test verze byla ověřena minimálně na Samsung/One UI a čistém Androidu
@@ -1062,32 +1095,32 @@ GeoReminder už má funkcí dost. Prioritou je, aby existující funkce byly př
 
 ### P0 – okamžitě
 
-- cold-start / reload race
-- editace repeating time
-- špatná quick-snooze akce
-- skutečný snooze stav
-- bezpečnost attachment path
+- cold-start / reload race ✅
+- editace repeating time ✅
+- špatná quick-snooze akce ✅
+- skutečný snooze stav ✅
+- bezpečnost attachment path ✅
 
 ### P1 – před veřejným releasem
 
-- API 36
-- exact alarm permission flow
-- background location flow
-- per-reminder geofence status
-- corrupted JSON recovery
-- backup/import hardening
-- testy kritické cesty
-- lint/CI
+- API 36 ✅
+- exact alarm permission flow ✅
+- background location flow ✅
+- per-reminder geofence status ✅
+- corrupted JSON recovery ✅
+- backup/import hardening ✅
+- testy kritické cesty – částečně, instrumentation zbývá
+- lint/CI – CI build+unit hotovo, lint zbývá
 
 ### P2 – po stabilizaci jádra
 
 - diagnostika
-- calendar Instances + dedup
-- Photon error states
-- widget pořadí
-- TTS lifecycle
-- deep linking
-- kompletní lokalizace
+- calendar Instances + dedup ✅
+- Photon error states ✅
+- widget pořadí ✅
+- TTS lifecycle ✅
+- deep linking ✅
+- kompletní lokalizace ✅
 - dokumentační úklid
 
 ---

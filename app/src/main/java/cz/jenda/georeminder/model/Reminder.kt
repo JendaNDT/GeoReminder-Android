@@ -17,7 +17,7 @@ const val DEFAULT_RADIUS = 150.0
 /**
  * Datumy se ukládají stejně jako v iOS verzi: jako počet sekund od 1. 1. 2001
  * (Apple "reference date"). Díky tomu jsou JSON soubory obou platforem
- * vzájemně čitelné (budoucí export/import).
+ * vzájemně čitelné.
  */
 object AppleDateSerializer : KSerializer<Long> {
     private const val APPLE_EPOCH_OFFSET_SECONDS = 978_307_200.0
@@ -36,69 +36,30 @@ object AppleDateSerializer : KSerializer<Long> {
 
 fun newUUID(): String = UUID.randomUUID().toString().uppercase(Locale.ROOT)
 
-/** Typ spouštěče připomínky – při příjezdu na místo, nebo při odjezdu z něj. */
 @Serializable
 enum class TriggerType {
     @SerialName("arrive") ARRIVE,
-    @SerialName("leave") LEAVE;
-
-    val label: String
-        get() = when (this) {
-            ARRIVE -> "Když přijedu"
-            LEAVE -> "Když odjedu"
-        }
-
-    val repeatLabel: String
-        get() = when (this) {
-            ARRIVE -> "Opakovat při každém příjezdu"
-            LEAVE -> "Opakovat při každém odjezdu"
-        }
+    @SerialName("leave") LEAVE,
 }
 
-/** Druh připomínky – na místo, nebo na čas. */
 @Serializable
 enum class ReminderKind {
     @SerialName("location") LOCATION,
-    @SerialName("time") TIME;
-
-    val label: String
-        get() = when (this) {
-            LOCATION -> "Na místě"
-            TIME -> "Na čas"
-        }
+    @SerialName("time") TIME,
 }
 
-/**
- * Druh upozornění (rozšíření Android verze – iOS pole ignoruje).
- * Tiché = bez zvuku, Naléhavé = budíkový zvuk hrající do zavření notifikace.
- */
 @Serializable
 enum class AlertStyle {
     @SerialName("quiet") QUIET,
     @SerialName("default") DEFAULT,
-    @SerialName("urgent") URGENT;
-
-    val label: String
-        get() = when (this) {
-            QUIET -> "Tiché"
-            DEFAULT -> "Výchozí"
-            URGENT -> "Naléhavé"
-        }
+    @SerialName("urgent") URGENT,
 }
 
-/** Opakování časové připomínky. */
 @Serializable
 enum class TimeRepeat {
     @SerialName("never") NEVER,
     @SerialName("daily") DAILY,
-    @SerialName("weekly") WEEKLY;
-
-    val label: String
-        get() = when (this) {
-            NEVER -> "Neopakovat"
-            DAILY -> "Každý den"
-            WEEKLY -> "Každý týden"
-        }
+    @SerialName("weekly") WEEKLY,
 }
 
 /** Jedna připomínka (geolokační nebo časová). Stejná pole jako v iOS verzi. */
@@ -108,7 +69,6 @@ data class Reminder(
     val title: String = "",
     val kind: ReminderKind = ReminderKind.LOCATION,
 
-    // Pole pro kind == LOCATION
     val placeName: String = "",
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
@@ -116,52 +76,24 @@ data class Reminder(
     val trigger: TriggerType = TriggerType.ARRIVE,
     val repeats: Boolean = false,
 
-    // Pole pro kind == TIME
     @Serializable(with = AppleDateSerializer::class)
     val dueDate: Long? = null,
     val timeRepeat: TimeRepeat = TimeRepeat.NEVER,
-    /**
-     * Vybrané dny v týdnu pro týdenní opakování (ISO: 1=pondělí … 7=neděle).
-     * null / jeden den = chování jako iOS verze (den podle dueDate).
-     * Rozšíření Android verze – iOS toto pole při čtení ignoruje.
-     */
+    /** ISO: 1=pondělí … 7=neděle. */
     val weekdays: List<Int>? = null,
 
     val isDone: Boolean = false,
     @Serializable(with = AppleDateSerializer::class)
     val createdAt: Long = System.currentTimeMillis(),
 
-    // Rozšíření Android verze (iOS tato pole při čtení ignoruje)
-    /** Druh upozornění: tiché / výchozí / naléhavé. */
     val alertStyle: AlertStyle = AlertStyle.DEFAULT,
-    /** Dožadování: nepotvrzená notifikace se vrací každých 5 minut. */
     val nagging: Boolean = false,
-    /** Cesta k lokální fotce nebo PDF příloze. */
     val attachmentPath: String? = null,
-    /** ID skupiny míst (kategorie) pro hromadný geofence. */
     val categoryId: String? = null,
-) {
-    /** Popisek do seznamu (druhý řádek) – bez vzdálenosti. */
-    val subtitle: String
-        get() = when (kind) {
-            ReminderKind.LOCATION -> buildString {
-                append(placeName)
-                append(" • ")
-                append(trigger.label)
-                if (repeats) append(" • opakuje se")
-            }
-            ReminderKind.TIME -> {
-                val due = dueDate ?: return "Bez termínu"
-                when (timeRepeat) {
-                    TimeRepeat.NEVER -> CzechFormat.dateTime(due)
-                    TimeRepeat.DAILY -> CzechFormat.time(due) + " • každý den"
-                    TimeRepeat.WEEKLY -> CzechFormat.weeklyLabel(due, weekdays) + " • každý týden"
-                }
-            }
-        }
-}
+    /** Zdrojová instance systémového kalendáře ve tvaru eventId:beginMillis. */
+    val calendarSourceKey: String? = null,
+)
 
-/** Oblíbené místo (Domov, Práce, Obchod…) pro rychlé zadávání připomínek. */
 @Serializable
 data class FavoritePlace(
     val id: String = newUUID(),

@@ -1,146 +1,167 @@
 # GeoReminder – texty pro Google Play
 
-*Připraveno 22. 07. 2026 pro verzi v2.4. Vše česky (výchozí jazyk pro Play = čeština). Kde je limit znaků, je uvedený. Bloky jsou psané tak, abys je mohl rovnou zkopírovat do Play konzole. Anglickou verzi můžu doplnit, kdybys chtěl cílit i mimo ČR – jen řekni.*
+**Aktualizováno:** 8. 9. 2026 pro build 2.7 / versionCode 19 / targetSdk 36.
 
-> **Poznámka:** Nejsem právník ani zaměstnanec Googlu. Texty k oprávněním a Data safety jsou napsané pravdivě podle toho, jak appka reálně funguje, ale přesné znění formulářů v konzoli se čas od času mění – před odesláním si je s formulářem porovnej a řiď se smyslem.
+> Store listing níže odpovídá současnému buildu. Texty pro Data safety a citlivá oprávnění jsou pracovní podklady, ne náhrada aktuálního formuláře Play Console. Před odesláním je vždy porovnej s otázkami, které Google zobrazí pro konkrétní `.aab`.
 
 ---
 
-## 1. Store listing (jak appka vypadá v obchodě)
+# 1. Store listing
 
-### Název aplikace (max 30 znaků)
-```
+## Název aplikace
+
+```text
 GeoReminder
 ```
 
-### Krátký popis (max 80 znaků)
+## Krátký popis
+
+```text
+Připomínky na místo i na čas. Ozvou se tam a tehdy, kdy je potřebuješ.
 ```
-Připomeň mi to, až budu u obchodu – připomínky na místo i na čas.
-```
-*(65 znaků)*
 
-### Dlouhý popis (max 4000 znaků)
-```
-GeoReminder ti připomene věci ve správný okamžik – buď podle místa, nebo podle času.
+## Dlouhý popis
 
-„Připomeň mi koupit mléko, až budu u obchodu." „Vyzvedni balík, až budeš odjíždět z práce." „Zavolej mámě dnes v 18:30." GeoReminder hlídá polohu i čas za tebe a ozve se přesně tehdy, kdy to potřebuješ – i když máš appku zavřenou.
+```text
+GeoReminder ti připomene věci podle místa nebo času.
 
-CO APPKA UMÍ
+„Připomeň mi koupit mléko, až budu u obchodu.“
+„Vyzvedni balík, až budu odjíždět z práce.“
+„Zavolej dnes v 18:30.“
 
-• Připomínky na místo – ozve se při příjezdu nebo odjezdu z místa, které vybereš na mapě. Nastavíš si poloměr (50–1000 m) a případně opakování při každém příjezdu.
-• Připomínky na čas – jednorázově, každý den, nebo každý týden ve vybrané dny.
-• Hledání míst našeptáváním – píšeš a rovnou vidíš výsledky včetně názvů podniků, vzdálenosti a typu místa. Oblíbená a naposledy použitá místa máš po ruce.
-• Druhy upozornění – Tiché, Výchozí, nebo Naléhavé (budíkový zvuk, dokud notifikaci nezavřeš). Volitelně „dožadování": nepotvrzená připomínka se vrací každých 5 minut.
-• Tlačítka přímo na notifikaci – Hotovo, Odložit o hodinu, Zítra ráno.
-• Navigovat – u připomínky na místo otevřeš jedním ťuknutím navigaci do cíle.
-• Hlasité čtení – po spuštění ti připomínku přečte telefon nahlas (volitelné).
-• Přílohy – k připomínce připojíš fotku, PDF nebo jiný soubor (třeba účtenku nebo lístek). Zůstávají uložené v aplikaci.
-• Chytré seskupení – víc připomínek na jednom místě se zobrazí jako jedno přehledné upozornění (volitelné).
-• Import z kalendáře – z události v kalendáři uděláš jedním ťuknutím připomínku (převezme název, čas a případně místo).
-• Sdílení místa z Map Google rovnou do připomínky.
-• Widget na plochu s nejbližšími připomínkami a tlačítkem pro rychlé přidání.
-• Světlý i tmavý vzhled.
-• Po restartu telefonu se hlídání samo obnoví.
+CO GEOREMINDER UMÍ
+
+• Připomínky na místo – upozornění při příchodu nebo odchodu z uživatelem zvoleného místa.
+• Nastavitelný poloměr geofence a volitelné opakování.
+• Připomínky na čas – jednorázově, každý den nebo týdně ve vybraných dnech.
+• Odložení připomínky bez změny jejího původního pravidla.
+• Akce přímo v notifikaci – Hotovo, Odložit, Zítra ráno a u míst také Navigovat.
+• Tiché, výchozí nebo naléhavé upozornění a volitelné opakované připomenutí.
+• Hledání míst přes Photon/OpenStreetMap s fallbackem systémového geokódování.
+• Oblíbená a nedávno použitá místa.
+• Sdílení podporovaných míst a geo: odkazů do nové připomínky.
+• JPEG, PNG a PDF přílohy uložené v soukromém úložišti aplikace.
+• Volitelné hlasité přečtení připomínky.
+• Jednorázový import události z kalendáře.
+• Mapový přehled připomínek.
+• Widget s nejbližšími připomínkami.
+• Čeština, angličtina nebo systémový jazyk aplikace.
+• Světlý, tmavý, neutrální a glass vzhled.
+• Obnova alarmů a geofence po restartu telefonu.
+• ZIP záloha připomínek, oblíbených míst a podporovaných příloh.
+• Diagnostika oprávnění, geofence, alarmů, snooze a datového stavu.
 
 SOUKROMÍ
 
-GeoReminder je jednoduchá appka bez účtů, bez reklam a bez sledování. Připomínky, oblíbená místa i přílohy zůstávají ve tvém telefonu. Poloha se používá jen k hlídání míst přímo v zařízení – neposíláme ji na žádný náš server. Mapu vykresluje Google Maps a hledání míst zajišťuje služba Photon (OpenStreetMap); těm se předává jen to, co je nutné pro zobrazení mapy a vyhledávání. Podrobnosti jsou v zásadách ochrany soukromí.
+GeoReminder nemá vlastní uživatelské účty, reklamy ani vlastní analytický backend. Připomínky a spravované přílohy jsou uložené v soukromém úložišti aplikace. Poloha se používá pro geofencing; aplikace nevytváří vlastní historii pohybu ani ji neodesílá na server provozovatele.
 
-PROČ POLOHA NA POZADÍ
+Některé funkce využívají služby třetích stran, například Google Maps/Google Play Services a Photon/OpenStreetMap. Podrobnosti jsou v zásadách ochrany soukromí.
 
-Aby ti připomínka na místo přišla i se zavřenou appkou, potřebuje GeoReminder přístup k poloze „Povolit vždy". Polohu používá výhradně k tomu, aby poznal, že jsi dorazil na místo připomínky. Nikam ji neodesíláme.
+POLOHA NA POZADÍ
+
+Aby mohla připomínka na místo fungovat i bez otevřené aplikace, GeoReminder používá Android geofencing a může potřebovat přístup k poloze na pozadí. Oprávnění slouží k detekci příchodu nebo odchodu z míst, která si uživatel sám uložil.
 ```
 
-### Poznámky k verzi / Co je nového (max 500 znaků) – v2.4
-```
-Novinky:
-• Navigovat – u připomínky na místo otevřeš navigaci jedním ťuknutím
-• Hlasité čtení připomínky (volitelné, v Nastavení → Funkce)
-• Přílohy k připomínce (foto, PDF…) uložené v aplikaci
-• Chytré seskupení víc připomínek na jednom místě (volitelné)
-• Import události z Google Kalendáře do připomínky
-Plus drobná vylepšení a opravy.
-```
-*(Cca 300 znaků. Můžu zkrátit/upravit.)*
+## Co je nového – build 2.7 / stabilizace API 36
 
-### Kategorie a další pole
-- **Kategorie aplikace:** Produktivita (Productivity).
-- **Tagy / štítky:** připomínky, úkoly, poloha, geofencing, kalendář (vyber z nabídky ty, co konzole dovolí).
-- **Kontaktní e-mail:** tvůj (mcnegr@gmail.com), případně web/telefon nepovinně.
-- **Grafika (nutná, dodám samostatně, až řekneš):** ikona 512×512 PNG, feature graphic 1024×500, min. 2–3 screenshoty z telefonu (na screenshoty se hodí: seznam připomínek, výběr místa na mapě, detail připomínky s přílohou, notifikace s tlačítkem Navigovat).
-
----
-
-## 2. Data safety (bezpečnost dat) – odpovědi do formuláře
-
-Play se ptá, jaká data appka **shromažďuje** (= odesílá ze zařízení) a **sdílí**. GeoReminder nemá vlastní server, účty ani reklamy. Data o připomínkách, oblíbených místech a přílohách zůstávají v telefonu. Pravdivé odpovědi:
-
-**Shromažďuje nebo sdílí appka nějaká uživatelská data?**
-- Odpověz **Ano** (kvůli poloze – viz níže; appka sice nic neukládá na tvůj server, ale poloha se předává mapové a vyhledávací službě, takže „opouští zařízení").
-
-**Typy dat:**
-
-| Typ dat | Shromažďuje se? | Sdílí se? | Účel | Poznámka |
-|---|---|---|---|---|
-| **Poloha (přesná i přibližná)** | Ano | Ne* | Funkčnost aplikace | Používá se k hlídání míst v zařízení; k vykreslení mapy se předává Google Maps SDK. Neukládáme na žádný náš server. |
-| Osobní údaje (jméno, e-mail, tel.) | Ne | Ne | – | Appka nemá účty ani přihlašování. |
-| Kontakty | Ne | Ne | – | – |
-| Kalendář | Ne | Ne | – | Kalendář se **jen čte v zařízení** při importu události; nikam se neodesílá. |
-| Fotky / soubory (přílohy) | Ne | Ne | – | Přílohy se kopírují do soukromého úložiště appky, zůstávají v telefonu. |
-| Zprávy, kontakty, platby, zdraví | Ne | Ne | – | – |
-
-*„Sdílení" ve smyslu Play = předání třetí straně pro její vlastní účely. Google Maps a Photon vystupují jako poskytovatelé služby (mapa, hledání), ne jako příjemci dat pro reklamu.
-
-**Další otázky ve formuláři (doporučené odpovědi):**
-- **Jsou data šifrovaná při přenosu?** Ano (veškerá síťová komunikace jde přes HTTPS).
-- **Můžou uživatelé požádat o smazání dat?** Ano – smazáním připomínek v appce nebo odinstalací appky se data odstraní. (Appka žádná data neshromažďuje na server, takže není co dál mazat.)
-- **Shromažďují se data od dětí?** Ne / appka není cílená na děti.
-
-> Pozor: kvůli poloze a použití Google Maps SDK Play obvykle očekává, že polohu deklaruješ jako „shromažďovanou" (protože technicky opouští zařízení směrem ke Google). Proto výše uvádím Poloha = Ano. Zbytek (kalendář, přílohy, kontakty) zůstává v zařízení = Ne.
-
----
-
-## 3. Zdůvodnění oprávnění (pro formuláře „App access" / deklarace)
-
-Pokud Play při odeslání chce vysvětlení citlivých oprávnění, použij tyto texty.
-
-### Poloha na pozadí (ACCESS_BACKGROUND_LOCATION) – POVINNÁ zvláštní deklarace
-**Proč to appka potřebuje (do zdůvodňovacího formuláře):**
-```
-GeoReminder je připomínkovač vázaný na místo. Hlavní funkcí aplikace je upozornit uživatele, když dorazí na místo, které si sám zvolil (např. „připomeň mi koupit mléko, až budu u obchodu"). Aby toto fungovalo i se zavřenou aplikací a zhasnutou obrazovkou, používá aplikace geofencing systému Android, který vyžaduje přístup k poloze na pozadí („Povolit vždy"). Poloha se používá výhradně k detekci příchodu/odchodu z uživatelem zvoleného místa a k zobrazení místní připomínky. Poloha se neodesílá na žádný server provozovatele, nesdílí se s třetími stranami pro reklamu a neukládá se mimo zařízení.
-```
-**Prominentní sdělení (prominent disclosure) – text, který uvidí uživatel v aplikaci před udělením oprávnění.** Aplikace ho ukazuje v onboardingu; pro jistotu ho můžeš uvést i do deklarace:
-```
-GeoReminder používá vaši polohu (i na pozadí, „Povolit vždy") k tomu, aby vás upozornil, když dorazíte na místo připomínky – i když je aplikace zavřená. Polohu nikam neodesíláme.
-```
-**Pozn.:** Play u polohy na pozadí často žádá **krátké video** (30–120 s), které scénář ukazuje: vytvoření připomínky na místo → příchod na místo → notifikace. Nahraješ ho k deklaraci (stačí záznam obrazovky telefonu). Play v roce 2026 pravidla polohy zpřísnil – u deklarace uvidíš aktuální požadavky, drž se jich.
-
-### Přesné budíky (USE_EXACT_ALARM)
-```
-GeoReminder je připomínkovací aplikace, která doručuje časové připomínky v přesný čas zvolený uživatelem (např. „připomeň mi v 18:30"). K tomu používá přesné budíky (exact alarms). Aplikace spadá do kategorie budík/kalendář/připomínky, pro kterou je toto oprávnění určené.
-```
-*(Kdyby to dělalo problém, mám v záloze variantu bez `USE_EXACT_ALARM` – uživatel by si přesné budíky povoloval sám v nastavení. Řekni a upravím.)*
-
-### Čtení kalendáře (READ_CALENDAR) – NOVÉ ve v2.4
-```
-GeoReminder umožňuje uživateli jednorázově importovat událost z kalendáře a udělat z ní připomínku (převezme název, čas začátku a případně místo). Oprávnění ke čtení kalendáře se používá výhradně k zobrazení seznamu nadcházejících událostí, ze kterých si uživatel vybere. Aplikace kalendář jen čte v zařízení, nic z něj neodesílá ani neupravuje. Nejde o průběžnou synchronizaci.
+```text
+• Připraveno pro Android 16 / API 36
+• Spolehlivější obnova alarmů a připomínek po restartu
+• Opravené Snooze a opakované časové připomínky
+• Bezpečnější obnova poškozených dat a ZIP zálohy s přílohami
+• CZ/EN/SYSTEM jazyk aplikace
+• Diagnostika oprávnění a doručování
+• Řada oprav notifikací, geofence, importu kalendáře a widgetu
 ```
 
 ---
 
-## 4. Content rating (věkové hodnocení)
-Dotazník vyplň pravdivě – appka **neobsahuje** násilí, sex, vulgaritu, hazard, drogy ani uživatelskou komunikaci. Výsledek bude nejnižší hodnocení (vhodné pro všechny / PEGI 3). Kategorie aplikace: nástroj/produktivita (ne hra).
+# 2. Podklad pro background location declaration
+
+## Zdůvodnění
+
+```text
+GeoReminder je aplikace pro připomínky vázané na místo. Uživatel si může vytvořit připomínku, která se má zobrazit při příchodu na konkrétní místo nebo při odchodu z něj. Aby tato základní funkce fungovala i tehdy, když není aplikace právě otevřená, používá GeoReminder geofencing systému Android a potřebuje přístup k poloze na pozadí.
+
+Poloha na pozadí se používá pouze pro detekci příchodu/odchodu z míst, která si uživatel sám nastavil. GeoReminder nevytváří vlastní historii pohybu a neodesílá polohu na server provozovatele aplikace.
+```
+
+## Prominent disclosure – pracovní text
+
+```text
+GeoReminder používá polohu i na pozadí, aby vás mohl upozornit při příchodu na místo připomínky nebo při odchodu z něj, i když aplikace není otevřená. Aplikace nevytváří vlastní historii vašeho pohybu ani ji neposílá na náš server.
+```
+
+Před Play review ověřit, že disclosure je skutečně zobrazený ve správném místě před žádostí o background permission a že případné demonstrační video odpovídá reálnému toku aplikace.
 
 ---
 
-## 5. Cílová skupina a obsah
-- **Cílová věková skupina:** dospělí / 13+ (ne appka pro děti). V dotazníku „Target audience" nevybírej dětské kategorie.
-- **Reklamy:** appka neobsahuje reklamy → v listingu označ „Obsahuje reklamy: Ne".
-- **Nákupy v aplikaci:** žádné.
+# 3. Přesné alarmy
+
+GeoReminder deklaruje:
+
+```text
+android.permission.SCHEDULE_EXACT_ALARM
+```
+
+Nepoužívá `USE_EXACT_ALARM`.
+
+Pracovní vysvětlení, pokud se Play Console na použití zeptá:
+
+```text
+GeoReminder umožňuje uživateli vytvořit časovou připomínku na konkrétní čas. Pro co nejpřesnější doručení používá special access SCHEDULE_EXACT_ALARM, který uživatel uděluje v systému Android. Pokud přístup není povolený, aplikace používá méně přesný AlarmManager fallback a stav je viditelný v diagnostice.
+```
 
 ---
 
-## 6. Co je potřeba dodat mimo texty (připomínka)
-- **Zásady ochrany soukromí** – hotový text je v `PRIVACY.md` / `privacy.html`. Vyvěsíš na veřejnou URL (GitHub Pages / Google Sites) a vložíš do App content → Privacy policy. Návod na vyvěšení je v checklistu.
-- **Grafika** (ikona 512, feature graphic, screenshoty) – vyrobím, až řekneš.
-- **`.aab`** místo APK – sestavím podepsaný tvým klíčem, až budeš mít účet a appku založenou (a až zapneme minifikaci a otestuješ ji).
+# 4. Čtení kalendáře
+
+```text
+GeoReminder umožňuje uživateli jednorázově importovat vybranou nadcházející událost z kalendáře do nové připomínky. Oprávnění READ_CALENDAR se používá pouze po uživatelské akci k zobrazení dostupných událostí a převzetí vybraných údajů do reminderu. Aplikace kalendář needituje a nejde o průběžnou synchronizaci.
+```
+
+---
+
+# 5. Data safety – pracovní podklad
+
+Finální odpovědi musí být vyplněny podle aktuálních definic Play Console pro `collected`, `shared`, účely zpracování a případné výjimky poskytovatelů služeb.
+
+Fakta o aplikaci:
+
+- nemá vlastní účet/login,
+- nemá reklamy,
+- nemá vlastní analytics/tracking SDK,
+- ukládá reminder texty, místa a přílohy lokálně,
+- používá přesnou/přibližnou/background location pro geofencing,
+- používá Google Maps/Google Play Services,
+- posílá text hledání službě Photon,
+- může použít systémový Geocoder,
+- může načíst uživatelem sdílený mapový odkaz,
+- může číst kalendář při uživatelském importu,
+- Android cloud backup/device transfer může přenést `reminders.json`, `favorites.json` a spravované přílohy podle systémového nastavení,
+- ruční ZIP backup může uživatel uložit do jím zvoleného úložiště.
+
+Před vyplněním Data safety porovnat formulář s `PRIVACY.md` a `GOOGLE-PLAY-CHECKLIST.md`.
+
+---
+
+# 6. Store grafika a screenshoty
+
+Před nahráním:
+
+- ikona 512×512,
+- feature graphic 1024×500,
+- aktuální screenshoty z build 2.7 nebo novějšího release kandidáta,
+- žádné screenshoty starých/odstraněných přepínačů,
+- nepoužívat text „libovolný soubor“ u příloh – podporované jsou JPEG, PNG a PDF,
+- nepoužívat staré tvrzení `target API 35`,
+- případná diagnostická obrazovka smí ukazovat pouze anonymizované technické údaje.
+
+Vhodné screenshoty:
+
+1. hlavní seznam připomínek,
+2. vytvoření location reminderu / výběr místa,
+3. time reminder,
+4. notifikace s akcemi,
+5. mapa nebo widget,
+6. diagnostika spolehlivosti.

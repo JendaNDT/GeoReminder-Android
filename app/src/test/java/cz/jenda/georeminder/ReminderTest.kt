@@ -24,7 +24,6 @@ class ReminderTest {
         val nowMillis = 1700000000000L
         val encoded = json.encodeToString(AppleDateSerializer, nowMillis)
         val decoded = json.decodeFromString(AppleDateSerializer, encoded)
-        // Allow tiny floating point millisecond rounding
         assertEquals(nowMillis / 1000, decoded / 1000)
     }
 
@@ -40,7 +39,8 @@ class ReminderTest {
             trigger = TriggerType.ARRIVE,
             repeats = true,
             alertStyle = AlertStyle.URGENT,
-            nagging = true
+            nagging = true,
+            calendarSourceKey = "42:123456",
         )
 
         val jsonString = json.encodeToString(reminder)
@@ -53,11 +53,11 @@ class ReminderTest {
         assertEquals(reminder.kind, decoded.kind)
         assertEquals(reminder.alertStyle, decoded.alertStyle)
         assertEquals(reminder.nagging, decoded.nagging)
+        assertEquals(reminder.calendarSourceKey, decoded.calendarSourceKey)
     }
 
     @Test
     fun testiOSCompatibilityJsonParsing() {
-        // Sample JSON string produced by iOS app
         val iosJson = """
             {
                 "id": "11111111-2222-3333-4444-555555555555",
@@ -81,18 +81,7 @@ class ReminderTest {
         assertEquals("Zavolat známému", decoded.title)
         assertEquals(ReminderKind.TIME, decoded.kind)
         assertNotNull(decoded.dueDate)
-        assertEquals(AlertStyle.DEFAULT, decoded.alertStyle) // default fallback
-    }
-
-    @Test
-    fun testSubtitleGeneration() {
-        val locReminder = Reminder(
-            title = "Nákup",
-            kind = ReminderKind.LOCATION,
-            placeName = "Globus",
-            trigger = TriggerType.LEAVE,
-            repeats = true
-        )
-        assertEquals("Globus • Když odjedu • opakuje se", locReminder.subtitle)
+        assertEquals(AlertStyle.DEFAULT, decoded.alertStyle)
+        assertEquals(null, decoded.calendarSourceKey)
     }
 }

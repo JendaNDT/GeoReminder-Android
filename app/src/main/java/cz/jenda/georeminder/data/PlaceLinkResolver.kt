@@ -24,16 +24,13 @@ object PlaceLinkResolver {
         }
 
     private fun resolveInternal(text: String): Pair<String, LatLng>? {
-        // 1) geo: souřadnice (geo:50.1,14.4 nebo geo:0,0?q=50.1,14.4(Název))
         if (text.startsWith("geo:")) {
             return parseGeoUri(text)
         }
 
-        // 2) Najít odkaz v textu
         val url = Regex("""https?://\S+""").find(text)?.value
             ?.trimEnd(')', '.', ',', ';') ?: return null
 
-        // Krátké odkazy (maps.app.goo.gl apod.) rozbalit přes přesměrování
         var coords = parseCoordsFromUrl(url)
         var finalUrl = url
         if (coords == null) {
@@ -52,12 +49,12 @@ object PlaceLinkResolver {
     }
 
     private fun parseGeoUri(uri: String): Pair<String, LatLng>? {
-        // q=lat,lng(Label) má přednost (geo:0,0?q=… je běžný formát)
         val q = Regex("""[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:\((.+?)\))?""")
             .find(uri)
         if (q != null) {
             val lat = q.groupValues[1].toDoubleOrNull() ?: return null
             val lng = q.groupValues[2].toDoubleOrNull() ?: return null
+            val coords = validatedLatLng(lat, lng) ?: return null
             val label = q.groupValues[3].let {
                 try {
                     URLDecoder.decode(it, "UTF-8")
@@ -65,13 +62,13 @@ object PlaceLinkResolver {
                     it
                 }
             }
-            return label to LatLng(lat, lng)
+            return label to coords
         }
         val m = Regex("""geo:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)""").find(uri) ?: return null
         val lat = m.groupValues[1].toDoubleOrNull() ?: return null
         val lng = m.groupValues[2].toDoubleOrNull() ?: return null
         if (lat == 0.0 && lng == 0.0) return null
-        return "" to LatLng(lat, lng)
+        return "" to (validatedLatLng(lat, lng) ?: return null)
     }
 
     /** Následuje přesměrování krátkých odkazů (max 6 skoků). */
@@ -103,24 +100,37 @@ object PlaceLinkResolver {
         return current
     }
 
-    /** Vytáhne souřadnice z odkazu na Mapy Google. */
+    /** Vytáhne a validuje souřadnice z odkazu na Mapy Google. */
     private fun parseCoordsFromUrl(url: String): LatLng? {
-        // !3d…!4d… = souřadnice špendlíku (nejpřesnější)
-        Regex("""!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)""").find(url)?.let {
-            return LatLng(it.groupValues[1].toDouble(), it.groupValues[2].toDouble())
+        Regex("""!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)""").find(url)?.let {
+            return validatedLatLng(
+                it.groupValues[1].toDoubleOrNull(),
+                it.groupValues[2].toDoubleOrNull(),
+            )
         }
-        // ?q=lat,lng nebo &ll=lat,lng
-        Regex("""[?&](?:q|ll|query)=(-?\d+\.\d+),(-?\d+\.\d+)""").find(url)?.let {
-            return LatLng(it.groupValues[1].toDouble(), it.groupValues[2].toDouble())
+        Regex("""[?&](?:q|ll|query)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)""").find(url)?.let {
+            return validatedLatLng(
+                it.groupValues[1].toDoubleOrNull(),
+                it.groupValues[2].toDoubleOrNull(),
+            )
         }
-        // /@lat,lng,zoom = střed mapy (záloha)
-        Regex("""/@(-?\d+\.\d+),(-?\d+\.\d+)""").find(url)?.let {
-            return LatLng(it.groupValues[1].toDouble(), it.groupValues[2].toDouble())
+        Regex("""/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)""").find(url)?.let {
+            return validatedLatLng(
+                it.groupValues[1].toDoubleOrNull(),
+                it.groupValues[2].toDoubleOrNull(),
+            )
         }
         return null
     }
 
-    /** Název místa z části „/place/Název+Místa/" v odkazu. */
+    internal fun validatedLatLng(latitude: Double?, longitude: Double?): LatLng? {
+        val lat = latitude ?: return null
+        val lng = longitude ?: return null
+        if (!lat.isFinite() || !lng.isFinite()) return null
+        if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return null
+        return LatLng(lat, lng)
+    }
+
     private fun parseNameFromUrl(url: String): String? {
         val m = Regex("""/place/([^/@?]+)""").find(url) ?: return null
         val raw = m.groupValues[1].replace('+', ' ')

@@ -12,12 +12,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -29,9 +27,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,36 +39,39 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import cz.jenda.georeminder.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cz.jenda.georeminder.MainActivity
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.ActivityInsets
 import cz.jenda.georeminder.data.LocationHolder
 import cz.jenda.georeminder.data.ReminderStore
 import cz.jenda.georeminder.data.SharedStorage
+import cz.jenda.georeminder.data.SystemAccess
+import cz.jenda.georeminder.model.Reminder
+import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.ui.components.iosClickable
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
+import kotlinx.coroutines.launch
 
-/**
- * Kořen aplikace: uvítací průvodce (jen poprvé), pak záložky Připomínky + Mapa
- * s plovoucím kapslovým tab barem. Oprávnění se žádají až PO zavření průvodce,
- * v pořadí: notifikace → poloha → poloha „Povolit vždy" (zvláštnost Androidu).
- */
+/** Kořen aplikace: onboarding, záložky, oprávnění a special access. */
 @Composable
 fun RootScreen() {
     val context = LocalContext.current
@@ -80,9 +83,32 @@ fun RootScreen() {
         mutableStateOf(prefs.getBoolean("hasSeenOnboarding", false))
     }
     val store = remember { ReminderStore.get(context) }
+    val reminders by store.reminders.collectAsStateWithLifecycle()
+    val resumeScope = rememberCoroutineScope()
 
-    // Změřit výšku spodní systémové lišty v okně aktivity (spolehlivé)
-    // a zpřístupnit ji dialogovým oknům, která ji samy nedostávají.
+    var backgroundAccessMissing by remember { mutableStateOf(false) }
+    var exactAlarmAccessMissing by remember { mutableStateOf(false) }
+    var backgroundPromptDismissed by rememberSaveable { mutableStateOf(false) }
+    var exactAlarmPromptDismissed by rememberSaveable { mutableStateOf(false) }
+    var android10BackgroundRequestStarted by rememberSaveable { mutableStateOf(false) }
+
+    fun refreshSpecialAccessState(items: List<Reminder>) {
+        val hasActiveLocation = items.any { !it.isDone && it.kind == ReminderKind.LOCATION }
+        val hasActiveTime = items.any { !it.isDone && it.kind == ReminderKind.TIME }
+
+        backgroundAccessMissing = hasActiveLocation &&
+            LocationHolder.hasFineLocation(context) &&
+            !LocationHolder.hasBackgroundLocation(context)
+
+        exactAlarmAccessMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            hasActiveTime &&
+            !SystemAccess.canScheduleExactAlarms(context)
+    }
+
+    LaunchedEffect(reminders) {
+        refreshSpecialAccessState(reminders)
+    }
+
     val density = LocalDensity.current
     val navigationBottomPx = WindowInsets.navigationBars.getBottom(density)
     LaunchedEffect(navigationBottomPx) {
@@ -91,28 +117,28 @@ fun RootScreen() {
         }
     }
 
-    // Řetězec žádostí o oprávnění (spouští se po průvodci)
     val backgroundLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
+        refreshSpecialAccessState(store.reminders.value)
         store.resyncAll()
         LocationHolder.refresh(context)
     }
+
     val locationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
-        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) {
+        val fineGranted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val anyLocationGranted = fineGranted ||
+            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+
+        if (anyLocationGranted) {
             LocationHolder.refresh(context)
             store.resyncAll()
-            if (Build.VERSION.SDK_INT >= 29 &&
-                !LocationHolder.hasBackgroundLocation(context)
-            ) {
-                backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            }
         }
+        refreshSpecialAccessState(store.reminders.value)
     }
+
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
@@ -137,15 +163,29 @@ fun RootScreen() {
         }
     }
 
-    // Návrat do popředí: znovu načíst data z disku a zaregistrovat spouštěče
-    // (změny z tlačítek na notifikaci, widgetu…) – ekvivalent iOS scenePhase.
+    LaunchedEffect(backgroundAccessMissing, reminders) {
+        if (
+            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q &&
+            backgroundAccessMissing &&
+            !android10BackgroundRequestStarted
+        ) {
+            android10BackgroundRequestStarted = true
+            backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                store.reload()
-                store.resyncAll()
-                LocationHolder.refresh(context)
+                resumeScope.launch {
+                    val loadResult = store.reloadAndWait()
+                    if (loadResult != ReminderStore.ReloadResult.ERROR) {
+                        store.resyncAll()
+                    }
+                    LocationHolder.refresh(context)
+                    refreshSpecialAccessState(store.reminders.value)
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -196,17 +236,19 @@ fun RootScreen() {
         } else {
             var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
-            // Zástupce z plochy má otevřít formulář → přepnout na záložku Připomínky,
-            // kde si požadavek převezme ReminderListScreen
             LaunchedEffect(Unit) {
                 MainActivity.shortcutRequest.collect { kind ->
                     if (kind != null) selectedTab = 0
                 }
             }
-            // Sdílené místo (z Map Google) → taky na záložku Připomínky
             LaunchedEffect(Unit) {
                 MainActivity.sharedPlaceText.collect { text ->
                     if (text != null) selectedTab = 0
+                }
+            }
+            LaunchedEffect(Unit) {
+                MainActivity.notificationReminderRequest.collect { reminderId ->
+                    if (reminderId != null) selectedTab = 0
                 }
             }
 
@@ -225,9 +267,61 @@ fun RootScreen() {
             )
         }
     }
+
+    val shouldShowBackgroundDialog = hasSeenOnboarding &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+        backgroundAccessMissing &&
+        !backgroundPromptDismissed
+
+    if (shouldShowBackgroundDialog) {
+        val optionLabel = SystemAccess.backgroundLocationOptionLabel(context)
+        AlertDialog(
+            onDismissRequest = { backgroundPromptDismissed = true },
+            title = { Text(stringResource(R.string.background_location_title)) },
+            text = {
+                Text(stringResource(R.string.background_location_message, optionLabel))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    backgroundPromptDismissed = true
+                    SystemAccess.openAppDetails(context)
+                }) {
+                    Text(stringResource(R.string.action_open_settings))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { backgroundPromptDismissed = true }) {
+                    Text(stringResource(R.string.action_not_now))
+                }
+            },
+        )
+    }
+
+    if (
+        hasSeenOnboarding && exactAlarmAccessMissing && !exactAlarmPromptDismissed &&
+        !shouldShowBackgroundDialog
+    ) {
+        AlertDialog(
+            onDismissRequest = { exactAlarmPromptDismissed = true },
+            title = { Text(stringResource(R.string.exact_alarm_title)) },
+            text = { Text(stringResource(R.string.exact_alarm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    exactAlarmPromptDismissed = true
+                    SystemAccess.openExactAlarmSettings(context)
+                }) {
+                    Text(stringResource(R.string.exact_alarm_allow))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { exactAlarmPromptDismissed = true }) {
+                    Text(stringResource(R.string.action_later))
+                }
+            },
+        )
+    }
 }
 
-/** Plovoucí kapslový tab bar dole na středu (vzhled iOS 26). */
 @Composable
 private fun FloatingTabBar(
     selectedTab: Int,

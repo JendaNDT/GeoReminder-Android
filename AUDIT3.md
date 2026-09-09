@@ -1,5 +1,7 @@
 # Komplexní Audit Aplikace GeoReminder Android (AUDIT3)
 
+> **HISTORICKÝ DOKUMENT.** Tento audit zachycuje stav z 23. 7. 2026 a není aktuálním zdrojem pravdy pro současnou kódovou bázi. Aktuální stav je v `PROJECT_STATUS.md`; stabilizační práce a release gate jsou v `IMPLEMENTACNI-PLAN-OPRAV-2026-09.md` a `DEVICE-TEST-MATRIX.md`.
+
 *Finální komplexní technický audit, 23. 07. 2026. Auditováno bylo aktuální kódové jádro v `Android/GeoReminderAndroid/` (45 Kotlin souborů, AndroidManifest, Gradle konfigurace).*
 
 ---

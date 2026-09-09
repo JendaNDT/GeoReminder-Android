@@ -26,7 +26,13 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val store = ReminderStore.get(context)
-                store.reload()
+                val loadResult = store.reloadAndWait()
+                if (loadResult == ReminderStore.ReloadResult.ERROR) {
+                    Log.w("BootReceiver", "Obnova přeskočena – data připomínek se nepodařilo načíst")
+                    return@launch
+                }
+                // Důležité: resync až po dokončeném načtení, jinak by cold start
+                // mohl zaregistrovat prázdný seznam a připomínky po rebootu zmizely.
                 store.resyncAll()
             } catch (e: Exception) {
                 Log.w("BootReceiver", "Chyba při obnově připomínek po restartu", e)

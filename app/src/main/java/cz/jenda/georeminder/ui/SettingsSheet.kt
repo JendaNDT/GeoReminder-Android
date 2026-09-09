@@ -16,22 +16,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Upload
-import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.ui.res.stringResource
-import cz.jenda.georeminder.R
-import cz.jenda.georeminder.data.LanguageController
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -41,15 +36,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.data.BackupManager
 import cz.jenda.georeminder.data.FeatureSettings
+import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.notify.TtsSpeaker
 import cz.jenda.georeminder.ui.components.CardDivider
 import cz.jenda.georeminder.ui.components.IOSSwitch
@@ -61,6 +60,9 @@ import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 import cz.jenda.georeminder.ui.theme.ThemeController
 import cz.jenda.georeminder.ui.theme.ThemeMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,23 +70,37 @@ fun SettingsSheet(onClose: () -> Unit) {
     val context = LocalContext.current
     val colors = GeoTheme.colors
     val currentMode by ThemeController.mode.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     val ttsEnabled by FeatureSettings.ttsEnabled.collectAsStateWithLifecycle()
     val ttsReadFullText by FeatureSettings.ttsReadFullText.collectAsStateWithLifecycle()
     val groupByPlace by FeatureSettings.groupByPlace.collectAsStateWithLifecycle()
+    val currentLang = LanguageController.currentLanguageCode()
+    val versionName = remember(context.packageName) {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+    }
 
     var showCalendarSheet by remember { mutableStateOf(false) }
+    var showDiagnosticsSheet by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         if (uri != null) {
-            val success = BackupManager.exportBackup(context, uri)
-            Toast.makeText(
-                context,
-                if (success) "Záloha byla úspěšně vytvořena" else "Export zálohy selhal",
-                Toast.LENGTH_SHORT
-            ).show()
+            scope.launch {
+                val success = withContext(Dispatchers.IO) {
+                    BackupManager.exportBackup(context, uri)
+                }
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        if (success) R.string.toast_backup_export_success
+                        else R.string.toast_backup_export_failed
+                    ),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
         }
     }
 
@@ -92,14 +108,29 @@ fun SettingsSheet(onClose: () -> Unit) {
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            val success = BackupManager.importBackup(context, uri)
-            Toast.makeText(
-                context,
-                if (success) "Záloha byla úspěšně obnovena" else "Obnovení zálohy selhalo",
-                Toast.LENGTH_SHORT
-            ).show()
+            scope.launch {
+                val success = withContext(Dispatchers.IO) {
+                    BackupManager.importBackup(context, uri)
+                }
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        if (success) R.string.toast_backup_import_success
+                        else R.string.toast_backup_import_failed
+                    ),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
         }
     }
+
+    val themeOptions = listOf(
+        ThemeMode.SYSTEM to stringResource(R.string.theme_system),
+        ThemeMode.LIGHT to stringResource(R.string.theme_light),
+        ThemeMode.DARK to stringResource(R.string.theme_dark),
+        ThemeMode.NEUTRAL to stringResource(R.string.theme_neutral),
+        ThemeMode.GLASS to stringResource(R.string.theme_glass),
+    )
 
     Column(
         modifier = Modifier
@@ -107,8 +138,8 @@ fun SettingsSheet(onClose: () -> Unit) {
             .fillMaxHeight()
     ) {
         SheetHeader(
-            title = "Nastavení",
-            leftText = "Hotovo",
+            title = stringResource(R.string.settings_title),
+            leftText = stringResource(R.string.action_done),
             onLeft = onClose,
         )
 
@@ -119,11 +150,10 @@ fun SettingsSheet(onClose: () -> Unit) {
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // --- SEKCIE 1: VZHLAD ---
             Column {
-                SectionHeader("Vzhled")
+                SectionHeader(stringResource(R.string.settings_appearance))
                 InsetCard {
-                    ThemeMode.entries.forEachIndexed { index, mode ->
+                    themeOptions.forEachIndexed { index, (mode, label) ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -138,7 +168,7 @@ fun SettingsSheet(onClose: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = mode.label,
+                                text = label,
                                 style = GeoType.body,
                                 color = colors.label,
                                 modifier = Modifier.weight(1f),
@@ -152,21 +182,17 @@ fun SettingsSheet(onClose: () -> Unit) {
                                 )
                             }
                         }
-                        if (index != ThemeMode.entries.lastIndex) {
-                            CardDivider()
-                        }
+                        if (index != themeOptions.lastIndex) CardDivider()
                     }
                 }
                 Text(
-                    text = "Widget na ploše se řídí nastavením systému.",
+                    text = stringResource(R.string.widget_appearance_system_note),
                     style = GeoType.caption2,
                     color = colors.secondaryLabel,
                     modifier = Modifier.padding(horizontal = 32.dp, vertical = 6.dp),
                 )
             }
 
-            // --- SEKCIE 1B: JAZYK ---
-            val currentLang by FeatureSettings.appLanguage.collectAsState()
             Column {
                 SectionHeader(stringResource(R.string.settings_language))
                 InsetCard {
@@ -208,7 +234,6 @@ fun SettingsSheet(onClose: () -> Unit) {
                 }
             }
 
-            // --- SEKCIE 2: FUNKCE & TTS ---
             Column {
                 SectionHeader(stringResource(R.string.settings_features))
                 InsetCard {
@@ -220,19 +245,22 @@ fun SettingsSheet(onClose: () -> Unit) {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Číst Připomínky nahlas (TTS)",
+                                text = stringResource(R.string.settings_tts_enable),
                                 style = GeoType.body,
                                 color = colors.label,
                             )
                             Text(
-                                text = "Při spuštění přečte název česky",
+                                text = stringResource(R.string.settings_tts_enable_desc),
                                 style = GeoType.caption,
                                 color = colors.secondaryLabel,
                             )
                         }
                         IOSSwitch(
                             checked = ttsEnabled,
-                            onCheckedChange = { FeatureSettings.setTtsEnabled(context, it) },
+                            onCheckedChange = { enabled ->
+                                FeatureSettings.setTtsEnabled(context, enabled)
+                                if (!enabled) TtsSpeaker.shutdown()
+                            },
                         )
                     }
 
@@ -246,12 +274,12 @@ fun SettingsSheet(onClose: () -> Unit) {
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Číst i celý podtitulek",
+                                    text = stringResource(R.string.settings_tts_full),
                                     style = GeoType.body,
                                     color = colors.label,
                                 )
                                 Text(
-                                    text = "Přečte místo i čas spuštění",
+                                    text = stringResource(R.string.settings_tts_full_desc),
                                     style = GeoType.caption,
                                     color = colors.secondaryLabel,
                                 )
@@ -266,7 +294,7 @@ fun SettingsSheet(onClose: () -> Unit) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .iosClickable {
-                                    TtsSpeaker.speakText(context, "GeoReminder: Toto je ukázka hlasitého čtení připomínek.")
+                                    TtsSpeaker.speakText(context, context.getString(R.string.tts_test_message))
                                 }
                                 .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -279,7 +307,7 @@ fun SettingsSheet(onClose: () -> Unit) {
                             )
                             Spacer(Modifier.size(10.dp))
                             Text(
-                                text = "Vyzkoušet hlasové čtení",
+                                text = stringResource(R.string.settings_tts_test),
                                 style = GeoType.body,
                                 color = colors.accent,
                                 modifier = Modifier.weight(1f),
@@ -302,12 +330,12 @@ fun SettingsSheet(onClose: () -> Unit) {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Seskupit notifikace na stejném místě",
+                                text = stringResource(R.string.settings_group_by_place),
                                 style = GeoType.body,
                                 color = colors.label,
                             )
                             Text(
-                                text = "Více připomínek na jednom místě spojí do jedné notifikace",
+                                text = stringResource(R.string.settings_group_by_place_desc),
                                 style = GeoType.caption,
                                 color = colors.secondaryLabel,
                             )
@@ -320,9 +348,8 @@ fun SettingsSheet(onClose: () -> Unit) {
                 }
             }
 
-            // --- SEKCIE 3: ZÁLOHOVÁNÍ & IMPORT ---
             Column {
-                SectionHeader("Zálohování & Kalendář")
+                SectionHeader(stringResource(R.string.settings_backup))
                 InsetCard {
                     Row(
                         modifier = Modifier
@@ -333,22 +360,35 @@ fun SettingsSheet(onClose: () -> Unit) {
                     ) {
                         Icon(Icons.Filled.CalendarMonth, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.size(10.dp))
-                        Text("Importovat z Google Kalendáře", style = GeoType.body, color = colors.accent, modifier = Modifier.weight(1f))
+                        Text(
+                            stringResource(R.string.settings_import_calendar),
+                            style = GeoType.body,
+                            color = colors.accent,
+                            modifier = Modifier.weight(1f),
+                        )
                         Icon(Icons.Filled.ChevronRight, null, tint = colors.tertiaryLabel, modifier = Modifier.size(20.dp))
                     }
                     CardDivider()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .iosClickable { exportLauncher.launch("georeminder_backup.json") }
+                            .iosClickable { exportLauncher.launch("georeminder_backup.zip") }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.Upload, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.size(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Exportovat zálohu (JSON)", style = GeoType.body, color = colors.accent)
-                            Text("Uloží seznam připomínek a oblíbených do souboru (bez příloh)", style = GeoType.caption, color = colors.secondaryLabel)
+                            Text(
+                                stringResource(R.string.settings_export_backup),
+                                style = GeoType.body,
+                                color = colors.accent,
+                            )
+                            Text(
+                                stringResource(R.string.settings_export_backup_desc),
+                                style = GeoType.caption,
+                                color = colors.secondaryLabel,
+                            )
                         }
                         Icon(Icons.Filled.ChevronRight, null, tint = colors.tertiaryLabel, modifier = Modifier.size(20.dp))
                     }
@@ -356,117 +396,74 @@ fun SettingsSheet(onClose: () -> Unit) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .iosClickable { importLauncher.launch(arrayOf("application/json")) }
+                            .iosClickable {
+                                importLauncher.launch(
+                                    arrayOf("application/zip", "application/json", "application/octet-stream")
+                                )
+                            }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(Icons.Filled.FileDownload, null, tint = colors.accent, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.size(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Importovat zálohu (JSON)", style = GeoType.body, color = colors.accent)
-                            Text("Načte seznam připomínek a oblíbených ze záložního JSONu", style = GeoType.caption, color = colors.secondaryLabel)
+                            Text(
+                                stringResource(R.string.settings_import_backup),
+                                style = GeoType.body,
+                                color = colors.accent,
+                            )
+                            Text(
+                                stringResource(R.string.settings_import_backup_desc),
+                                style = GeoType.caption,
+                                color = colors.secondaryLabel,
+                            )
                         }
                         Icon(Icons.Filled.ChevronRight, null, tint = colors.tertiaryLabel, modifier = Modifier.size(20.dp))
                     }
                 }
             }
 
-            // --- SEKCIE 4: SPOLEHLIVOST & SYSTÉM ---
             Column {
-                SectionHeader("Spolehlivost & Oprávnění")
+                SectionHeader(stringResource(R.string.settings_reliability))
                 InsetCard {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .iosClickable {
-                                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                try { context.startActivity(intent) } catch (_: Exception) {}
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Nastavení notifikací telefonu",
-                            style = GeoType.body,
-                            color = colors.label,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = colors.tertiaryLabel,
-                            modifier = Modifier.size(20.dp),
-                        )
+                    SettingsLinkRow(stringResource(R.string.diagnostics_title)) {
+                        showDiagnosticsSheet = true
                     }
                     CardDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .iosClickable {
-                                val powerManager = context.getSystemService(PowerManager::class.java)
-                                val intent = if (powerManager?.isIgnoringBatteryOptimizations(context.packageName) == false) {
-                                    Intent(
-                                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                        Uri.parse("package:${context.packageName}")
-                                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                } else {
-                                    Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                try { context.startActivity(intent) } catch (_: Exception) {}
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Optimalizace baterie",
-                            style = GeoType.body,
-                            color = colors.label,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = colors.tertiaryLabel,
-                            modifier = Modifier.size(20.dp),
-                        )
+                    SettingsLinkRow(stringResource(R.string.settings_phone_notifications)) {
+                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        try { context.startActivity(intent) } catch (_: Exception) {}
                     }
                     CardDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .iosClickable {
-                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = Uri.fromParts("package", context.packageName, null)
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                try { context.startActivity(intent) } catch (_: Exception) {}
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Všechna oprávnění v Nastavení",
-                            style = GeoType.body,
-                            color = colors.label,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = colors.tertiaryLabel,
-                            modifier = Modifier.size(20.dp),
-                        )
+                    SettingsLinkRow(stringResource(R.string.settings_battery_optimization)) {
+                        val powerManager = context.getSystemService(PowerManager::class.java)
+                        val intent = if (powerManager?.isIgnoringBatteryOptimizations(context.packageName) == false) {
+                            Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:${context.packageName}")
+                            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        } else {
+                            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        try { context.startActivity(intent) } catch (_: Exception) {}
+                    }
+                    CardDivider()
+                    SettingsLinkRow(stringResource(R.string.settings_all_permissions)) {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        try { context.startActivity(intent) } catch (_: Exception) {}
                     }
                 }
             }
 
-            // --- SEKCIE 5: O APLIKACI ---
             Column {
-                SectionHeader("O aplikaci")
+                SectionHeader(stringResource(R.string.settings_app_info))
                 InsetCard {
                     Row(
                         modifier = Modifier
@@ -475,41 +472,27 @@ fun SettingsSheet(onClose: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Verze aplikace",
+                            text = stringResource(R.string.settings_version_label),
                             style = GeoType.body,
                             color = colors.label,
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            text = "v2.5 (Redesign Vytříbený)",
+                            text = stringResource(R.string.settings_version_format, versionName),
                             style = GeoType.subheadline,
                             color = colors.secondaryLabel,
                         )
                     }
                     CardDivider()
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .iosClickable {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/JendaNDT/GeoReminder-Android"))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                try { context.startActivity(intent) } catch (_: Exception) {}
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    SettingsLinkRow(
+                        label = stringResource(R.string.settings_source_code),
+                        accent = true,
                     ) {
-                        Text(
-                            text = "Zdrojový kód na GitHubu",
-                            style = GeoType.body,
-                            color = colors.accent,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = colors.tertiaryLabel,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://github.com/JendaNDT/GeoReminder-Android")
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        try { context.startActivity(intent) } catch (_: Exception) {}
                     }
                 }
             }
@@ -526,5 +509,46 @@ fun SettingsSheet(onClose: () -> Unit) {
         ) {
             CalendarImportSheet(onClose = { showCalendarSheet = false })
         }
+    }
+
+    if (showDiagnosticsSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showDiagnosticsSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = colors.background,
+            shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
+            dragHandle = null,
+        ) {
+            DiagnosticsScreen(onClose = { showDiagnosticsSheet = false })
+        }
+    }
+}
+
+@Composable
+private fun SettingsLinkRow(
+    label: String,
+    accent: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val colors = GeoTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .iosClickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = GeoType.body,
+            color = if (accent) colors.accent else colors.label,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = colors.tertiaryLabel,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }

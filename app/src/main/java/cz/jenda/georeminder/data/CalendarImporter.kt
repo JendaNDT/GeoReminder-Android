@@ -1,72 +1,118 @@
 package cz.jenda.georeminder.data
 
+import android.Manifest
+import android.content.ContentUris
 import android.content.Context
+import android.content.pm.PackageManager
 import android.provider.CalendarContract
+import androidx.core.content.ContextCompat
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 data class CalendarEventItem(
-    val id: Long,
+    val eventId: Long,
+    val instanceKey: String,
     val title: String,
     val startTimeMillis: Long,
+    val endTimeMillis: Long,
     val location: String?,
+    val allDay: Boolean,
 )
 
+sealed interface CalendarLoadResult {
+    data class Success(val events: List<CalendarEventItem>) : CalendarLoadResult
+    data object Empty : CalendarLoadResult
+    data object PermissionDenied : CalendarLoadResult
+    data class Error(val reason: String) : CalendarLoadResult
+}
+
 object CalendarImporter {
-    /** Načte nadcházející události ze systémového kalendáře (příštích 30 dní). */
-    fun getUpcomingEvents(context: Context): List<CalendarEventItem> {
-        val events = mutableListOf<CalendarEventItem>()
-        try {
-            val now = System.currentTimeMillis()
-            val future = now + 30L * 24 * 3600 * 1000 // 30 dní dopředu
+    private const val WINDOW_DAYS = 30L
 
-            val projection = arrayOf(
-                CalendarContract.Events._ID,
-                CalendarContract.Events.TITLE,
-                CalendarContract.Events.DTSTART,
-                CalendarContract.Events.EVENT_LOCATION
-            )
-            val selection = "${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ? AND ${CalendarContract.Events.DELETED} = 0"
-            val selectionArgs = arrayOf(now.toString(), future.toString())
-            val sortOrder = "${CalendarContract.Events.DTSTART} ASC"
-
-            context.contentResolver.query(
-                CalendarContract.Events.CONTENT_URI,
-                projection,
-                selection,
-                selectionArgs,
-                sortOrder
-            )?.use { cursor ->
-                val idIdx = cursor.getColumnIndexOrThrow(CalendarContract.Events._ID)
-                val titleIdx = cursor.getColumnIndexOrThrow(CalendarContract.Events.TITLE)
-                val startIdx = cursor.getColumnIndexOrThrow(CalendarContract.Events.DTSTART)
-                val locIdx = cursor.getColumnIndexOrThrow(CalendarContract.Events.EVENT_LOCATION)
-
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idIdx)
-                    val title = cursor.getString(titleIdx) ?: "Událost"
-                    val start = cursor.getLong(startIdx)
-                    val loc = cursor.getString(locIdx)
-
-                    events.add(CalendarEventItem(id, title, start, loc))
-                }
+    suspend fun getUpcomingEvents(context: Context): CalendarLoadResult =
+        withContext(Dispatchers.IO) {
+            if (
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                return@withContext CalendarLoadResult.PermissionDenied
             }
-        } catch (_: SecurityException) {
-            // Oprávnění READ_CALENDAR nebylo uděleno
-        } catch (_: Exception) {}
 
-        return events
-    }
+            try {
+                val now = System.currentTimeMillis()
+                val future = now + WINDOW_DAYS * 24L * 60L * 60L * 1000L
+                val builder = CalendarContract.Instances.CONTENT_URI.buildUpon()
+                ContentUris.appendId(builder, now)
+                ContentUris.appendId(builder, future)
 
-    /** Převádí událost z kalendáře na Reminder model. */
-    fun toReminder(event: CalendarEventItem): Reminder {
-        return Reminder(
-            title = event.title,
-            kind = ReminderKind.TIME,
-            dueDate = event.startTimeMillis,
-            timeRepeat = TimeRepeat.NEVER,
-            placeName = event.location ?: "",
-        )
-    }
+                val projection = arrayOf(
+                    CalendarContract.Instances.EVENT_ID,
+                    CalendarContract.Instances.TITLE,
+                    CalendarContract.Instances.BEGIN,
+                    CalendarContract.Instances.END,
+                    CalendarContract.Instances.EVENT_LOCATION,
+                    CalendarContract.Instances.ALL_DAY,
+                )
+
+                val cursor = context.contentResolver.query(
+                    builder.build(),
+                    projection,
+                    null,
+                    null,
+                    "${CalendarContract.Instances.BEGIN} ASC",
+                ) ?: return@withContext CalendarLoadResult.Error("null_cursor")
+
+                val untitled = context.getString(R.string.location_no_name)
+                val byInstance = linkedMapOf<String, CalendarEventItem>()
+                cursor.use {
+                    val eventIdIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_ID)
+                    val titleIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.TITLE)
+                    val beginIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.BEGIN)
+                    val endIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.END)
+                    val locationIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_LOCATION)
+                    val allDayIdx = it.getColumnIndexOrThrow(CalendarContract.Instances.ALL_DAY)
+
+                    while (it.moveToNext()) {
+                        val eventId = it.getLong(eventIdIdx)
+                        val begin = it.getLong(beginIdx)
+                        if (begin < now || begin > future) continue
+
+                        val key = sourceKey(eventId, begin)
+                        byInstance[key] = CalendarEventItem(
+                            eventId = eventId,
+                            instanceKey = key,
+                            title = it.getString(titleIdx)?.takeIf { value -> value.isNotBlank() } ?: untitled,
+                            startTimeMillis = begin,
+                            endTimeMillis = it.getLong(endIdx),
+                            location = it.getString(locationIdx)?.takeIf { value -> value.isNotBlank() },
+                            allDay = it.getInt(allDayIdx) != 0,
+                        )
+                    }
+                }
+
+                val events = byInstance.values.sortedBy { it.startTimeMillis }
+                if (events.isEmpty()) CalendarLoadResult.Empty
+                else CalendarLoadResult.Success(events)
+            } catch (_: SecurityException) {
+                CalendarLoadResult.PermissionDenied
+            } catch (e: Exception) {
+                android.util.Log.w("CalendarImporter", "Calendar instances query failed", e)
+                CalendarLoadResult.Error(e.javaClass.simpleName)
+            }
+        }
+
+    fun sourceKey(eventId: Long, beginMillis: Long): String = "$eventId:$beginMillis"
+
+    fun toReminder(event: CalendarEventItem): Reminder = Reminder(
+        title = event.title,
+        kind = ReminderKind.TIME,
+        dueDate = event.startTimeMillis,
+        timeRepeat = TimeRepeat.NEVER,
+        placeName = event.location.orEmpty(),
+        calendarSourceKey = event.instanceKey,
+    )
 }

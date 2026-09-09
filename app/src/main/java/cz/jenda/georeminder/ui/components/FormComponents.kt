@@ -5,7 +5,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,24 +27,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import cz.jenda.georeminder.model.AlertStyle
+import cz.jenda.georeminder.R
 import cz.jenda.georeminder.model.FavoritePlace
 import cz.jenda.georeminder.ui.theme.GeoTheme
 import cz.jenda.georeminder.ui.theme.GeoType
 
-/** Pole pro zadání náznaku / názvu připomínky. */
 @Composable
 fun ReminderTitleInput(
     title: String,
     onTitleChange: (String) -> Unit,
-    placeholder: String = "Co ti mám připomenout?",
+    placeholder: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = GeoTheme.colors
+    val resolvedPlaceholder = placeholder ?: stringResource(R.string.field_title_hint)
     InsetCard(modifier = modifier) {
         Box(
             modifier = Modifier
@@ -54,7 +54,7 @@ fun ReminderTitleInput(
         ) {
             if (title.isEmpty()) {
                 Text(
-                    text = placeholder,
+                    text = resolvedPlaceholder,
                     style = GeoType.body,
                     color = colors.tertiaryLabel,
                 )
@@ -70,7 +70,6 @@ fun ReminderTitleInput(
     }
 }
 
-/** Řada čipů oblíbených míst pod sekcí Kde. */
 @Composable
 fun FavoritePlacesChipsRow(
     favorites: List<FavoritePlace>,
@@ -112,7 +111,6 @@ fun FavoritePlacesChipsRow(
     }
 }
 
-/** Výběr dnů v týdnu pro týdenní opakování (Po–Ne). */
 @Composable
 fun WeekdayChipsRow(
     selectedDays: Set<Int>,
@@ -120,7 +118,24 @@ fun WeekdayChipsRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = GeoTheme.colors
-    val dayLabels = listOf("Po", "Út", "St", "Čt", "Pá", "So", "Ne")
+    val dayLabels = listOf(
+        stringResource(R.string.day_mon),
+        stringResource(R.string.day_tue),
+        stringResource(R.string.day_wed),
+        stringResource(R.string.day_thu),
+        stringResource(R.string.day_fri),
+        stringResource(R.string.day_sat),
+        stringResource(R.string.day_sun),
+    )
+    val fullDayLabels = listOf(
+        stringResource(R.string.day_mon_full),
+        stringResource(R.string.day_tue_full),
+        stringResource(R.string.day_wed_full),
+        stringResource(R.string.day_thu_full),
+        stringResource(R.string.day_fri_full),
+        stringResource(R.string.day_sat_full),
+        stringResource(R.string.day_sun_full),
+    )
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -146,9 +161,7 @@ fun WeekdayChipsRow(
                         role = Role.Checkbox,
                         onValueChange = { onToggleDay(dayIso) },
                     )
-                    .semantics {
-                        contentDescription = "Den $label ${if (selected) "vybrán" else "nevybrán"}"
-                    },
+                    .semantics { contentDescription = fullDayLabels[idx] },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

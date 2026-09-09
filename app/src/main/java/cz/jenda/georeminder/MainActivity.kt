@@ -2,15 +2,17 @@ package cz.jenda.georeminder
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
+import cz.jenda.georeminder.data.LanguageController
 import cz.jenda.georeminder.data.ReminderStore
+import cz.jenda.georeminder.notify.NotificationHelper
 import cz.jenda.georeminder.ui.RootScreen
 import cz.jenda.georeminder.ui.theme.GeoReminderTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     companion object {
         /** Požadavek ze zástupce na ploše: "time" / "location" → otevřít formulář. */
@@ -18,11 +20,19 @@ class MainActivity : ComponentActivity() {
 
         /** Sdílený text s místem (z Map Google apod.) → předvyplnit připomínku. */
         val sharedPlaceText = MutableStateFlow<String?>(null)
+
+        /** Kliknutí na notifikaci → otevřít konkrétní existující připomínku. */
+        val notificationReminderRequest = MutableStateFlow<String?>(null)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        LanguageController.migrateLegacyPreferenceIfNeeded(this)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Při změně per-app locale AppCompat Activity znovu vytvoří, ale Application ne.
+        // Opětovná registrace zachová uživatelská nastavení kanálů a aktualizuje
+        // jejich lokalizované názvy/popisy v systémovém nastavení notifikací.
+        NotificationHelper.createChannel(this)
         ReminderStore.get(this) // zahřátí úložiště
         handleIntent(intent)
         setContent {
@@ -34,11 +44,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
+
+        if (intent.action == NotificationHelper.ACTION_OPEN_REMINDER) {
+            val reminderId = intent.getStringExtra(NotificationHelper.EXTRA_REMINDER_ID)
+                ?.takeIf { it.isNotBlank() }
+                ?: return
+            val token = intent.getStringExtra(NotificationHelper.EXTRA_NOTIFICATION_TOKEN)
+                ?.takeIf { it.isNotBlank() }
+                ?: return
+
+            if (NotificationHelper.consumeInteractionToken(this, reminderId, token)) {
+                notificationReminderRequest.value = reminderId
+            }
+            return
+        }
 
         intent.getStringExtra("shortcut_kind")?.let {
             shortcutRequest.value = it

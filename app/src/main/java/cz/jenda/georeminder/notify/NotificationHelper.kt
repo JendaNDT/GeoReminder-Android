@@ -20,58 +20,58 @@ import cz.jenda.georeminder.model.Reminder
 import cz.jenda.georeminder.model.ReminderKind
 import cz.jenda.georeminder.model.TimeRepeat
 import cz.jenda.georeminder.model.TriggerType
+import java.util.UUID
 
 /**
- * Stavba a zobrazování notifikací s tlačítky „Hotovo" a „Odložit o hodinu".
- * Kanál má IMPORTANCE_HIGH, takže se banner ukáže i při běžící appce
- * (ekvivalent iOS zobrazení v popředí).
+ * Stavba a zobrazování notifikací s tlačítky „Hotovo" a „Odložit".
+ * Každé zobrazení dostává vlastní akční token, takže první interakce atomicky
+ * vyhraje a dvojité/souběžné interakce ze stejné notifikace se ignorují.
  */
 object NotificationHelper {
     const val CHANNEL_ID = "reminders"
     const val CHANNEL_QUIET_ID = "reminders_quiet"
     const val CHANNEL_URGENT_ID = "reminders_urgent"
 
+    const val ACTION_OPEN_REMINDER = "cz.jenda.georeminder.ACTION_OPEN_REMINDER"
     const val ACTION_DONE = "cz.jenda.georeminder.ACTION_DONE"
     const val ACTION_SNOOZE = "cz.jenda.georeminder.ACTION_SNOOZE"
     const val ACTION_SNOOZE_MORNING = "cz.jenda.georeminder.ACTION_SNOOZE_MORNING"
-    // Sdílíme jednu hodnotu se schedulerem, ať se doručování nerozejde.
     const val EXTRA_REMINDER_ID = ReminderScheduler.EXTRA_REMINDER_ID
+    const val EXTRA_NOTIFICATION_TOKEN = "notification_action_token"
 
     fun createChannel(context: Context) {
+        val strings = LanguageController.localizedContext(context)
         val manager = context.getSystemService(NotificationManager::class.java)
 
-        // Výchozí: banner + běžný zvuk
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "Připomínky",
+                strings.getString(R.string.notification_channel_default),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Připomínky na místa a časy"
+                description = strings.getString(R.string.notification_channel_default_desc)
             }
         )
 
-        // Tiché: jen v liště, žádný zvuk ani vyskakování
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_QUIET_ID,
-                "Tiché připomínky",
+                strings.getString(R.string.notification_channel_quiet),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Připomínky bez zvuku"
+                description = strings.getString(R.string.notification_channel_quiet_desc)
                 setSound(null, null)
                 enableVibration(false)
             }
         )
 
-        // Naléhavé: budíkový zvuk (hraje na hlasitost budíku) + silná vibrace
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_URGENT_ID,
-                "Naléhavé připomínky",
+                strings.getString(R.string.notification_channel_urgent),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Důležité připomínky s hlasitým zvukem"
+                description = strings.getString(R.string.notification_channel_urgent_desc)
                 setSound(
                     RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
                     AudioAttributes.Builder()
@@ -91,73 +91,96 @@ object NotificationHelper {
         AlertStyle.URGENT -> CHANNEL_URGENT_ID
     }
 
-    /** Tělo notifikace – s podpora CZ a EN. */
-    fun body(reminder: Reminder): String {
-        val isEn = FeatureSettings.appLanguage.value == LanguageController.LANG_EN
+    fun body(context: Context, reminder: Reminder): String {
+        val strings = LanguageController.localizedContext(context)
+        val locale = LanguageController.localeForContext(strings)
         return when (reminder.kind) {
-            ReminderKind.LOCATION ->
-                if (reminder.trigger == TriggerType.ARRIVE) {
-                    if (isEn) "Arriving at: ${reminder.placeName}" else "Jsi u místa: ${reminder.placeName}"
-                } else {
-                    if (isEn) "Leaving location: ${reminder.placeName}" else "Odjíždíš od místa: ${reminder.placeName}"
-                }
+            ReminderKind.LOCATION -> if (reminder.trigger == TriggerType.ARRIVE) {
+                strings.getString(R.string.notification_arrive_body, reminder.placeName)
+            } else {
+                strings.getString(R.string.notification_leave_body, reminder.placeName)
+            }
+
             ReminderKind.TIME -> {
                 val due = reminder.dueDate
                 if (due == null) "" else when (reminder.timeRepeat) {
-                    TimeRepeat.NEVER -> (if (isEn) "Reminder for " else "Připomínka na ") + CzechFormat.dateTime(due)
-                    TimeRepeat.DAILY -> (if (isEn) "Repeats every day at " else "Opakuje se každý den v ") + CzechFormat.time(due)
-                    TimeRepeat.WEEKLY -> (if (isEn) "Repeats every week: " else "Opakuje se každý týden: ") + CzechFormat.weeklyLabel(due, reminder.weekdays)
+                    TimeRepeat.NEVER -> strings.getString(
+                        R.string.notification_time_once_body,
+                        CzechFormat.dateTimeForLocale(due, locale),
+                    )
+                    TimeRepeat.DAILY -> strings.getString(
+                        R.string.notification_time_daily_body,
+                        CzechFormat.timeForLocale(due, locale),
+                    )
+                    TimeRepeat.WEEKLY -> strings.getString(
+                        R.string.notification_time_weekly_body,
+                        CzechFormat.weeklyLabelForLocale(due, reminder.weekdays, locale),
+                    )
                 }
             }
         }
     }
 
     fun show(context: Context, reminder: Reminder) {
-        val notifId = reminder.id.hashCode()
+        val strings = LanguageController.localizedContext(context)
+        val stateStore = SchedulerStateStore(context)
+        val notifId = stateStore.requestCode(
+            reminder.id,
+            SchedulerStateStore.OFFSET_NOTIFICATION_CONTENT,
+        )
+        val actionToken = UUID.randomUUID().toString()
+        stateStore.setNotificationActionToken(reminder.id, actionToken)
 
         val contentIntent = PendingIntent.getActivity(
             context,
             notifId,
             Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                .setAction(ACTION_OPEN_REMINDER)
+                .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .putExtra(EXTRA_NOTIFICATION_TOKEN, actionToken)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val doneIntent = PendingIntent.getBroadcast(
             context,
-            notifId + 1,
+            stateStore.requestCode(reminder.id, SchedulerStateStore.OFFSET_NOTIFICATION_DONE),
             Intent(context, NotificationActionReceiver::class.java)
                 .setAction(ACTION_DONE)
-                .putExtra(EXTRA_REMINDER_ID, reminder.id),
+                .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .putExtra(EXTRA_NOTIFICATION_TOKEN, actionToken),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val snoozeIntent = PendingIntent.getBroadcast(
             context,
-            notifId + 2,
+            stateStore.requestCode(reminder.id, SchedulerStateStore.OFFSET_NOTIFICATION_SNOOZE),
             Intent(context, NotificationActionReceiver::class.java)
                 .setAction(ACTION_SNOOZE)
-                .putExtra(EXTRA_REMINDER_ID, reminder.id),
+                .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .putExtra(EXTRA_NOTIFICATION_TOKEN, actionToken),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val morningIntent = PendingIntent.getBroadcast(
             context,
-            notifId + 3,
+            stateStore.requestCode(reminder.id, SchedulerStateStore.OFFSET_NOTIFICATION_MORNING),
             Intent(context, NotificationActionReceiver::class.java)
                 .setAction(ACTION_SNOOZE_MORNING)
-                .putExtra(EXTRA_REMINDER_ID, reminder.id),
+                .putExtra(EXTRA_REMINDER_ID, reminder.id)
+                .putExtra(EXTRA_NOTIFICATION_TOKEN, actionToken),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val wearableExtender = NotificationCompat.WearableExtender()
             .setHintHideIcon(false)
+        val notificationBody = body(strings, reminder)
 
         val builder = NotificationCompat.Builder(context, channelFor(reminder.alertStyle))
             .setSmallIcon(R.drawable.ic_stat_pin)
             .setContentTitle(reminder.title)
-            .setContentText(body(reminder))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body(reminder)))
+            .setContentText(notificationBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(notificationBody))
             .setPriority(
                 if (reminder.alertStyle == AlertStyle.QUIET) {
                     NotificationCompat.PRIORITY_LOW
@@ -168,9 +191,9 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
-            .addAction(0, context.getString(R.string.action_done), doneIntent)
-            .addAction(0, context.getString(R.string.action_snooze_hour), snoozeIntent)
-            .addAction(0, context.getString(R.string.action_snooze_morning), morningIntent)
+            .addAction(0, strings.getString(R.string.action_done), doneIntent)
+            .addAction(0, strings.getString(R.string.action_snooze_hour), snoozeIntent)
+            .addAction(0, strings.getString(R.string.action_snooze_morning), morningIntent)
             .extend(wearableExtender)
             .setVibrate(longArrayOf(0, 150, 100, 150))
 
@@ -181,7 +204,6 @@ object NotificationHelper {
 
         val notification = builder.build()
 
-        // Naléhavé: zvuk se opakuje, dokud uživatel notifikaci nezavře
         if (reminder.alertStyle == AlertStyle.URGENT) {
             notification.flags = notification.flags or Notification.FLAG_INSISTENT
         }
@@ -193,20 +215,28 @@ object NotificationHelper {
             // Uživatel nepovolil notifikace – appka to ukazuje oranžovým bannerem.
         }
 
-        // Dožadování: nepotvrzená připomínka se za 5 minut připomene znovu.
-        // Neplánovat, když jsou notifikace vypnuté celé NEBO jen tento kanál –
-        // jinak by neviditelná smyčka budíků běžela donekonečna.
         val channelBlocked = context.getSystemService(NotificationManager::class.java)
             .getNotificationChannel(channelFor(reminder.alertStyle))
             ?.importance == NotificationManager.IMPORTANCE_NONE
         if (reminder.nagging && !reminder.isDone && !channelBlocked &&
             NotificationManagerCompat.from(context).areNotificationsEnabled()
         ) {
-            ReminderScheduler(context).scheduleNag(reminder)
+            ReminderScheduler.get(context).scheduleNag(reminder)
         }
     }
 
+    /** První interakce s konkrétním zobrazením notifikace vyhraje. */
+    fun consumeInteractionToken(context: Context, reminderId: String, token: String): Boolean =
+        SchedulerStateStore(context).consumeNotificationActionToken(reminderId, token)
+
     fun cancel(context: Context, reminderId: String) {
-        NotificationManagerCompat.from(context).cancel(reminderId.hashCode())
+        val stateStore = SchedulerStateStore(context)
+        val manager = NotificationManagerCompat.from(context)
+        manager.cancel(
+            stateStore.requestCode(reminderId, SchedulerStateStore.OFFSET_NOTIFICATION_CONTENT)
+        )
+        // Zrušit i notifikaci vytvořenou verzí <= 2.7, která používala hash ID.
+        manager.cancel(reminderId.hashCode())
+        stateStore.clearNotificationActionToken(reminderId)
     }
 }
